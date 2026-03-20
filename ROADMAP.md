@@ -27,6 +27,9 @@ Each phase is a complete unit:
 - Passes all tests ✓
 - Has working demo ✓
 - Has RESULTS.md ✓
+- Has Kaggle notebook (`notebooks/phaseN_kaggle.ipynb`) ✓
+- Uploads checkpoint to HuggingFace Hub (`UnseenGAP/FLUX`) ✓
+- Writes logs to `logs/phaseN.log` via `PhaseLogger` ✓
 
 ---
 
@@ -49,6 +52,9 @@ phases/phase1/
 ├── test_phase1_test2.py     ← Test: Language agnostic encoding
 ├── test_phase1_test3.py     ← Test: Similar words → similar waves
 └── RESULTS_PHASE_1.md       ← Auto-generated results
+
+notebooks/
+└── phase1_kaggle.ipynb      ← Kaggle notebook: train + test + upload
 ```
 
 ### Acceptance Criteria
@@ -61,6 +67,8 @@ phases/phase1/
 - [ ] All tests pass
 - [ ] Both demos run without error
 - [ ] Checkpoint saved to `checkpoints/phase1.phase.pt`
+- [ ] Checkpoint uploaded to HuggingFace Hub (`UnseenGAP/FLUX`)
+- [ ] Phase log written to `logs/phase1.log`
 
 ### Key Implementation Notes
 ```python
@@ -508,6 +516,42 @@ def load_and_verify(phase_n: int) -> Dict:
     print(f"✓ Phase {phase_n} checkpoint verified")
     return checkpoint
 ```
+
+### Checkpoint Storage
+
+| Location | Contents | Access |
+|---|---|---|
+| `checkpoints/` (local) | `.phase.pt` files | Fastest; gitignored |
+| HuggingFace Hub (`UnseenGAP/FLUX`) | `checkpoints/phaseN.phase.pt` | Persistent cloud backup |
+| HuggingFace Hub (`UnseenGAP/FLUX`) | `logs/phaseN.log` | Training logs |
+| GitHub (`Unseengap/FLUX`) | Code + logs + results | Version controlled |
+
+Checkpoints are uploaded via `upload_checkpoint_to_hf()` after training.
+If a local checkpoint is missing, `load_checkpoint()` automatically falls back to downloading from HuggingFace Hub.
+
+---
+
+## Kaggle Notebook Standard
+
+Every phase notebook (`notebooks/phaseN_kaggle.ipynb`) follows this cell structure:
+
+| Cell | Purpose |
+|---|---|
+| 1 | Clone / pull repo from GitHub |
+| 2 | Install dependencies + `setup.py` |
+| 3 | Init `PhaseLogger`, detect hardware, load `HF_TOKEN` from Kaggle secrets |
+| 4 | Smoke test (build model, verify gradients) |
+| 5 | Training run |
+| 6 | Upload checkpoint to HuggingFace Hub |
+| 7–9 | Run 3 phase tests |
+| 10–11 | Run 2 demos |
+| 12 | Interactive exploration |
+| 13 | View RESULTS_PHASE_N.md |
+| 14 | View full phase log |
+| 15 | Final upload (logs → HF + GitHub) |
+| 16 | Save artifacts to Kaggle output |
+
+Every code cell calls `log.cell_start()` / `log.cell_end()` for persistent logging.
 
 ---
 

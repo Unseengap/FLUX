@@ -12,6 +12,7 @@ flux/
 ├── README.md                    ← You are here
 ├── SPECIFICATION.md             ← Full technical specification
 ├── ROADMAP.md                   ← Phase-by-phase build plan
+├── flux_utils.py                ← Core utilities (checkpoints, logging, HF Hub)
 │
 ├── phases/
 │   ├── phase1/                  ← Continuous Semantic Encoder
@@ -23,12 +24,16 @@ flux/
 │   ├── phase7/                  ← Full FLUX Integration
 │   └── phase8/                  ← Scale & Benchmark vs GPT-2
 │
+├── notebooks/                   ← Kaggle notebooks (one per phase)
+│   └── phase1_kaggle.ipynb      ← Phase 1 complete pipeline
+│
 ├── shared/
 │   ├── utils/                   ← Shared utilities
 │   ├── data/                    ← Dataset loaders
 │   └── eval/                    ← Evaluation harness
 │
 ├── checkpoints/                 ← Saved field snapshots per phase
+├── logs/                        ← Phase logs (phase1.log, phase2.log, ...)
 ├── results/                     ← All RESULTS.md files per phase
 └── demos/                       ← All demo scripts
 ```
@@ -71,6 +76,52 @@ cat RESULTS_PHASE_N.md
 
 ---
 
+## Kaggle Notebook Workflow
+
+Each phase has a Kaggle notebook (`notebooks/phaseN_kaggle.ipynb`) that runs the full pipeline:
+
+1. **Clone / Pull** — Gets latest code from GitHub
+2. **Install & Setup** — Dependencies + directory structure
+3. **Logger Init** — Creates `logs/phaseN.log` (updated every cell)
+4. **Smoke Test** — Verifies component builds and gradients flow
+5. **Train** — Full training run on Kaggle GPU
+6. **Upload Checkpoint** — Saves to HuggingFace Hub (`UnseenGAP/FLUX`)
+7. **Run Tests** — All 3 phase tests with logged results
+8. **Run Demos** — Visualizations + interactive exploration
+9. **Final Upload** — Logs → HuggingFace Hub, logs + results → GitHub
+
+### Secrets Required (Kaggle → Add-ons → Secrets)
+- **`HF_TOKEN`** — HuggingFace write token for checkpoint upload
+
+### Storage
+| Artifact | Location |
+|---|---|
+| Code | GitHub: `Unseengap/FLUX` |
+| Checkpoints | HuggingFace: `UnseenGAP/FLUX` (`checkpoints/`) |
+| Logs | HuggingFace: `UnseenGAP/FLUX` (`logs/`) + GitHub |
+| Results | GitHub: `results/` + `phases/phaseN/RESULTS_PHASE_N.md` |
+
+---
+
+## Logging System
+
+Every phase writes detailed logs to `logs/phaseN.log`:
+
+```
+[2024-01-15 10:30:00] ============================================================
+[2024-01-15 10:30:00] Phase 1: Continuous Semantic Encoder
+[2024-01-15 10:30:00] ============================================================
+[2024-01-15 10:30:01] >>> CELL START: Cell 3 — Hardware & Secrets
+[2024-01-15 10:30:01] [INFO] Device: cuda
+[2024-01-15 10:30:01] [INFO] PyTorch: 2.2.2
+[2024-01-15 10:30:01] [OK]   HuggingFace token loaded
+[2024-01-15 10:30:01] <<< CELL END: Cell 3 — Hardware & Secrets
+```
+
+Logs are uploaded to both HuggingFace Hub and GitHub after training.
+
+---
+
 ## Hardware Requirements
 
 | Phase | Minimum | Recommended |
@@ -101,6 +152,9 @@ cat RESULTS_PHASE_N.md
 4. **Every phase has** at least one `test_phaseN_testX.py`
 5. **Every phase produces** a `RESULTS_PHASE_N.md`
 6. **No phase assumes** a clean state — always load and verify
+7. **Every phase has** a Kaggle notebook (`notebooks/phaseN_kaggle.ipynb`)
+8. **Every phase uploads** checkpoint to HuggingFace Hub
+9. **Every phase logs** to `logs/phaseN.log` via `PhaseLogger`
 
 ---
 
@@ -112,3 +166,6 @@ When using GitHub Copilot to build phases:
 3. Write descriptive function signatures before letting Copilot fill in bodies
 4. After each file, run the phase test before moving on
 5. Commit after every passing test — never lose working state
+6. Use `PhaseLogger` in all notebook cells for persistent logging
+7. Upload checkpoints to HuggingFace Hub after training
+8. Use `flux_utils.py` utilities — never reimplement checkpoint/log management

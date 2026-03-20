@@ -1,27 +1,129 @@
 """
 FLUX Shared Utilities
 Used by all phases. Import from here to avoid duplication.
+
+Includes:
+- Checkpoint management (local + HuggingFace Hub)
+- Phase logging system (phase.log per phase)
+- Hardware detection
+- Results tracking (RESULTS_PHASE_N.md)
+- Forgetting score utility
 """
 
+import os
 import torch
 import json
 import platform
 import subprocess
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 
 # ─────────────────────────────────────────────
-# Checkpoint Management
+# Project Paths
 # ─────────────────────────────────────────────
 
 CHECKPOINT_DIR = Path(__file__).parent / 'checkpoints'
 RESULTS_DIR = Path(__file__).parent / 'results'
+LOGS_DIR = Path(__file__).parent / 'logs'
+
+# HuggingFace Hub settings
+HF_REPO_ID = "UnseenGAP/FLUX"
+GITHUB_REPO_URL = "https://github.com/Unseengap/FLUX.git"
+
+
+# ─────────────────────────────────────────────
+# Phase Logger
+# ─────────────────────────────────────────────
+
+class PhaseLogger:
+    """
+    Persistent logger for a phase. Writes to logs/phaseN.log and prints.
+    Every cell/step appends to the log file so progress is never lost.
+
+    Usage:
+        log = PhaseLogger(phase=1)
+        log.info("Starting training")
+        log.success("Checkpoint saved")
+        log.error("Test failed")
+        log.metric("accuracy", 0.95)
+        log.separator("Training Complete")
+    """
+
+    def __init__(self, phase: int, verbose: bool = True):
+        self.phase = phase
+        self.verbose = verbose
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        self.log_path = LOGS_DIR / f'phase{phase}.log'
+
+        # Write header if new log
+        if not self.log_path.exists():
+            self._write(f"{'='*60}")
+            self._write(f"FLUX Phase {phase} Log")
+            self._write(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            self._write(f"{'='*60}\n")
+
+    def _write(self, msg: str):
+        """Append a line to the log file and optionally print."""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        line = f"[{timestamp}] {msg}"
+        with open(self.log_path, 'a') as f:
+            f.write(line + '\n')
+        if self.verbose:
+            print(line)
+
+    def info(self, msg: str):
+        """Log an informational message."""
+        self._write(f"  ℹ {msg}")
+
+    def success(self, msg: str):
+        """Log a success message."""
+        self._write(f"  ✓ {msg}")
+
+    def warning(self, msg: str):
+        """Log a warning message."""
+        self._write(f"  ⚠ {msg}")
+
+    def error(self, msg: str):
+        """Log an error message."""
+        self._write(f"  ✗ {msg}")
+
+    def metric(self, key: str, value: Any):
+        """Log a metric key-value pair."""
+        self._write(f"  📊 {key}: {value}")
+
+    def separator(self, title: str = ""):
+        """Log a section divider."""
+        if title:
+            self._write(f"\n{'─'*20} {title} {'─'*20}")
+        else:
+            self._write(f"{'─'*60}")
+
+    def cell_start(self, cell_name: str):
+        """Mark the start of a notebook cell execution."""
+        self._write(f"\n▶ CELL: {cell_name}")
+        self._write(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    def cell_end(self, cell_name: str, status: str = "OK"):
+        """Mark the end of a notebook cell execution."""
+        self._write(f"  ◼ CELL {cell_name} — {status}")
+
+    def get_log_contents(self) -> str:
+        """Read the full log file contents."""
+        if self.log_path.exists():
+            return self.log_path.read_text()
+        return ""
+
+
+# ─────────────────────────────────────────────
+# Checkpoint Management (Local + HuggingFace)
+# ─────────────────────────────────────────────
 
 def save_checkpoint(phase: int, state: Dict[str, Any]) -> Path:
     """
-    Save a phase checkpoint with metadata.
+    Save a phase checkpoint locally with metadata.
     Always includes phase number, timestamp, and component list.
     """
     CHECKPOINT_DIR.mkdir(exist_ok=True)
@@ -33,27 +135,43 @@ def save_checkpoint(phase: int, state: Dict[str, Any]) -> Path:
     print(f"✓ Phase {phase} checkpoint saved: {path} ({size_mb:.1f} MB)")
     return path
 
+
 def load_checkpoint(phase: int) -> Dict[str, Any]:
     """
-    Load a phase checkpoint, with verification.
-    Raises clear error if checkpoint missing.
+    Load a phase checkpoint with verification.
+    Tries local first, then downloads from HuggingFace Hub if missing.
     """
     path = CHECKPOINT_DIR / f'phase{phase}.phase.pt'
-    if not path.exists():
-        raise FileNotFoundError(
-            f"Phase {phase} checkpoint not found at {path}\n"
-            f"Run Phase {phase} training first."
+
+    # Try local first
+    if path.exists():
+        state = torch.load(path, map_location='cpu')
+        assert state.get('phase') == phase, (
+            f"Checkpoint phase mismatch: expected {phase}, got {state.get('phase')}"
         )
-    state = torch.load(path, map_location='cpu')
-    assert state.get('phase') == phase, (
-        f"Checkpoint phase mismatch: expected {phase}, got {state.get('phase')}"
+        print(f"✓ Phase {phase} checkpoint loaded (local, {path.stat().st_size/1e6:.1f} MB)")
+        return state
+
+    # Try HuggingFace Hub download
+    print(f"  ℹ Local checkpoint not found, trying HuggingFace Hub...")
+    downloaded = download_checkpoint_from_hf(phase)
+    if downloaded and path.exists():
+        state = torch.load(path, map_location='cpu')
+        assert state.get('phase') == phase
+        print(f"✓ Phase {phase} checkpoint loaded (from HuggingFace Hub)")
+        return state
+
+    raise FileNotFoundError(
+        f"Phase {phase} checkpoint not found at {path}\n"
+        f"Not found on HuggingFace Hub ({HF_REPO_ID}) either.\n"
+        f"Run Phase {phase} training first."
     )
-    print(f"✓ Phase {phase} checkpoint loaded ({path.stat().st_size/1e6:.1f} MB)")
-    return state
+
 
 def checkpoint_exists(phase: int) -> bool:
-    """Check if a phase checkpoint exists."""
+    """Check if a phase checkpoint exists locally."""
     return (CHECKPOINT_DIR / f'phase{phase}.phase.pt').exists()
+
 
 def verify_checkpoint_chain(up_to_phase: int) -> bool:
     """Verify all checkpoints up to the given phase exist."""
@@ -63,6 +181,272 @@ def verify_checkpoint_chain(up_to_phase: int) -> bool:
             return False
         print(f"✓ Phase {p} checkpoint present")
     return True
+
+
+# ─────────────────────────────────────────────
+# HuggingFace Hub Integration
+# ─────────────────────────────────────────────
+
+def upload_checkpoint_to_hf(
+    phase: int,
+    hf_token: Optional[str] = None,
+    repo_id: str = HF_REPO_ID,
+) -> bool:
+    """
+    Upload a phase checkpoint to HuggingFace Hub.
+    Token sourced from: arg > env var HF_TOKEN > Kaggle secrets.
+
+    Args:
+        phase: phase number to upload
+        hf_token: HuggingFace API token (optional, falls back to env/secrets)
+        repo_id: HuggingFace repo ID (default: UnseenGAP/FLUX)
+    Returns:
+        True if upload succeeded
+    """
+    path = CHECKPOINT_DIR / f'phase{phase}.phase.pt'
+    if not path.exists():
+        print(f"  ✗ Cannot upload — Phase {phase} checkpoint not found locally")
+        return False
+
+    token = _resolve_hf_token(hf_token)
+    if not token:
+        print("  ⚠ No HuggingFace token found — skipping upload")
+        print("    Set HF_TOKEN env var, or add to Kaggle secrets")
+        return False
+
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=token)
+
+        # Ensure repo exists (create if not)
+        try:
+            api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
+        except Exception:
+            pass  # Repo likely already exists
+
+        # Upload checkpoint
+        api.upload_file(
+            path_or_fileobj=str(path),
+            path_in_repo=f"checkpoints/phase{phase}.phase.pt",
+            repo_id=repo_id,
+            commit_message=f"Phase {phase} checkpoint — {datetime.now().isoformat()}",
+        )
+        size_mb = path.stat().st_size / 1e6
+        print(f"  ✓ Phase {phase} checkpoint uploaded to HuggingFace Hub ({size_mb:.1f} MB)")
+        print(f"    https://huggingface.co/{repo_id}")
+        return True
+
+    except ImportError:
+        print("  ⚠ huggingface_hub not installed — run: pip install huggingface_hub")
+        return False
+    except Exception as e:
+        print(f"  ✗ HuggingFace upload failed: {e}")
+        return False
+
+
+def download_checkpoint_from_hf(
+    phase: int,
+    hf_token: Optional[str] = None,
+    repo_id: str = HF_REPO_ID,
+) -> bool:
+    """
+    Download a phase checkpoint from HuggingFace Hub.
+
+    Args:
+        phase: phase number to download
+        hf_token: HuggingFace API token (optional)
+        repo_id: HuggingFace repo ID
+    Returns:
+        True if download succeeded
+    """
+    CHECKPOINT_DIR.mkdir(exist_ok=True)
+    dest = CHECKPOINT_DIR / f'phase{phase}.phase.pt'
+
+    token = _resolve_hf_token(hf_token)
+
+    try:
+        from huggingface_hub import hf_hub_download
+        downloaded_path = hf_hub_download(
+            repo_id=repo_id,
+            filename=f"checkpoints/phase{phase}.phase.pt",
+            local_dir=str(CHECKPOINT_DIR.parent),
+            token=token,
+        )
+        print(f"  ✓ Phase {phase} checkpoint downloaded from HuggingFace Hub")
+        return True
+    except ImportError:
+        print("  ⚠ huggingface_hub not installed")
+        return False
+    except Exception as e:
+        print(f"  ℹ Phase {phase} not found on HuggingFace Hub: {e}")
+        return False
+
+
+def upload_logs_to_hf(
+    phase: int,
+    hf_token: Optional[str] = None,
+    repo_id: str = HF_REPO_ID,
+) -> bool:
+    """Upload phase log file to HuggingFace Hub."""
+    log_path = LOGS_DIR / f'phase{phase}.log'
+    if not log_path.exists():
+        return False
+
+    token = _resolve_hf_token(hf_token)
+    if not token:
+        return False
+
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=token)
+        api.upload_file(
+            path_or_fileobj=str(log_path),
+            path_in_repo=f"logs/phase{phase}.log",
+            repo_id=repo_id,
+            commit_message=f"Phase {phase} logs — {datetime.now().isoformat()}",
+        )
+        print(f"  ✓ Phase {phase} logs uploaded to HuggingFace Hub")
+        return True
+    except Exception as e:
+        print(f"  ⚠ Log upload failed: {e}")
+        return False
+
+
+def _resolve_hf_token(token: Optional[str] = None) -> Optional[str]:
+    """
+    Resolve HuggingFace token from multiple sources.
+    Priority: explicit arg > HF_TOKEN env var > Kaggle secrets.
+    """
+    if token:
+        return token
+
+    # Environment variable
+    env_token = os.environ.get('HF_TOKEN')
+    if env_token:
+        return env_token
+
+    # Kaggle secrets
+    try:
+        from kaggle_secrets import UserSecretsClient
+        secrets = UserSecretsClient()
+        kaggle_token = secrets.get_secret("HF_TOKEN")
+        if kaggle_token:
+            return kaggle_token
+    except Exception:
+        pass
+
+    # huggingface-cli login token (cached)
+    try:
+        from huggingface_hub import HfFolder
+        cached = HfFolder.get_token()
+        if cached:
+            return cached
+    except Exception:
+        pass
+
+    return None
+
+
+def save_and_upload_checkpoint(
+    phase: int,
+    state: Dict[str, Any],
+    hf_token: Optional[str] = None,
+) -> Path:
+    """
+    Save checkpoint locally AND upload to HuggingFace Hub.
+    This is the recommended checkpoint save function for notebooks.
+    """
+    path = save_checkpoint(phase, state)
+    upload_checkpoint_to_hf(phase, hf_token=hf_token)
+    return path
+
+
+# ─────────────────────────────────────────────
+# Git Integration (auto-commit logs/results)
+# ─────────────────────────────────────────────
+
+def git_commit_and_push(
+    files: List[str],
+    message: str,
+    repo_dir: Optional[str] = None,
+) -> bool:
+    """
+    Stage files, commit, and push to GitHub.
+    Silently skips if not in a git repo or push fails.
+
+    Args:
+        files: list of file paths (relative to repo root) to stage
+        message: commit message
+        repo_dir: path to git repo root (auto-detected if None)
+    Returns:
+        True if push succeeded
+    """
+    if repo_dir is None:
+        repo_dir = str(Path(__file__).parent)
+
+    try:
+        for f in files:
+            subprocess.run(
+                ['git', 'add', f],
+                cwd=repo_dir, capture_output=True, timeout=10,
+            )
+        subprocess.run(
+            ['git', 'commit', '-m', message],
+            cwd=repo_dir, capture_output=True, timeout=10,
+        )
+        result = subprocess.run(
+            ['git', 'push'],
+            cwd=repo_dir, capture_output=True, timeout=30,
+        )
+        if result.returncode == 0:
+            print(f"  ✓ Git push: {message}")
+            return True
+        else:
+            print(f"  ⚠ Git push failed (non-fatal): {result.stderr.decode()[:100]}")
+            return False
+    except Exception as e:
+        print(f"  ⚠ Git commit/push skipped: {e}")
+        return False
+
+
+def clone_or_pull_repo(
+    repo_url: str = GITHUB_REPO_URL,
+    dest: str = "FLUX",
+) -> str:
+    """
+    Clone the FLUX repo if not present, or pull latest changes.
+    Designed for Kaggle/Colab notebook first-cell usage.
+
+    Args:
+        repo_url: GitHub repository URL
+        dest: destination directory name
+    Returns:
+        Absolute path to the repo directory
+    """
+    dest_path = Path(dest).resolve()
+
+    if dest_path.exists() and (dest_path / '.git').exists():
+        print(f"  ℹ Repo already exists at {dest_path}, pulling latest...")
+        result = subprocess.run(
+            ['git', 'pull', '--ff-only'],
+            cwd=str(dest_path), capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            print(f"  ✓ Pulled latest changes")
+        else:
+            print(f"  ⚠ Pull failed (using existing): {result.stderr[:100]}")
+    else:
+        print(f"  ℹ Cloning {repo_url}...")
+        result = subprocess.run(
+            ['git', 'clone', repo_url, str(dest_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            print(f"  ✓ Cloned to {dest_path}")
+        else:
+            raise RuntimeError(f"Git clone failed: {result.stderr}")
+
+    return str(dest_path)
 
 
 # ─────────────────────────────────────────────

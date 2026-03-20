@@ -30,6 +30,9 @@ The project follows a strict **checkpoint chain** pattern across 8 phases:
 3. **Every phase has** at least one `demo_phaseN_demoX.py` and three `test_phaseN_testX.py` files
 4. **Every phase generates** `RESULTS_PHASE_N.md` via the `PhaseResults` utility
 5. **Checkpoints accumulate** — phase N contains all components from phases 1 through N
+6. **Every phase has** a Kaggle notebook (`notebooks/phaseN_kaggle.ipynb`)
+7. **Every phase uploads** checkpoint to HuggingFace Hub (`UnseenGAP/FLUX`)
+8. **Every phase logs** to `logs/phaseN.log` via `PhaseLogger`
 
 ---
 
@@ -44,14 +47,17 @@ flux/
 │   ├── demo_phaseN_demoM.py # Demo scripts (runnable)
 │   ├── test_phaseN_testM.py # Test scripts (standalone, no pytest)
 │   └── RESULTS_PHASE_N.md   # Auto-generated results
+├── notebooks/
+│   └── phaseN_kaggle.ipynb  # Kaggle notebook for each phase
 ├── shared/
 │   ├── utils/               # Shared utilities
 │   ├── data/                # Dataset loaders
 │   └── eval/                # Evaluation harness
-├── checkpoints/             # Saved .phase.pt files
+├── checkpoints/             # Saved .phase.pt files (gitignored)
+├── logs/                    # Phase logs (phase1.log, phase2.log, ...)
 ├── results/                 # Copies of all RESULTS_PHASE_N.md
 ├── demos/                   # Standalone demo scripts
-├── flux_utils.py            # Core utilities (checkpoint, device, PhaseResults)
+├── flux_utils.py            # Core utilities (checkpoints, logging, HF Hub)
 ├── SPECIFICATION.md         # Full technical specification (source of truth)
 ├── ROADMAP.md               # Phase-by-phase build plan
 └── requirements.txt         # Python dependencies
@@ -341,9 +347,104 @@ When implementing any component, remember these physics-inspired principles:
 
 ## Dependencies
 
-Core stack: `torch>=2.0.0`, `numpy`, `scipy`, `faiss-gpu`, `datasets`, `evaluate`, `matplotlib`, `tensorboard`, `tqdm`, `rich`, `transformers`
+Core stack: `torch>=2.0.0`, `numpy`, `scipy`, `faiss-gpu`, `datasets`, `evaluate`, `matplotlib`, `tensorboard`, `tqdm`, `rich`, `transformers`, `huggingface_hub`
 
 See `requirements.txt` for full pinned versions.
+
+---
+
+## HuggingFace Hub Integration
+
+### Constants
+```python
+HF_REPO_ID = "UnseenGAP/FLUX"          # HuggingFace model repo
+GITHUB_REPO_URL = "https://github.com/Unseengap/FLUX.git"
+```
+
+### Token Resolution
+Always use `_resolve_hf_token()` — never hardcode tokens:
+```python
+from flux_utils import _resolve_hf_token
+token = _resolve_hf_token()
+# Checks: 1. Kaggle secrets  2. HF_TOKEN env var  3. .env file
+```
+
+### Checkpoint Upload
+After training, upload to HuggingFace Hub:
+```python
+from flux_utils import upload_checkpoint_to_hf
+upload_checkpoint_to_hf(phase=1, hf_token=token)
+```
+
+### Checkpoint Loading with Fallback
+`load_checkpoint()` automatically falls back to HuggingFace if local file missing:
+```python
+checkpoint = load_checkpoint(1)  # Tries local, then HF Hub
+```
+
+---
+
+## Logging Conventions
+
+### PhaseLogger
+Every phase uses `PhaseLogger` from `flux_utils.py`:
+
+```python
+from flux_utils import PhaseLogger
+log = PhaseLogger(phase=1)
+
+log.separator("Phase 1: Continuous Semantic Encoder")
+log.cell_start("Cell 3 — Hardware & Secrets")
+log.info("Device: cuda")
+log.success("Checkpoint saved")
+log.warning("Low VRAM")
+log.error("Test failed")
+log.metric("loss", "0.0123")
+log.cell_end("Cell 3 — Hardware & Secrets", "PASS")
+```
+
+### In Kaggle Notebooks
+Every code cell must call:
+```python
+log.cell_start("Cell N — Description")
+# ... cell code ...
+log.cell_end("Cell N — Description", "PASS/FAIL")  # status optional
+```
+
+### Log Upload
+Logs are uploaded to both HuggingFace Hub and GitHub:
+```python
+from flux_utils import upload_logs_to_hf, git_commit_and_push
+upload_logs_to_hf(phase=1, hf_token=token)
+git_commit_and_push(files=['logs/phase1.log'], message='Phase 1 logs')
+```
+
+---
+
+## Kaggle Notebook Conventions
+
+### Standard Cell Structure
+Every phase notebook follows this template:
+1. Clone/pull repo from GitHub
+2. Install deps + setup.py
+3. Init PhaseLogger + detect hardware + load HF_TOKEN from Kaggle secrets
+4. Smoke test
+5. Training
+6. Upload checkpoint to HuggingFace Hub
+7–9. Run 3 tests
+10–11. Run 2 demos
+12. Interactive exploration
+13. View results
+14. View full log
+15. Final upload (logs → HF + GitHub)
+16. Save artifacts to Kaggle output
+
+### Kaggle Secrets
+Add `HF_TOKEN` via Kaggle → Add-ons → Secrets. Accessed via:
+```python
+from kaggle_secrets import UserSecretsClient
+token = UserSecretsClient().get_secret("HF_TOKEN")
+```
 
 ---
 
@@ -353,6 +454,8 @@ See `requirements.txt` for full pinned versions.
 - Use `flux_utils.py` utilities — never reimplement checkpoint management
 - Run `verify_checkpoint_chain(up_to_phase=N)` at the start of each phase
 - Save checkpoints via `save_checkpoint()`, load via `load_checkpoint()`
+- Upload checkpoints via `upload_checkpoint_to_hf()` after training
+- Use `PhaseLogger` for all logging in notebooks and scripts
 - Generate results via `PhaseResults` — never write `RESULTS_PHASE_N.md` manually
 - Check acceptance criteria in `ROADMAP.md` before declaring a phase complete
 - Mark TODO items as `# TODO: Copilot — <description>` for unimplemented methods

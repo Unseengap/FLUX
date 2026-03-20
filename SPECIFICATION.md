@@ -453,6 +453,36 @@ Full model snapshot loadable for inference and continued learning:
 }
 ```
 
+### 3.3 Phase Logs (`logs/phaseN.log`)
+Every phase writes persistent logs via `PhaseLogger`:
+```
+[2024-01-15 10:30:00] ============================================================
+[2024-01-15 10:30:00] Phase 1: Continuous Semantic Encoder
+[2024-01-15 10:30:00] ============================================================
+[2024-01-15 10:30:01] >>> CELL START: Cell 3 — Hardware & Secrets
+[2024-01-15 10:30:01] [INFO] Device: cuda
+[2024-01-15 10:30:01] [OK]   HuggingFace token loaded
+[2024-01-15 10:30:01] <<< CELL END: Cell 3 — Hardware & Secrets
+```
+
+### 3.4 HuggingFace Hub Storage
+Checkpoints and logs are stored on `https://huggingface.co/UnseenGAP/FLUX`:
+```
+UnseenGAP/FLUX/
+├── checkpoints/
+│   ├── phase1.phase.pt
+│   ├── phase2.phase.pt
+│   └── ...
+└── logs/
+    ├── phase1.log
+    ├── phase2.log
+    └── ...
+```
+
+Upload via `upload_checkpoint_to_hf(phase=N, hf_token=token)`.
+Download fallback: `load_checkpoint(N)` auto-downloads from HF Hub if local file missing.
+Token resolution: `_resolve_hf_token()` checks Kaggle secrets, env var, then `.env` file.
+
 ---
 
 ## 4. Evaluation Metrics
@@ -555,4 +585,39 @@ tensorboard>=2.13.0
 tqdm>=4.65.0
 pyyaml>=6.0
 rich>=13.0.0              # Pretty terminal output
+
+# Cloud integration
+huggingface_hub>=0.19.0   # Checkpoint upload/download to HF Hub
 ```
+
+---
+
+## 7. Infrastructure & Workflow
+
+### 7.1 Kaggle Notebook Workflow
+Each phase is trained via a Kaggle notebook (`notebooks/phaseN_kaggle.ipynb`):
+1. Clone/pull repo from GitHub
+2. Install deps + run `setup.py`
+3. Initialize `PhaseLogger(phase=N)` for persistent logging
+4. Load HF token from Kaggle secrets via `_resolve_hf_token()`
+5. Smoke test → Train → Upload checkpoint to HuggingFace Hub
+6. Run all tests and demos
+7. Upload logs to HuggingFace Hub + push to GitHub
+
+### 7.2 Token Resolution
+`_resolve_hf_token()` checks in order:
+1. Kaggle secrets API (`kaggle_secrets.UserSecretsClient`)
+2. `HF_TOKEN` environment variable
+3. `.env` file in project root
+
+### 7.3 Automatic Fallback
+`load_checkpoint(phase)` tries:
+1. Local file at `checkpoints/phaseN.phase.pt`
+2. Download from HuggingFace Hub (`UnseenGAP/FLUX`)
+3. Raises `FileNotFoundError` with actionable message
+
+### 7.4 Git Integration
+`git_commit_and_push(files, message, repo_dir)` auto-commits training artifacts:
+- `logs/phaseN.log` — persistent training log
+- `results/` — results markdown files
+- `phases/phaseN/RESULTS_PHASE_N.md`
