@@ -1,0 +1,10 @@
+# FLUX Project
+checkpoints/
+results/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.png
+*.pt
+.ipynb_checkpoints/
