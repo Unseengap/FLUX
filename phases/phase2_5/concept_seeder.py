@@ -112,7 +112,7 @@ FALLBACK_TRIPLES = [
 
 def load_conceptnet_triples(
     path: Optional[str] = None,
-    max_triples: int = 50000,
+    max_triples: int = 150000,
 ) -> List[Tuple[str, str, str]]:
     """
     Load ConceptNet triples from file or use fallback.
@@ -148,7 +148,11 @@ def _load_from_file(path: str, max_triples: int) -> List[Tuple[str,str,str]]:
                 break
             parts = line.strip().split('\t')
             if len(parts) >= 3:
-                relation = parts[1].split('/')[-1]
+                # Strip '/r/' prefix if present
+                relation = parts[1]
+                if relation.startswith('/r/'):
+                    relation = relation[3:]
+                relation = relation.split('/')[-1]
                 head     = parts[2].split('/')[-1].replace('_', ' ')
                 tail     = parts[3].split('/')[-1].replace('_', ' ') if len(parts) > 3 else parts[2]
                 if relation in EDGE_WEIGHTS:
@@ -164,7 +168,11 @@ def _download_conceptnet_subset(max_triples: int) -> List[Tuple[str,str,str]]:
     for item in ds:
         if len(triples) >= max_triples:
             break
-        rel  = item.get('rel', '').split('/')[-1]
+        rel = item.get('rel', '')
+        # Strip '/r/' prefix if present
+        if rel.startswith('/r/'):
+            rel = rel[3:]
+        rel = rel.split('/')[-1]
         head = item.get('arg1', '').replace('_', ' ').lower()
         tail = item.get('arg2', '').replace('_', ' ').lower()
         if rel in EDGE_WEIGHTS and head and tail:

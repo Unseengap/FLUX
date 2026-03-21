@@ -292,8 +292,8 @@ class CurriculumRunner:
     def run_snli(
         self,
         examples:     Optional[List[Tuple[str,str,str]]] = None,
-        max_examples: int = 500,
-        log_every:    int = 50,
+        max_examples: int = 5000,
+        log_every:    int = 100,
         check_growth: bool = True,
     ) -> Dict:
         """
@@ -398,8 +398,8 @@ class CurriculumRunner:
     def run_gsm8k(
         self,
         problems:     Optional[List[Dict]] = None,
-        max_problems: int = 200,
-        log_every:    int = 20,
+        max_problems: int = 2000,
+        log_every:    int = 50,
         check_growth: bool = True,
     ) -> Dict:
         """
