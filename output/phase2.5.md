@@ -111,3 +111,92 @@
   GSM8K ingested: 1108 problems, 2040 arrows
   ImplicationStore total arrows: 3157
 [10:41:21]   ◼ CELL Cell 9 — GSM8K Curriculum — PASS
+
+
+
+
+
+[11:00:37] 
+▶ CELL: Cell 11 — Test 1: Sparse Field Integrity
+[11:00:37]   Started: 2026-03-21 11:00:37
+============================================================
+  Phase 2.5 Test 1: Sparse Field Integrity
+============================================================
+
+  Test 1: Write → read round-trip...
+  ✓ Write-read round-trip: bit-exact (threshold: cosine_sim > 0.999)
+    ✓ Write-read: OK
+
+  Test 2: Capacity fraction tracking...
+  ✓ Capacity fraction accuracy: 0.0996 (threshold: ≈ 0.0996 (±0.01))
+    ✓ Capacity fraction: 0.0996 (expected 0.0996)
+
+  Test 3: Registry resize migration (8³ → 16³)...
+  FieldRegistry migrated: 8³ → 16³  |  3 → 3 locations
+  ✓ Registry resize migration: 3 → 3 locations, sim > 0.99 (threshold: all locations preserved, features intact)
+    ✓ Migration: 3 → 3 locations
+
+  Test 4: Serialization round-trip...
+  ✓ Serialization round-trip: bit-exact (threshold: all features preserved)
+    ✓ Serialization: OK
+
+  Test 5: Phase 2 weight inheritance...
+✓ Phase 2 checkpoint loaded (local, 545.6 MB)
+  ✓ SpatialProjection weights inherited from Phase 2
+  ✓ wave_to_feature weights inherited from Phase 2
+  ✓ Migrated 3224 Phase 2 attractors to sparse registry
+  ✓ Phase 2 weight inheritance: SP norm=64.80, WF norm=14.28 (threshold: non-zero projection norms)
+    ✓ Inheritance: SP norm=64.80, WF norm=14.28
+  ✓ Runtime < 60s: 0.8s (threshold: < 60s)
+
+  ✓ ALL TESTS PASSED
+
+==================================================
+Phase 2.5 Results saved to: /kaggle/working/FLUX/phases/phase2.5/RESULTS_PHASE_2.5.md
+All tests passed: True
+Ready for Phase 3.5: False
+==================================================
+[11:00:40]   ◼ CELL Cell 11 — Test 1 — PASS
+
+
+[11:00:37] 
+▶ CELL: Cell 11 — Test 1: Sparse Field Integrity
+[11:00:37]   Started: 2026-03-21 11:00:37
+============================================================
+  Phase 2.5 Test 1: Sparse Field Integrity
+============================================================
+
+  Test 1: Write → read round-trip...
+  ✓ Write-read round-trip: bit-exact (threshold: cosine_sim > 0.999)
+    ✓ Write-read: OK
+
+  Test 2: Capacity fraction tracking...
+  ✓ Capacity fraction accuracy: 0.0996 (threshold: ≈ 0.0996 (±0.01))
+    ✓ Capacity fraction: 0.0996 (expected 0.0996)
+
+  Test 3: Registry resize migration (8³ → 16³)...
+  FieldRegistry migrated: 8³ → 16³  |  3 → 3 locations
+  ✓ Registry resize migration: 3 → 3 locations, sim > 0.99 (threshold: all locations preserved, features intact)
+    ✓ Migration: 3 → 3 locations
+
+  Test 4: Serialization round-trip...
+  ✓ Serialization round-trip: bit-exact (threshold: all features preserved)
+    ✓ Serialization: OK
+
+  Test 5: Phase 2 weight inheritance...
+✓ Phase 2 checkpoint loaded (local, 545.6 MB)
+  ✓ SpatialProjection weights inherited from Phase 2
+  ✓ wave_to_feature weights inherited from Phase 2
+  ✓ Migrated 3224 Phase 2 attractors to sparse registry
+  ✓ Phase 2 weight inheritance: SP norm=64.80, WF norm=14.28 (threshold: non-zero projection norms)
+    ✓ Inheritance: SP norm=64.80, WF norm=14.28
+  ✓ Runtime < 60s: 0.8s (threshold: < 60s)
+
+  ✓ ALL TESTS PASSED
+
+==================================================
+Phase 2.5 Results saved to: /kaggle/working/FLUX/phases/phase2.5/RESULTS_PHASE_2.5.md
+All tests passed: True
+Ready for Phase 3.5: False
+==================================================
+[11:00:40]   ◼ CELL Cell 11 — Test 1 — PASS
