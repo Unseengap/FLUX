@@ -115,10 +115,11 @@ def main():
     log.cell_start("Train SanityDecoder")
     import random
     decoder.train()
-    dec_optimizer = torch.optim.Adam(decoder.parameters(), lr=3e-4)
-    NUM_DECODER_EPOCHS = 30
+    dec_optimizer = torch.optim.AdamW(decoder.parameters(), lr=5e-4, weight_decay=1e-4)
+    dec_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(dec_optimizer, T_max=80, eta_min=1e-5)
+    NUM_DECODER_EPOCHS = 80
     best_loss = float('inf')
-    patience, patience_limit = 0, 5
+    patience, patience_limit = 0, 10
 
     for epoch in range(NUM_DECODER_EPOCHS):
         epoch_loss = 0.0
@@ -133,20 +134,21 @@ def main():
             torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1.0)
             dec_optimizer.step()
             epoch_loss += loss.item()
+        dec_scheduler.step()
         avg_loss = epoch_loss / len(cached_pairs)
-        if (epoch + 1) % 5 == 0:
+        if (epoch + 1) % 10 == 0:
             decoder.eval()
             with torch.no_grad():
                 sample_text, sample_feat = cached_pairs[0]
                 sample_out = decoder.decode(sample_feat.to(device))
             decoder.train()
             log.info(f"Decoder epoch {epoch+1}: loss={avg_loss:.4f}, sample='{sample_out[:40]}'")
-        if avg_loss < best_loss - 0.01:
+        if avg_loss < best_loss - 0.005:
             best_loss = avg_loss
             patience = 0
         else:
             patience += 1
-        if patience >= patience_limit and epoch >= 10:
+        if patience >= patience_limit and epoch >= 30:
             log.info(f"Decoder early stop at epoch {epoch+1}")
             break
 
