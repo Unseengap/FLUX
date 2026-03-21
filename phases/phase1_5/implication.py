@@ -4,22 +4,19 @@ ImplicationChain: Stores and propagates learned causal arrows.
 An implication is: knowing A makes B more likely.
 A chain is: A → B → C → D — a sequence of causally linked concepts.
 
-These chains are how FLUX reasons:
+These chains are how FLUX reasons transitively:
     "I know A. A implies B. B implies C. Therefore C is likely."
 
-Unlike classical logic, these implications are PROBABILISTIC and WEIGHTED.
+Unlike classical logic, implications are PROBABILISTIC and WEIGHTED.
 Strong evidence makes the arrow stronger.
 Contradicting evidence weakens or reverses the arrow.
-
-This is the direct precursor to Phase 5's Causal Geometry Nodes —
-the chains built here become the manifold structure of Phase 5.
 """
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor
 from causal_types import CausalArrow
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 import numpy as np
 
 
@@ -39,10 +36,10 @@ class ImplicationChainStore:
         min_strength: float = 0.3,
         device:       str   = 'cuda',
     ):
-        self.causal_dim  = causal_dim
-        self.max_arrows  = max_arrows
+        self.causal_dim   = causal_dim
+        self.max_arrows   = max_arrows
         self.min_strength = min_strength
-        self.device      = device
+        self.device       = device
         self.arrows: List[CausalArrow] = []
 
     def add_arrow(
@@ -62,9 +59,9 @@ class ImplicationChainStore:
             arrow_type: 'temporal', 'logical', 'semantic', 'contradiction'
         """
         if strength < self.min_strength:
-            return  # Too weak to store
+            return
 
-        # Check for existing arrow (reinforce if found)
+        # Check for existing arrow — reinforce if found
         for arrow in self.arrows:
             src = F.normalize(arrow.source_vector.float(), dim=-1)
             new = F.normalize(source.cpu().float(), dim=-1)
@@ -72,7 +69,6 @@ class ImplicationChainStore:
                 tgt_src = F.normalize(arrow.target_vector.float(), dim=-1)
                 tgt_new = F.normalize(target.cpu().float(), dim=-1)
                 if F.cosine_similarity(tgt_src.unsqueeze(0), tgt_new.unsqueeze(0)).item() > 0.9:
-                    # Same arrow — reinforce
                     arrow.evidence_count += 1
                     arrow.strength = min(1.0, arrow.strength + 0.01)
                     return
@@ -98,11 +94,8 @@ class ImplicationChainStore:
         """
         Given a query wave, find all waves that this query implies.
 
-        This is the inference-time reasoning step:
-            "I am currently seeing X. What does X tend to cause?"
-
         Returns:
-            List of (target_vector, effective_strength) sorted by strength
+            List of (target_vector, effective_strength) sorted by strength desc
         """
         if not self.arrows:
             return []
@@ -114,13 +107,11 @@ class ImplicationChainStore:
             src = F.normalize(arrow.source_vector.float(), dim=-1)
             sim = F.cosine_similarity(q.unsqueeze(0), src.unsqueeze(0)).item()
             if sim > 0.5:
-                # Effective strength = arrow strength × similarity × evidence weight
-                evidence_weight  = min(1.0, np.log1p(arrow.evidence_count) / 5.0)
+                evidence_weight    = min(1.0, np.log1p(arrow.evidence_count) / 5.0)
                 effective_strength = arrow.strength * sim * evidence_weight
                 if effective_strength > min_strength:
                     results.append((arrow.target_vector, effective_strength))
 
-        # Sort by effective strength, return top k
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:k]
 
@@ -133,17 +124,13 @@ class ImplicationChainStore:
         """
         Multi-step chain propagation: A → B → C → D.
 
-        Given query A, finds B (what A implies),
-        then finds C (what B implies), up to `depth` steps.
-
-        This is how FLUX reasons transitively:
-            "A implies B. B implies C. Therefore from A we can reach C."
+        This is how FLUX reasons transitively — following arrows
+        that were never seen together in training.
 
         Returns:
-            List of chains, each chain is a list of (vector, strength) tuples
+            List of chains, each chain is list of (vector, strength) tuples
         """
-        # Step 0: start nodes
-        step_0 = [(query, 1.0)]
+        step_0    = [(query, 1.0)]
         all_chains = [[s] for s in step_0]
 
         for _ in range(depth):
@@ -154,7 +141,6 @@ class ImplicationChainStore:
                     last_vec, k=k_per_step, min_strength=0.2
                 )
                 for next_vec, next_str in next_steps:
-                    # Compound strength decreases along chain
                     compound_str = last_str * next_str
                     if compound_str > 0.05:
                         new_chains.append(chain + [(next_vec, compound_str)])
@@ -163,14 +149,13 @@ class ImplicationChainStore:
             else:
                 break
 
-        # Remove the seed — return only discovered steps
         return [chain[1:] for chain in all_chains if len(chain) > 1]
 
     def _prune(self, keep_fraction: float = 0.8):
         """Keep highest-evidence, highest-strength arrows."""
         self.arrows.sort(
             key=lambda a: a.evidence_count * a.strength,
-            reverse=True
+            reverse=True,
         )
         keep_n = int(self.max_arrows * keep_fraction)
         self.arrows = self.arrows[:keep_n]
@@ -182,11 +167,11 @@ class ImplicationChainStore:
         for a in self.arrows:
             by_type[a.arrow_type] = by_type.get(a.arrow_type, 0) + 1
         return {
-            'count':          len(self.arrows),
-            'by_type':        by_type,
-            'mean_strength':  np.mean([a.strength for a in self.arrows]),
-            'max_strength':   max(a.strength for a in self.arrows),
-            'mean_evidence':  np.mean([a.evidence_count for a in self.arrows]),
+            'count':         len(self.arrows),
+            'by_type':       by_type,
+            'mean_strength': float(np.mean([a.strength for a in self.arrows])),
+            'max_strength':  float(max(a.strength for a in self.arrows)),
+            'mean_evidence': float(np.mean([a.evidence_count for a in self.arrows])),
         }
 
     def save(self) -> dict:
