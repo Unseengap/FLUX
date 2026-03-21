@@ -197,3 +197,152 @@ Ready for Phase 4: True
 
 
 
+  ✓ Phase 3 checkpoint downloaded from HuggingFace Hub
+✓ Phase 3 checkpoint loaded (from HuggingFace Hub)
+
+Input                               Reconstructed                     LCS    Tri   Rec
+--------------------------------------------------------------------------------------
+  ✓ the cat sat on the mat            Pa mlnGtumotphthedvtavenps9,  0.77  0.12    Y
+  ✓ hello world                       Except foor~~soheVickClub Ce  0.91  0.00    Y
+  ✓ artificial intelligence           Except foor~~soheVackClub Ce  0.74  0.05    Y
+  ✓ the quick brown fox               Sxnj~~lfoaVy~fyhcei3f:LUtzlz  0.53  0.06    Y
+  ✓ once upon a time                  The gmovrne  ao lodempteeeby  0.94  0.00    Y
+  ✓ machine learning algorithms       Ascthuldimrs wocedvbsCegl wa  0.70  0.08    Y
+  ✓ the ocean covers earth            The gtverwor wouedteakecppds  0.86  0.15    Y
+  ✓ quantum mechanics                 Asaw87h prrvifbsildlkyiwasCr  0.71  0.13    Y
+  ✓ stars are giant plasma balls      Famitsu ebjoyed tad story ,   0.79  0.15    Y
+  ✓ democracy requires participation  Cxccet fwo k~soheVickyrua Ch  0.59  0.00    Y
+  ✓ the sun rises in the east         Ptemltvtiwoopwoh0dvtakenpsds  0.76  0.14    Y
+  ✓ neural networks learn from data   The sacd brs aodlvdeepur one  0.71  0.03    Y
+  ✓ gravity pulls objects together    Exnepttfor ~~sthetic Club me  0.57  0.11    Y
+  ✓ the sky is blue today             The ts tnyr i receaseuin ti,  0.86  0.16    Y
+  ✓ water freezes at zero degrees     FtrSstvemwosy2010dvhaksipper  0.52  0.00    Y
+  ✓ music soothes the soul            Excepttfor ~~sthefic Club me  0.68  0.17    Y
+  ✓ birds fly south in winter         Except forr~~fthctic CLub me  0.64  0.13    Y
+  ✓ computers process binary data     " Machinpryvwas made for man  0.72  0.00    Y
+  ✓ the earth orbits the sun          Pa mly tum tphthes waventst,  0.83  0.25    Y
+  ✓ knowledge is power                752 smckigrs woulddbmpocLowc  0.78  0.00    Y
+
+Result: 20/20 recognizable (need ≥10)
+Avg LCS ratio:     73.03%
+Avg trigram overlap: 8.65%
+✓ PASS
+  ✓ End-to-End Text Reconstruction (honest): 20 (threshold: 10)
+  ✓ Avg LCS Ratio: 0.7303 (threshold: 0.1)
+
+==================================================
+Phase 3 Results saved to: /kaggle/working/FLUX/phases/phase3/RESULTS_PHASE_3.md
+All tests passed: True
+Ready for Phase 4: True
+==================================================
+[23:26:28]   ◼ CELL Cell 10 — Test 4: End-to-End Text Reconstruction — PASS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[23:27:48] 
+▶ CELL: Cell 13 — Demo 3: ★ FIRST TEXT OUTPUT FROM FLUX ★
+[23:27:48]   Started: 2026-03-21 23:27:48
+✓ Phase 1 checkpoint loaded (local, 7.0 MB)
+✓ Phase 2 checkpoint loaded (local, 545.6 MB)
+✓ Phase 3 checkpoint loaded (local, 300.7 MB)
+
+=================================================================
+  ★  FLUX FIRST TEXT OUTPUT — Full Pipeline Demo  ★
+  CSE (Phase 1) → Field (Phase 2) → GR (Phase 3) → Decoder → TEXT
+  [wave identity + field context → text reconstruction]
+=================================================================
+
+Input: 'the cat sat on the mat'
+Reconstructed: 'Pa mlnGtumotphthedvtavenps9,0aJsontpffyh ua6mh rhbimejb" lotteerfaAmlnpotW lGalnys suffeup .oAAvdctshe gdd ,far . wervwishotheoE'
+Char accuracy: 4.5%  LCS ratio: 77.3%  Trigrams: 11.8%
+Recognizable: YES
+  LCS ratio=77.27%  trigram=11.76%  char_acc=4.55%
+
+Input: 'hello world'
+Reconstructed: 'Except foor~~soheVickClub Ceeoings , thI Togan Building rlmamned largelyiunnccupied for almost fifty yeerrland0sufferid sfgnlfic'
+Char accuracy: 0.0%  LCS ratio: 90.9%  Trigrams: 0.0%
+Recognizable: YES
+  LCS ratio=90.91%  trigram=0.00%  char_acc=0.00%
+
+Input: 'artificial intelligence is transforming the world'
+Reconstructed: 'Except Noor~~soheffccCiub Cdoonfgs x the,TegaruBuildicgmalmsmner langelyiunbArmy expaortrlmiml ncIty y epllundbsufferiabgfgayfic'
+Char accuracy: 4.1%  LCS ratio: 53.1%  Trigrams: 6.4%
+Recognizable: YES
+  LCS ratio=53.06%  trigram=6.38%  char_acc=4.08%
+
+Input: 'the quick brown fox jumps over the lazy dog'
+Reconstructed: 'Senj~~7moaVy~kMhbeim :LUStleeRockcuh eheDuowH(sJpiynsoek: ~~i~~~~~~~~ur~~~~~~~~~~h~~~~@-3',aMtselfV, wyj18 4fdtbB.BLttcm iuliC3U'
+Char accuracy: 2.3%  LCS ratio: 48.8%  Trigrams: 0.0%
+Recognizable: YES
+  LCS ratio=48.84%  trigram=0.00%  char_acc=2.33%
+
+Input: 'once upon a time in a land far away'
+Reconstructed: 'FamStpuembjrye010he s try   ahd were warticveased by Ssgl wnhi tie  mpravemw Vslky ia Cplay . Japgnmee.gIm ntssSte Gmme Wis alIm'
+Char accuracy: 14.3%  LCS ratio: 60.0%  Trigrams: 6.5%
+Recognizable: YES
+  LCS ratio=60.00%  trigram=6.45%  char_acc=14.29%
+
+Input: 'stars are giant balls of plasma fusing hydrogen'
+Reconstructed: 'AsMwhth prrvifbs Vdlkyika Cnenamcl p gtmesR,cVaBk dicnChannscles IIIa saaudckoacdw malrur-@dpoucini gmmelwqur tplayird   TfwexuF'
+Char accuracy: 6.4%  LCS ratio: 57.4%  Trigrams: 4.4%
+Recognizable: YES
+  LCS ratio=57.45%  trigram=4.44%  char_acc=6.38%
+
+Input: 'the ocean covers seventy percent of Earth'
+Reconstructed: 'Ttemltveiwos wahedthrkemtperlssdpnpif ehofawnwgrliiu jbuabam pJvitne Tnunddlytrles .rfricsn.sAterrughlu drs,fstatf frverl.ogle a'
+Char accuracy: 9.8%  LCS ratio: 56.1%  Trigrams: 7.9%
+Recognizable: YES
+  LCS ratio=56.10%  trigram=7.89%  char_acc=9.76%
+
+Input: 'knowledge is power'
+Reconstructed: '752 smckigrs woulddbmpocLowc  heheecequaoicasspcyvvldauJdg csSez igiofnwtim ntapsconqserndche.paroleveers gggcydte fa.mswinch ce'
+Char accuracy: 16.7%  LCS ratio: 77.8%  Trigrams: 0.0%
+Recognizable: YES
+  LCS ratio=77.78%  trigram=0.00%  char_acc=16.67%
+
+-----------------------------------------------------------------
+  Input-specificity check (v2 wave-aware decoder):
+-----------------------------------------------------------------
+  Unique outputs: 8/8 (100%)
+  ✓ Decoder is input-specific — different inputs → different outputs
+
+=================================================================
+  ★  MILESTONE: First text output from FLUX demonstrated  ★
+=================================================================
+[23:27:51]   ✓ MILESTONE: First text output demonstrated via full pipeline
+[23:27:51]   ◼ CELL Cell 13 — Demo 3: First Text Output — PASS
