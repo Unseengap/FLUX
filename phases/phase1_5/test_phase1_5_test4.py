@@ -174,18 +174,14 @@ def main():
     print(f"  {'✓' if cse_unchanged else '✗'} CSE output bit-identical: max_diff={max_diff:.2e}")
     print(f"  {'✓' if hash_ok else '✗'} Phase 1 checkpoint unchanged")
 
+    # Write results manually
+    results_dir = ROOT / "phases" / "phase1_5"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    rp = results_dir / "RESULTS_PHASE_1_5.md"
     try:
-        results = PhaseResults(phase=1.5, component_name="CausalWaveChainer")
-    except TypeError:
-        results = PhaseResults(phase=1.5)
-    results.add("CausalWave shape 608", int(shape_608_all), "True", shape_608_all)
-    results.add("Phase2Wave shape 432", int(shape_432_all), "True", shape_432_all)
-    results.add("Field accepts wave", int(field_ok_all), "True", field_ok_all)
-    results.add("Attractor sim > 0.7", mean_sim, "> 0.7", sim_ok_all)
-    results.add("CSE output unchanged", max_diff, "< 1e-6", cse_unchanged)
-    results.add("Phase1 checkpoint hash", int(hash_ok), "unchanged", hash_ok)
-    try:
-        results.save()
+        ex = rp.read_text() if rp.exists() else ""
+        rp.write_text(ex + f"\n## Test 4: Pipeline Integration\n608:{shape_608_all} 432:{shape_432_all} Field:{field_ok_all} Sim:{mean_sim:.4f} CSE:{cse_unchanged} Hash:{hash_ok} Pass:{all_pass}\n")
+        print(f"\n  Results saved to: {rp}")
     except Exception as e:
         print(f"  ℹ Results save: {e}")
 
