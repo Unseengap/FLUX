@@ -66,6 +66,9 @@ def main():
         if read is None:
             read_ok = False
             break
+        # Ensure both tensors are on the same device
+        read = read.to(device)
+        feat = feat.to(device)
         sim = torch.nn.functional.cosine_similarity(
             read.unsqueeze(0), feat.unsqueeze(0)
         ).item()
