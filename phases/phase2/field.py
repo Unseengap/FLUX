@@ -91,25 +91,34 @@ class SpatialProjection(nn.Module):
 
     def __init__(self, wave_dim: int, hidden_dim: int = 64):
         super().__init__()
-        self.net = nn.Sequential(
+        # THREE INDEPENDENT heads — each learns its own mapping
+        # Shared head had one neuron dominate, others collapse
+        self.head_h = nn.Sequential(
             nn.Linear(wave_dim, hidden_dim),
             nn.Tanh(),
-            nn.Linear(hidden_dim, 3),
+            nn.Linear(hidden_dim, 1),
         )
-        # Initialize final layer with larger scale to encourage spread
-        nn.init.uniform_(self.net[-1].weight, -0.5, 0.5)
-        nn.init.zeros_(self.net[-1].bias)
+        self.head_w = nn.Sequential(
+            nn.Linear(wave_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1),
+        )
+        self.head_d = nn.Sequential(
+            nn.Linear(wave_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1),
+        )
+        # Init each head's final layer differently so they diverge early
+        for i, head in enumerate([self.head_h, self.head_w, self.head_d]):
+            nn.init.uniform_(head[-1].weight, -0.5 + i*0.1, 0.5 + i*0.1)
+            nn.init.constant_(head[-1].bias, (i - 1) * 0.3)
 
     def forward(self, wave_vector: Tensor) -> Tensor:
-        """
-        Args:
-            wave_vector: [wave_dim] input wave
-        Returns:
-            [3] coordinates in range (-1, 1) via tanh
-        """
-        # L2 normalize so magnitude doesn't dominate spatial mapping
         v = F.normalize(wave_vector.unsqueeze(0), dim=-1).squeeze(0)
-        return torch.tanh(self.net(v))
+        h = torch.tanh(self.head_h(v))
+        w = torch.tanh(self.head_w(v))
+        d = torch.tanh(self.head_d(v))
+        return torch.cat([h, w, d], dim=-1)
 
 
 # ─────────────────────────────────────────────
