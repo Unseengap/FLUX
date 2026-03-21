@@ -85,10 +85,14 @@ def main():
                       f"max_mass={stats.get('max_mass', 0):.4f}")
 
     # ── Contradict a concept ──
+    # Must project through field's wave_to_feature to get 512-dim vector
+    # (mass tracker stores 512-dim GR feature space, not 432-dim wave space)
     print(f"\n  Contradicting: '{CONTRADICT_TEXT}'")
-    contradict_vec = cse.encode(CONTRADICT_TEXT).full.mean(dim=0).to(device)
+    contradict_wave = cse.encode(CONTRADICT_TEXT).full.mean(dim=0).to(device)
+    with torch.no_grad():
+        contradict_feat = field.wave_to_feature(contradict_wave)  # [432] → [512]
     stats_before = gr.mass_tracker.stats()
-    gr.contradict(contradict_vec, strength=50.0)
+    gr.contradict(contradict_feat, strength=50.0)
     stats_after = gr.mass_tracker.stats()
 
     print(f"    Before: mean_mass={stats_before.get('mean_mass', 0):.4f}, "
