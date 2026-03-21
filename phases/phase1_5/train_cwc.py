@@ -265,6 +265,8 @@ def train(args):
     print(f"  ✓ Implication pairs:   {len(IMPLICATION_PAIRS)}")
 
     # Pre-populate implication store from training pairs
+    # Use force=True to bypass duplicate detection on untrained model
+    # (vectors will spread after training — store is rebuilt at checkpoint time)
     print("\n── Pre-populating Implication Store ──")
     with torch.no_grad():
         for premise, conclusion, strength in IMPLICATION_PAIRS:
@@ -272,7 +274,15 @@ def train(args):
             cw_c = cwc.encode(cse, conclusion)
             src  = cw_p.full.mean(dim=0)
             tgt  = cw_c.full.mean(dim=0)
-            implication_store.add_arrow(src, tgt, strength, 'temporal')
+            # Bypass duplicate check — directly append to store
+            from causal_types import CausalArrow
+            implication_store.arrows.append(CausalArrow(
+                source_vector  = src.detach().cpu(),
+                target_vector  = tgt.detach().cpu(),
+                strength       = strength,
+                evidence_count = 1,
+                arrow_type     = 'temporal',
+            ))
     print(f"  ✓ Implication store: {len(implication_store.arrows)} arrows")
 
     # ── Optimizer ──
@@ -337,20 +347,22 @@ def train(args):
 
         # ── L4: Implication consistency ──
         if step % 3 == 0:
-            i_idx = step % len(IMPLICATION_PAIRS)
-            prem, conc, strength = IMPLICATION_PAIRS[i_idx]
-            # Next implication for chain: A→B→C transitivity
-            i_idx2  = (i_idx + 1) % len(IMPLICATION_PAIRS)
+            i_idx  = step % len(IMPLICATION_PAIRS)
+            prem,  conc,  strength  = IMPLICATION_PAIRS[i_idx]
+            i_idx2 = (i_idx + 1) % len(IMPLICATION_PAIRS)
             prem2, conc2, strength2 = IMPLICATION_PAIRS[i_idx2]
 
+            # CSE is frozen — encode under no_grad, then pass SemanticWave
+            # through CWC (which IS differentiable) to get gradients
             with torch.no_grad():
-                cw_a = cwc.encode(cse, prem)
-                cw_b = cwc.encode(cse, conc)
-                cw_c_imp = cwc.encode(cse, conc2)
-            # Re-encode with grad for loss
-            cw_a_g = cwc.forward(cse.encode(prem) if False else
-                                  __import__('causal_types', fromlist=['CausalWave']) and cw_a)
-            # Simpler: just use the pre-computed CausalWaves directly
+                wave_a    = cse.encode(prem)
+                wave_b    = cse.encode(conc)
+                wave_c_i  = cse.encode(conc2)
+
+            cw_a     = cwc.forward(wave_a)
+            cw_b     = cwc.forward(wave_b)
+            cw_c_imp = cwc.forward(wave_c_i)
+
             l_impl = cwc.implication_consistency_loss(
                 cw_a, cw_b, cw_c_imp,
                 implies_ab=True,
