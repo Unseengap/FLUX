@@ -19,6 +19,24 @@ Edge weight mapping:
     CapableOf:   +0.7  (capability)
     AtLocation:  +0.6  (spatial)
     Antonym:     -1.0  (repulsion — negative mass)
+
+Fix v1.1:
+    The HuggingFace conceptnet5 dataset schema (confirmed from dataset viewer):
+        rel:  '/r/IsA'          — full URI, split('/')[-1] gives 'IsA' ✓
+        arg1: '/c/en/dog/n'     — URI where parts[2] is the concept, NOT parts[-1]
+                                  parts[-1] is the POS tag ('n','v','a') ✗
+        arg2: '/c/en/animal'    — same
+        lang: 'en'              — dedicated field for language filtering
+
+    Two bugs fixed:
+    1. No lang=='en' filter. Dataset is sorted alphabetically by language code
+       (ab, adx, ae, af, ..., en). Without filtering, max_triples is exhausted
+       on non-English Antonym rows before any English IsA/Causes rows appear.
+       This caused arrows_registered=0 in all previous runs.
+
+    2. arg1/arg2 parsed with split('/')[-1] which returns the POS tag ('n')
+       for URIs like /c/en/dog/n instead of the concept word 'dog'.
+       Fixed: take parts[2] for /c/lang/concept[/pos] URIs.
 """
 
 import sys
@@ -53,82 +71,156 @@ EDGE_WEIGHTS = {
 # Bundled minimal ConceptNet triples for offline / fallback use
 FALLBACK_TRIPLES = [
     # Taxonomy
-    ('dog',       'IsA',         'animal'),
-    ('cat',       'IsA',         'animal'),
-    ('bird',      'IsA',         'animal'),
-    ('rose',      'IsA',         'flower'),
-    ('flower',    'IsA',         'plant'),
-    ('plant',     'IsA',         'living thing'),
-    ('car',       'IsA',         'vehicle'),
-    ('truck',     'IsA',         'vehicle'),
-    ('apple',     'IsA',         'fruit'),
-    ('banana',    'IsA',         'fruit'),
-    ('doctor',    'IsA',         'person'),
-    ('teacher',   'IsA',         'person'),
-    ('paris',     'IsA',         'city'),
-    ('france',    'IsA',         'country'),
+    ('dog',        'IsA',         'animal'),
+    ('cat',        'IsA',         'animal'),
+    ('bird',       'IsA',         'animal'),
+    ('rose',       'IsA',         'flower'),
+    ('flower',     'IsA',         'plant'),
+    ('plant',      'IsA',         'living thing'),
+    ('car',        'IsA',         'vehicle'),
+    ('truck',      'IsA',         'vehicle'),
+    ('apple',      'IsA',         'fruit'),
+    ('banana',     'IsA',         'fruit'),
+    ('doctor',     'IsA',         'person'),
+    ('teacher',    'IsA',         'person'),
+    ('paris',      'IsA',         'city'),
+    ('france',     'IsA',         'country'),
+    ('dog',        'IsA',         'mammal'),
+    ('cat',        'IsA',         'mammal'),
+    ('whale',      'IsA',         'mammal'),
+    ('salmon',     'IsA',         'fish'),
+    ('eagle',      'IsA',         'bird'),
+    ('oak',        'IsA',         'tree'),
+    ('table',      'IsA',         'furniture'),
+    ('chair',      'IsA',         'furniture'),
+    ('bus',        'IsA',         'vehicle'),
+    ('train',      'IsA',         'vehicle'),
+    ('red',        'IsA',         'color'),
+    ('monday',     'IsA',         'day'),
     # Causal
-    ('rain',      'Causes',      'wet ground'),
-    ('fire',      'Causes',      'smoke'),
-    ('eating',    'Causes',      'fullness'),
-    ('exercise',  'Causes',      'fatigue'),
-    ('sun',       'Causes',      'warmth'),
-    ('study',     'Causes',      'knowledge'),
+    ('rain',       'Causes',      'wet ground'),
+    ('fire',       'Causes',      'smoke'),
+    ('eating',     'Causes',      'fullness'),
+    ('exercise',   'Causes',      'fatigue'),
+    ('sun',        'Causes',      'warmth'),
+    ('study',      'Causes',      'knowledge'),
+    ('reading',    'Causes',      'knowledge'),
+    ('infection',  'Causes',      'fever'),
+    ('drought',    'Causes',      'famine'),
+    ('practice',   'Causes',      'improvement'),
+    ('wind',       'Causes',      'waves'),
+    ('gravity',    'Causes',      'falling'),
     # Properties
-    ('fire',      'HasProperty', 'hot'),
-    ('ice',       'HasProperty', 'cold'),
-    ('sky',       'HasProperty', 'blue'),
-    ('grass',     'HasProperty', 'green'),
-    ('sugar',     'HasProperty', 'sweet'),
-    ('lemon',     'HasProperty', 'sour'),
+    ('fire',       'HasProperty', 'hot'),
+    ('ice',        'HasProperty', 'cold'),
+    ('sky',        'HasProperty', 'blue'),
+    ('grass',      'HasProperty', 'green'),
+    ('sugar',      'HasProperty', 'sweet'),
+    ('lemon',      'HasProperty', 'sour'),
+    ('rock',       'HasProperty', 'hard'),
+    ('cotton',     'HasProperty', 'soft'),
+    ('gold',       'HasProperty', 'shiny'),
+    ('ocean',      'HasProperty', 'vast'),
+    ('diamond',    'HasProperty', 'hard'),
     # Part of
-    ('wheel',     'PartOf',      'car'),
-    ('branch',    'PartOf',      'tree'),
-    ('finger',    'PartOf',      'hand'),
-    ('page',      'PartOf',      'book'),
+    ('wheel',      'PartOf',      'car'),
+    ('branch',     'PartOf',      'tree'),
+    ('finger',     'PartOf',      'hand'),
+    ('page',       'PartOf',      'book'),
+    ('engine',     'PartOf',      'car'),
+    ('roof',       'PartOf',      'house'),
+    ('chapter',    'PartOf',      'book'),
+    ('petal',      'PartOf',      'flower'),
+    ('wing',       'PartOf',      'bird'),
+    ('nucleus',    'PartOf',      'cell'),
     # Used for
-    ('knife',     'UsedFor',     'cutting'),
-    ('pen',       'UsedFor',     'writing'),
-    ('bed',       'UsedFor',     'sleeping'),
-    ('key',       'UsedFor',     'opening locks'),
+    ('knife',      'UsedFor',     'cutting'),
+    ('pen',        'UsedFor',     'writing'),
+    ('bed',        'UsedFor',     'sleeping'),
+    ('key',        'UsedFor',     'opening locks'),
+    ('hammer',     'UsedFor',     'hitting nails'),
+    ('glasses',    'UsedFor',     'seeing clearly'),
+    ('umbrella',   'UsedFor',     'blocking rain'),
+    ('telescope',  'UsedFor',     'viewing distant objects'),
+    ('microscope', 'UsedFor',     'viewing tiny objects'),
+    ('stove',      'UsedFor',     'cooking food'),
+    # Capable of
+    ('dog',        'CapableOf',   'barking'),
+    ('bird',       'CapableOf',   'flying'),
+    ('fish',       'CapableOf',   'swimming'),
+    ('human',      'CapableOf',   'thinking'),
+    ('computer',   'CapableOf',   'calculating'),
+    ('plant',      'CapableOf',   'photosynthesis'),
+    ('fire',       'CapableOf',   'burning'),
     # Antonyms
-    ('hot',       'Antonym',     'cold'),
-    ('big',       'Antonym',     'small'),
-    ('happy',     'Antonym',     'sad'),
-    ('fast',      'Antonym',     'slow'),
-    ('dark',      'Antonym',     'light'),
-    ('up',        'Antonym',     'down'),
-    ('open',      'Antonym',     'closed'),
-    ('alive',     'Antonym',     'dead'),
-    ('love',      'Antonym',     'hate'),
-    ('truth',     'Antonym',     'lie'),
+    ('hot',        'Antonym',     'cold'),
+    ('big',        'Antonym',     'small'),
+    ('happy',      'Antonym',     'sad'),
+    ('fast',       'Antonym',     'slow'),
+    ('dark',       'Antonym',     'light'),
+    ('up',         'Antonym',     'down'),
+    ('open',       'Antonym',     'closed'),
+    ('alive',      'Antonym',     'dead'),
+    ('love',       'Antonym',     'hate'),
+    ('truth',      'Antonym',     'lie'),
+    ('hard',       'Antonym',     'soft'),
+    ('rich',       'Antonym',     'poor'),
+    ('old',        'Antonym',     'young'),
+    ('strong',     'Antonym',     'weak'),
+    ('empty',      'Antonym',     'full'),
     # Location
-    ('fish',      'AtLocation',  'ocean'),
-    ('books',     'AtLocation',  'library'),
-    ('food',      'AtLocation',  'kitchen'),
-    ('patients',  'AtLocation',  'hospital'),
+    ('fish',       'AtLocation',  'ocean'),
+    ('books',      'AtLocation',  'library'),
+    ('food',       'AtLocation',  'kitchen'),
+    ('patients',   'AtLocation',  'hospital'),
+    ('students',   'AtLocation',  'school'),
+    ('athletes',   'AtLocation',  'stadium'),
+    ('penguins',   'AtLocation',  'antarctica'),
 ]
+
+
+def _parse_concept_uri(uri: str) -> str:
+    """
+    Parse a ConceptNet concept URI to a clean word/phrase.
+
+    URI formats seen in the dataset:
+        /c/en/dog/n        → 'dog'    (take parts[2], not parts[-1]='n')
+        /c/en/hot_dog/n    → 'hot dog'
+        /c/en/be_on_fire   → 'be on fire'
+        /r/IsA             → 'IsA'   (relation URI)
+        dog                → 'dog'   (already clean)
+    """
+    if not uri:
+        return ''
+    parts = uri.strip('/').split('/')
+    # Concept URI: /c/lang/concept[/pos[/sense]]
+    if len(parts) >= 3 and parts[0] == 'c':
+        return parts[2].replace('_', ' ').lower()
+    # Relation URI: /r/IsA
+    if len(parts) >= 2 and parts[0] == 'r':
+        return parts[-1]
+    # Already clean string
+    return uri.replace('_', ' ').lower()
 
 
 def load_conceptnet_triples(
     path: Optional[str] = None,
-    max_triples: int = 150000,
+    max_triples: int = 50000,
 ) -> List[Tuple[str, str, str]]:
     """
-    Load ConceptNet triples from file or use fallback.
+    Load ConceptNet triples from file or download, English-only.
 
     Args:
-        path: path to ConceptNet assertions CSV or JSON, or None for fallback
-        max_triples: maximum triples to load
+        path: path to ConceptNet assertions TSV file, or None to download
+        max_triples: maximum English triples to collect
     Returns:
-        List of (head, relation, tail) string triples
+        List of (head, relation, tail) clean string triples
     """
     if path and Path(path).exists():
         triples = _load_from_file(path, max_triples)
         print(f"  ✓ Loaded {len(triples)} ConceptNet triples from {path}")
         return triples
 
-    # Try downloading a small subset via datasets
     try:
         triples = _download_conceptnet_subset(max_triples)
         print(f"  ✓ Downloaded {len(triples)} ConceptNet triples")
@@ -138,45 +230,84 @@ def load_conceptnet_triples(
         return FALLBACK_TRIPLES
 
 
-def _load_from_file(path: str, max_triples: int) -> List[Tuple[str,str,str]]:
-    """Load triples from a ConceptNet assertions file."""
+def _load_from_file(path: str, max_triples: int) -> List[Tuple[str, str, str]]:
+    """
+    Load from a ConceptNet assertions TSV file.
+    Columns: URI  full_rel  arg1_uri  arg2_uri  weight  ...
+    Filters to English-only by checking /en/ in arg1 URI.
+    """
     triples = []
-    p = Path(path)
-    with open(p) as f:
+    with open(path) as f:
         for line in f:
             if len(triples) >= max_triples:
                 break
             parts = line.strip().split('\t')
-            if len(parts) >= 3:
-                # Strip '/r/' prefix if present
-                relation = parts[1]
-                if relation.startswith('/r/'):
-                    relation = relation[3:]
-                relation = relation.split('/')[-1]
-                head     = parts[2].split('/')[-1].replace('_', ' ')
-                tail     = parts[3].split('/')[-1].replace('_', ' ') if len(parts) > 3 else parts[2]
-                if relation in EDGE_WEIGHTS:
-                    triples.append((head, relation, tail))
+            if len(parts) < 4:
+                continue
+            # Filter English by URI
+            if '/en/' not in parts[2]:
+                continue
+            rel  = _parse_concept_uri(parts[1])
+            head = _parse_concept_uri(parts[2])
+            tail = _parse_concept_uri(parts[3])
+            if rel in EDGE_WEIGHTS and head and tail:
+                triples.append((head, rel, tail))
     return triples
 
 
-def _download_conceptnet_subset(max_triples: int) -> List[Tuple[str,str,str]]:
-    """Download a subset of ConceptNet via HuggingFace datasets."""
+def _download_conceptnet_subset(max_triples: int) -> List[Tuple[str, str, str]]:
+    """
+    Download English ConceptNet triples via HuggingFace datasets.
+
+    Key fixes vs original:
+    1. Filter on lang == 'en' FIRST — the dataset is sorted alphabetically
+       by language so non-English rows dominate the start of the stream.
+    2. Parse arg1/arg2 with _parse_concept_uri which takes parts[2]
+       (the concept slot) rather than parts[-1] (the POS tag).
+    """
     from datasets import load_dataset
+
     ds = load_dataset('conceptnet5', 'conceptnet5', split='train', streaming=True)
-    triples = []
+    triples      = []
+    skipped_lang = 0
+    skipped_rel  = 0
+
     for item in ds:
         if len(triples) >= max_triples:
             break
-        rel = item.get('rel', '')
-        # Strip '/r/' prefix if present
-        if rel.startswith('/r/'):
-            rel = rel[3:]
-        rel = rel.split('/')[-1]
-        head = item.get('arg1', '').replace('_', ' ').lower()
-        tail = item.get('arg2', '').replace('_', ' ').lower()
-        if rel in EDGE_WEIGHTS and head and tail:
+
+        # ── English-only filter using the dedicated 'lang' field ──
+        lang = item.get('lang', '')
+        if lang != 'en':
+            skipped_lang += 1
+            continue
+
+        # ── Relation: /r/IsA → IsA ──
+        rel = _parse_concept_uri(item.get('rel', ''))
+        if rel not in EDGE_WEIGHTS:
+            skipped_rel += 1
+            continue
+
+        # ── Concepts: /c/en/dog/n → dog ──
+        head = _parse_concept_uri(item.get('arg1', ''))
+        tail = _parse_concept_uri(item.get('arg2', ''))
+
+        if head and tail:
             triples.append((head, rel, tail))
+
+        # Progress every 500k items scanned
+        total_seen = len(triples) + skipped_lang + skipped_rel
+        if total_seen % 500_000 == 0 and total_seen > 0:
+            print(
+                f"    Scanned {total_seen:,} → "
+                f"{len(triples):,} EN triples, "
+                f"{skipped_lang:,} non-EN skipped"
+            )
+
+    print(
+        f"  Scan complete: {len(triples):,} EN triples, "
+        f"{skipped_lang:,} non-EN rows skipped"
+    )
     return triples
 
 
@@ -206,7 +337,7 @@ class OntologicalSeeder:
         self.device     = device
 
         self.stats = {
-            'total_seeded':   0,
+            'total_seeded':       0,
             'attractors_created': 0,
             'arrows_registered':  0,
             'antonyms_repelled':  0,
@@ -215,7 +346,7 @@ class OntologicalSeeder:
         }
 
     def _encode_concept(self, text: str) -> Tensor:
-        """Encode a concept through CSE → CWC → mean pool."""
+        """Encode a concept through CSE → CWC → mean pool → [608]."""
         with torch.no_grad():
             wave   = self.cse.encode(text)
             causal = self.cwc.forward(wave)
@@ -229,7 +360,6 @@ class OntologicalSeeder:
     ) -> bool:
         """
         Seed a single ConceptNet triple into the field.
-
         Returns True if successful.
         """
         weight = EDGE_WEIGHTS.get(relation, 0.0)
@@ -241,15 +371,16 @@ class OntologicalSeeder:
             vec_tail = self._encode_concept(tail)
 
             # Use the 432-dim base wave for field perturbation
-            wave_head = self.cse.encode(head).full.mean(dim=0)
-            wave_tail = self.cse.encode(tail).full.mean(dim=0)
+            with torch.no_grad():
+                wave_head = self.cse.encode(head).full.mean(dim=0)
+                wave_tail = self.cse.encode(tail).full.mean(dim=0)
 
             if weight > 0:
                 # Positive relationship: create/reinforce both attractors
                 self.field.perturb(wave_head, strength=abs(weight))
                 self.field.perturb(wave_tail, strength=abs(weight))
 
-                # Register implication arrow
+                # Register implication arrow head → tail
                 self.impl_store.arrows.append(CausalArrow(
                     source_vector  = vec_head.cpu(),
                     target_vector  = vec_tail.cpu(),
@@ -260,44 +391,34 @@ class OntologicalSeeder:
                 self.stats['arrows_registered'] += 1
 
             else:
-                # Antonym: create attractors but apply negative mass
+                # Antonym: create attractors but drive mass negative
                 self.field.perturb(wave_head, strength=0.5)
                 self.field.perturb(wave_tail, strength=0.5)
 
-                # Apply negative mass to head location (repels tail)
                 h, w, d = self.field.wave_to_field_coords(wave_head)
                 current_mass = self.field.registry.get_mass(h, w, d)
-                # Drive mass negative → repulsion
                 self.field.registry._mass[
                     self.field.registry._key(h, w, d)
                 ] = max(-1.0, current_mass - abs(weight) * 0.3)
 
                 self.stats['antonyms_repelled'] += 1
 
-            self.stats['total_seeded']      += 1
+            self.stats['total_seeded']       += 1
             self.stats['attractors_created'] += 2
             return True
 
-        except Exception as e:
+        except Exception:
             return False
 
     def seed_batch(
         self,
-        triples:      List[Tuple[str,str,str]],
+        triples:      List[Tuple[str, str, str]],
         log_every:    int = 100,
         check_growth: bool = True,
         extra_state:  Dict = None,
     ) -> Dict:
         """
         Seed a batch of triples with progress logging and growth monitoring.
-
-        Args:
-            triples:      list of (head, relation, tail)
-            log_every:    log capacity status every N triples
-            check_growth: whether to check for field growth after each batch
-            extra_state:  passed to GrowthManager if growth occurs
-        Returns:
-            stats dict
         """
         print(f"\n  Seeding {len(triples)} ConceptNet triples...")
         print(f"  Field starting capacity: {self.field.registry.capacity_fraction():.1%}")
@@ -341,10 +462,6 @@ class OntologicalSeeder:
         """
         Force the child concept to nest physically within the
         gravitational radius of the parent in the sparse field.
-
-        We achieve this by encoding both, computing the child's
-        target location as a small perturbation of the parent's
-        location, and writing it directly.
         """
         with torch.no_grad():
             wave_parent = self.cse.encode(parent).full.mean(dim=0)
@@ -352,7 +469,6 @@ class OntologicalSeeder:
 
         ph, pw, pd = self.field.wave_to_field_coords(wave_parent)
 
-        # Place child in a small radius around parent
         offset = 2
         ch = min(self.field.h - 1, ph + offset)
         cw = min(self.field.w - 1, pw + offset)

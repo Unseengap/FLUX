@@ -152,18 +152,27 @@ class AnalogicalMapper:
         best_feat, best_sim, best_loc = self.find_analogical_target(va, vb, vc)
 
         if label_index:
-            # Find closest label
+            # Find closest label.
+            # label_index vectors are 608-dim (causal wave).
+            # best_feat is 512-dim (field feature space).
+            # Project label vectors to feature space before comparing.
             best_label = f"[field location {best_loc}]"
             best_label_sim = best_sim
-            for label, lv in label_index.items():
-                lv_n = F.normalize(lv.float().cpu(), dim=-1)
-                bf_n = F.normalize(best_feat.float().cpu(), dim=-1)
-                s = F.cosine_similarity(
-                    lv_n.unsqueeze(0), bf_n.unsqueeze(0)
-                ).item()
-                if s > best_label_sim:
-                    best_label_sim = s
-                    best_label     = label
+            bf_n = F.normalize(best_feat.float().cpu(), dim=-1)  # [512]
+            with torch.no_grad():
+                for label, lv in label_index.items():
+                    # lv is 608-dim causal wave — take base 432 dims and project
+                    lv_base = lv[:self.field.wave_dim].to(
+                        next(self.field.parameters()).device
+                    )
+                    lv_feat = self.field.wave_to_feature(lv_base).detach().cpu()
+                    lv_n = F.normalize(lv_feat.float(), dim=-1)  # [512]
+                    s = F.cosine_similarity(
+                        lv_n.unsqueeze(0), bf_n.unsqueeze(0)
+                    ).item()
+                    if s > best_label_sim:
+                        best_label_sim = s
+                        best_label     = label
             return best_label, best_label_sim
 
         return f"field@{best_loc}", best_sim
