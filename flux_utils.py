@@ -145,7 +145,7 @@ def load_checkpoint(phase: int) -> Dict[str, Any]:
 
     # Try local first
     if path.exists():
-        state = torch.load(path, map_location='cpu')
+        state = torch.load(path, map_location='cpu', weights_only=False)
         assert state.get('phase') == phase, (
             f"Checkpoint phase mismatch: expected {phase}, got {state.get('phase')}"
         )
@@ -156,7 +156,7 @@ def load_checkpoint(phase: int) -> Dict[str, Any]:
     print(f"  ℹ Local checkpoint not found, trying HuggingFace Hub...")
     downloaded = download_checkpoint_from_hf(phase)
     if downloaded and path.exists():
-        state = torch.load(path, map_location='cpu')
+        state = torch.load(path, map_location='cpu', weights_only=False)
         assert state.get('phase') == phase
         print(f"✓ Phase {phase} checkpoint loaded (from HuggingFace Hub)")
         return state
