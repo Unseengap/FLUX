@@ -98,19 +98,20 @@ def main():
     ] * 5
     start_time = time.time()
     gr.train()
-    cached_pairs = []  # Store (text, gr_output) for decoder training
+    cached_triples = []  # Store (text, wave_vec, gr_output) for decoder training
     with torch.no_grad():
         for i, text in enumerate(warmup_texts):
             wave = cse.encode(text)
-            vec  = wave.full.mean(dim=0).to(device)
+            wave_mean = wave.full.mean(dim=0)               # [432] text identity
+            vec  = wave_mean.to(device)
             field_out, _, _ = field.query(vec, k=8)
             gr_out = gr(field_out.unsqueeze(0)).squeeze(0)
-            cached_pairs.append((text, gr_out.detach().clone()))
+            cached_triples.append((text, wave_mean.detach().clone(), gr_out.detach().clone()))
     log.success(f"Warmup complete: {gr.mass_tracker.count} concepts, {time.time()-start_time:.1f}s")
     log.cell_end("GR Warmup", "PASS")
 
     # ─────────────────────────────────────────────
-    # Stage B2: Train SanityDecoder
+    # Stage B2: Train SanityDecoder (wave-aware)
     # ─────────────────────────────────────────────
     log.cell_start("Train SanityDecoder")
     import random
@@ -123,26 +124,27 @@ def main():
 
     for epoch in range(NUM_DECODER_EPOCHS):
         epoch_loss = 0.0
-        indices = list(range(len(cached_pairs)))
+        indices = list(range(len(cached_triples)))
         random.shuffle(indices)
         for idx in indices:
-            text, gr_features = cached_pairs[idx]
+            text, wave_vec, gr_features = cached_triples[idx]
             gr_features = gr_features.to(device)
-            loss = decoder.compute_loss(gr_features, text)
+            wave_vec_d  = wave_vec.to(device)
+            loss = decoder.compute_loss(gr_features, text, wave_vec=wave_vec_d)
             dec_optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1.0)
             dec_optimizer.step()
             epoch_loss += loss.item()
         dec_scheduler.step()
-        avg_loss = epoch_loss / len(cached_pairs)
+        avg_loss = epoch_loss / len(cached_triples)
         if (epoch + 1) % 10 == 0:
             decoder.eval()
             with torch.no_grad():
-                sample_text, sample_feat = cached_pairs[0]
-                sample_out = decoder.decode(sample_feat.to(device))
+                sample_text, sample_wave, sample_feat = cached_triples[0]
+                sample_out = decoder.decode(sample_feat.to(device), wave_vec=sample_wave.to(device))
             decoder.train()
-            log.info(f"Decoder epoch {epoch+1}: loss={avg_loss:.4f}, sample='{sample_out[:40]}'")
+            log.info(f"Decoder epoch {epoch+1}: loss={avg_loss:.4f}, sample='{sample_out[:50]}'")
         if avg_loss < best_loss - 0.005:
             best_loss = avg_loss
             patience = 0

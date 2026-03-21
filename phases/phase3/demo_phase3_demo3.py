@@ -48,12 +48,29 @@ def main():
     print("\n" + "=" * 65)
     print("  ★  FLUX FIRST TEXT OUTPUT — Full Pipeline Demo  ★")
     print("  CSE (Phase 1) → Field (Phase 2) → GR (Phase 3) → Decoder → TEXT")
+    print("  [wave identity + field context → text reconstruction]")
     print("=" * 65)
 
     for text in DEMO_TEXTS:
         result = pipeline_check(cse, field, gr, dec, text, verbose=True)
-        print(f"  char_overlap={result['char_overlap']:.2f}  "
-              f"char_accuracy={result['char_accuracy']:.2f}")
+        print(f"  LCS ratio={result['lcs_ratio']:.2%}  "
+              f"trigram={result['trigram_overlap']:.2%}  "
+              f"char_acc={result['char_accuracy']:.2%}")
+
+    # ── Uniqueness check: different inputs should produce different outputs ──
+    print("\n" + "-" * 65)
+    print("  Input-specificity check (v2 wave-aware decoder):")
+    print("-" * 65)
+    outputs = set()
+    for text in DEMO_TEXTS:
+        result = pipeline_check(cse, field, gr, dec, text, verbose=False)
+        outputs.add(result['reconstructed'][:30])
+    unique_pct = len(outputs) / len(DEMO_TEXTS) * 100
+    print(f"  Unique outputs: {len(outputs)}/{len(DEMO_TEXTS)} ({unique_pct:.0f}%)")
+    if unique_pct >= 75:
+        print(f"  ✓ Decoder is input-specific — different inputs → different outputs")
+    else:
+        print(f"  ✗ Decoder is still collapsing inputs — wave signal may not be working")
 
     print("\n" + "=" * 65)
     print("  ★  MILESTONE: First text output from FLUX demonstrated  ★")
