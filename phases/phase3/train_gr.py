@@ -98,14 +98,61 @@ def main():
     ] * 5
     start_time = time.time()
     gr.train()
+    cached_pairs = []  # Store (text, gr_output) for decoder training
     with torch.no_grad():
-        for text in warmup_texts:
+        for i, text in enumerate(warmup_texts):
             wave = cse.encode(text)
             vec  = wave.full.mean(dim=0).to(device)
             field_out, _, _ = field.query(vec, k=8)
-            gr(field_out.unsqueeze(0))
+            gr_out = gr(field_out.unsqueeze(0)).squeeze(0)
+            cached_pairs.append((text, gr_out.detach().clone()))
     log.success(f"Warmup complete: {gr.mass_tracker.count} concepts, {time.time()-start_time:.1f}s")
     log.cell_end("GR Warmup", "PASS")
+
+    # ─────────────────────────────────────────────
+    # Stage B2: Train SanityDecoder
+    # ─────────────────────────────────────────────
+    log.cell_start("Train SanityDecoder")
+    import random
+    decoder.train()
+    dec_optimizer = torch.optim.Adam(decoder.parameters(), lr=3e-4)
+    NUM_DECODER_EPOCHS = 30
+    best_loss = float('inf')
+    patience, patience_limit = 0, 5
+
+    for epoch in range(NUM_DECODER_EPOCHS):
+        epoch_loss = 0.0
+        indices = list(range(len(cached_pairs)))
+        random.shuffle(indices)
+        for idx in indices:
+            text, gr_features = cached_pairs[idx]
+            gr_features = gr_features.to(device)
+            loss = decoder.compute_loss(gr_features, text)
+            dec_optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1.0)
+            dec_optimizer.step()
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss / len(cached_pairs)
+        if (epoch + 1) % 5 == 0:
+            decoder.eval()
+            with torch.no_grad():
+                sample_text, sample_feat = cached_pairs[0]
+                sample_out = decoder.decode(sample_feat.to(device))
+            decoder.train()
+            log.info(f"Decoder epoch {epoch+1}: loss={avg_loss:.4f}, sample='{sample_out[:40]}'")
+        if avg_loss < best_loss - 0.01:
+            best_loss = avg_loss
+            patience = 0
+        else:
+            patience += 1
+        if patience >= patience_limit and epoch >= 10:
+            log.info(f"Decoder early stop at epoch {epoch+1}")
+            break
+
+    decoder.eval()
+    log.success(f"Decoder trained: final loss={avg_loss:.4f}")
+    log.cell_end("Train SanityDecoder", "PASS")
 
     # ─────────────────────────────────────────────
     # Stage C: End-to-end pipeline check
