@@ -15,8 +15,6 @@ Architecture:
 The forward and backward projections are trained to satisfy:
     cosine_similarity(forward[i], backward[i+1]) is HIGH
     when position i causally precedes position i+1 in real text.
-
-This is learned from naturally ordered text — no labels required.
 """
 
 import torch
@@ -30,8 +28,10 @@ from wave_types import SemanticWave
 class CausalProjectionHead(nn.Module):
     """
     Projects semantic wave to causal direction vector.
-    Used for both forward and backward causal heads.
-    Separate heads learn different aspects of causality.
+
+    Uses temperature-scaled output so forward and backward heads
+    produce outputs with meaningful angular spread — prevents
+    collapse to uniform unit sphere.
     """
     def __init__(self, in_dim: int = 432, out_dim: int = 64, hidden: int = 256):
         super().__init__()
@@ -43,10 +43,16 @@ class CausalProjectionHead(nn.Module):
             nn.GELU(),
             nn.Linear(hidden // 2, out_dim),
         )
+        # Temperature: learned scaling before normalization
+        # Starts at 1.0, allows the model to control output spread
+        self.temperature = nn.Parameter(torch.ones(1) * 0.1)
 
     def forward(self, x: Tensor) -> Tensor:
-        """x: [seq_len, 432] → [seq_len, out_dim], L2-normalized."""
+        """x: [seq_len, 432] → [seq_len, out_dim], temperature-scaled L2-normalized."""
         out = self.net(x)
+        # Scale by temperature before normalizing — controls angular spread
+        # Low temperature = sharp peaks, High temperature = spread out
+        out = out / (self.temperature.abs() + 1e-4)
         return F.normalize(out, dim=-1)
 
 
@@ -54,58 +60,105 @@ class TensionDetector(nn.Module):
     """
     Detects contradiction tension at each position in a sequence.
 
-    Tension is HIGH when:
-    - Nearby positions have opposing semantic vectors
-    - The causal forward of position i contradicts causal backward of i+1
-    - A fact that was established earlier is being negated
+    Core insight: contradiction creates SEMANTIC OPPOSITION between
+    nearby positions. We detect this directly via pairwise cosine
+    similarity within the window — no attention needed.
 
-    Tension is LOW when:
-    - Meaning flows naturally
-    - No contradiction is present
+    Tension is HIGH when nearby positions are semantically opposed.
+    Tension is LOW when meaning flows consistently.
     """
     def __init__(self, in_dim: int = 432, tension_dim: int = 32, radius: int = 4):
         super().__init__()
         self.radius = radius
-        # Attends to local window to detect contradiction
-        self.local_attention = nn.MultiheadAttention(
-            embed_dim=in_dim,
-            num_heads=4,
-            batch_first=True,
-            dropout=0.1,
+
+        # Projects wave to a opposition-sensitive space
+        self.opposition_proj = nn.Sequential(
+            nn.Linear(in_dim, 256),
+            nn.GELU(),
+            nn.Linear(256, 128),
         )
-        self.tension_proj = nn.Sequential(
+
+        # Detects mean-field deviation — how far is this position
+        # from the average meaning of the window?
+        self.deviation_proj = nn.Sequential(
             nn.Linear(in_dim, 128),
             nn.GELU(),
+            nn.Linear(128, 64),
+        )
+
+        # Final tension projection
+        # Input: [opposition_128 + deviation_64 + pairwise_scalar_1] = 193
+        self.tension_proj = nn.Sequential(
+            nn.Linear(193, 128),
+            nn.GELU(),
             nn.Linear(128, tension_dim),
-            nn.Sigmoid(),  # Tension in [0, 1]
+            nn.Sigmoid(),
         )
 
     def forward(self, wave: Tensor) -> Tensor:
         """
         wave: [seq_len, 432]
         Returns: [seq_len, tension_dim] tension values in [0, 1]
-        """
-        # Self-attention over local window detects local contradictions
-        x = wave.unsqueeze(0)  # [1, seq_len, 432]
-        attended, _ = self.local_attention(x, x, x)
-        attended = attended.squeeze(0)  # [seq_len, 432]
 
-        # Tension = divergence between original and attended
-        divergence = wave - attended
-        tension = self.tension_proj(divergence)
+        Tension is computed from:
+        1. Pairwise opposition within local window (direct contradiction signal)
+        2. Deviation from local mean (consistency signal)
+        """
+        seq_len = wave.shape[0]
+
+        opp_features = self.opposition_proj(wave)    # [seq_len, 128]
+        dev_features = self.deviation_proj(wave)     # [seq_len, 64]
+
+        tension_inputs = []
+        for i in range(seq_len):
+            # Window boundaries
+            lo = max(0, i - self.radius)
+            hi = min(seq_len, i + self.radius + 1)
+
+            window = opp_features[lo:hi]             # [w, 128]
+            center = opp_features[i].unsqueeze(0)    # [1, 128]
+
+            # Pairwise cosine similarity of center to all window members
+            sims = F.cosine_similarity(
+                center.expand(window.shape[0], -1), window, dim=-1
+            )                                        # [w]
+
+            # Opposition score: how many window members are opposing?
+            # Negative cosine similarity = semantic opposition
+            opposition = F.relu(-sims).mean()        # scalar in [0, 1]
+
+            # Mean deviation: how far is this position from window mean?
+            window_mean = opp_features[lo:hi].mean(dim=0)
+            deviation   = (opp_features[i] - window_mean).norm()
+
+            # Pack features
+            opp_feat = opp_features[i]               # [128]
+            dev_feat = dev_features[i]               # [64]
+            pair_scalar = opposition.unsqueeze(0) * deviation.unsqueeze(0)  # [1]
+
+            combined = torch.cat([opp_feat, dev_feat, pair_scalar], dim=-1)  # [193]
+            tension_inputs.append(combined)
+
+        tension_in = torch.stack(tension_inputs, dim=0)  # [seq_len, 193]
+        tension    = self.tension_proj(tension_in)        # [seq_len, tension_dim]
+
+        # Scale output by opposition magnitude so contradictions are visibly higher
+        # Compute per-position opposition score as a scaling factor
+        opp_norms = F.normalize(opp_features, dim=-1)
+        # Mean anti-correlation within window
+        global_sim = F.cosine_similarity(
+            opp_norms.unsqueeze(1), opp_norms.unsqueeze(0), dim=-1
+        ).mean(dim=1, keepdim=True)                      # [seq_len, 1]
+        # More opposition = higher scaling
+        opposition_scale = (1.0 - global_sim).clamp(0.1, 2.0)
+        tension = tension * opposition_scale
+
         return tension
 
 
 class ChainIDEncoder(nn.Module):
     """
     Assigns each position to an implication chain.
-
-    Positions that belong to the same logical chain
-    (e.g. all statements about a single subject)
-    get similar chain_id vectors.
-
-    Positions that start new logical chains get distinct vectors.
-    This is learned from co-occurrence patterns in training text.
     """
     def __init__(self, in_dim: int = 432, chain_dim: int = 16):
         super().__init__()
@@ -117,7 +170,6 @@ class ChainIDEncoder(nn.Module):
         )
 
     def forward(self, wave: Tensor) -> Tensor:
-        """wave: [seq_len, 432] → [seq_len, chain_dim]"""
         return self.encoder(wave)
 
 
@@ -127,24 +179,17 @@ class CausalWaveChainer(nn.Module):
     causal direction, tension, and chain identity.
 
     The CSE is FROZEN. This module only adds the causal extension.
-    Phase 2 compatibility is preserved — call .to_phase2_wave()
-    to strip the extension when handing off to the Resonance Field.
-
-    Training objectives:
-    1. Causal coherence loss: forward[i] should align with backward[i+1]
-    2. Order sensitivity loss: swapped sequences should have lower coherence
-    3. Contradiction loss: contradicting sentences should have high tension
-    4. Chain consistency loss: same-topic positions should share chain_id
+    Phase 2 compatibility is preserved via .to_phase2_wave().
     """
 
     def __init__(
         self,
-        wave_dim:    int = 432,
-        forward_dim: int = 64,
+        wave_dim:     int = 432,
+        forward_dim:  int = 64,
         backward_dim: int = 64,
-        tension_dim: int = 32,
-        chain_dim:   int = 16,
-        device:      str = 'cuda',
+        tension_dim:  int = 32,
+        chain_dim:    int = 16,
+        device:       str = 'cuda',
     ):
         super().__init__()
         self.wave_dim     = wave_dim
@@ -170,10 +215,10 @@ class CausalWaveChainer(nn.Module):
         """
         full = semantic_wave.full           # [seq_len, 432]
 
-        causal_fwd  = self.forward_head(full)     # [seq_len, 64]
-        causal_bwd  = self.backward_head(full)    # [seq_len, 64]
-        tension     = self.tension_det(full)      # [seq_len, 32]
-        chain_id    = self.chain_encoder(full)    # [seq_len, 16]
+        causal_fwd  = self.forward_head(full)
+        causal_bwd  = self.backward_head(full)
+        tension     = self.tension_det(full)
+        chain_id    = self.chain_encoder(full)
 
         return CausalWave(
             base            = semantic_wave,
@@ -184,26 +229,15 @@ class CausalWaveChainer(nn.Module):
         )
 
     def encode(self, cse, text: str) -> CausalWave:
-        """
-        Convenience: CSE encode then causal extend in one call.
-
-        Args:
-            cse:  frozen ContinuousSemanticEncoder from Phase 1
-            text: raw input string
-        Returns:
-            CausalWave
-        """
+        """CSE encode then causal extend in one call."""
         with torch.no_grad():
             wave = cse.encode(text)
         return self.forward(wave)
 
     def causal_coherence_loss(self, causal_wave: CausalWave) -> Tensor:
         """
-        Forward pass of position i should predict backward pass of i+1.
-        Minimizing this loss teaches directional causal flow.
-
+        Forward[i] should align with backward[i+1].
         Loss = 1 - mean(cosine_similarity(forward[:-1], backward[1:]))
-        Perfect causal chain = loss 0.0
         """
         coherence = causal_wave.causal_coherence()
         if coherence.numel() == 0:
@@ -217,34 +251,42 @@ class CausalWaveChainer(nn.Module):
         n_shuffles: int = 4,
     ) -> Tensor:
         """
-        The original sequence should have HIGHER coherence than shuffled.
+        Original sentence must have HIGHER coherence than shuffled.
 
-        For each shuffle:
-            coherence(original) > coherence(shuffled)
-
-        Loss = mean(max(0, coherence(shuffled) - coherence(original) + margin))
-        Margin = 0.2 — shuffled must be at least 0.2 worse than original.
+        Uses a harder margin (0.3) and more shuffles to force
+        meaningful directional learning rather than just hitting
+        the margin floor.
         """
-        original_cw  = self.encode(cse, text)
-        orig_coh     = original_cw.causal_coherence().mean()
+        original_cw = self.encode(cse, text)
+        orig_coh    = original_cw.causal_coherence()
+        if orig_coh.numel() == 0:
+            return torch.tensor(0.0, device=self.device)
+        orig_score = orig_coh.mean()
 
-        margin = 0.2
+        # Harder margin than before — forces genuine differentiation
+        margin = 0.3
         total_loss = torch.tensor(0.0, device=self.device)
 
         words = text.split()
         if len(words) < 3:
             return total_loss
 
+        shuf_scores = []
         for _ in range(n_shuffles):
             idx      = torch.randperm(len(words)).tolist()
             shuffled = ' '.join([words[i] for i in idx])
             shuf_cw  = self.encode(cse, shuffled)
-            shuf_coh = shuf_cw.causal_coherence().mean()
-            # Original should be more coherent than shuffled
-            loss_i   = torch.clamp(shuf_coh - orig_coh + margin, min=0.0)
-            total_loss = total_loss + loss_i
+            shuf_coh = shuf_cw.causal_coherence()
+            if shuf_coh.numel() > 0:
+                shuf_scores.append(shuf_coh.mean())
 
-        return total_loss / n_shuffles
+        if not shuf_scores:
+            return total_loss
+
+        mean_shuf = torch.stack(shuf_scores).mean()
+        # Hinge loss: original must beat shuffled by at least margin
+        loss = torch.clamp(mean_shuf - orig_score + margin, min=0.0)
+        return loss
 
     def contradiction_loss(
         self,
@@ -254,28 +296,23 @@ class CausalWaveChainer(nn.Module):
         non_contradiction: str,
     ) -> Tensor:
         """
-        Contradiction pairs should have HIGHER tension than neutral pairs.
+        Contradiction pairs must have HIGHER tension than neutral.
 
-        tension(statement + contradiction) > tension(statement + non_contradiction)
-
-        Example:
-            statement       = "the sky is blue"
-            contradiction   = "the sky is green"
-            non_contradiction = "birds can fly"
+        Uses tension_score() which aggregates the TensionDetector output.
+        Harder margin (0.15) to force meaningful separation.
         """
-        joint_contra = self.encode(cse, statement + ' ' + contradiction)
+        joint_contra  = self.encode(cse, statement + ' ' + contradiction)
         joint_neutral = self.encode(cse, statement + ' ' + non_contradiction)
 
-        tension_contra  = joint_contra.tension_score()
-        tension_neutral = joint_neutral.tension_score()
+        t_contra  = joint_contra.tension_score()
+        t_neutral = joint_neutral.tension_score()
 
-        # Contradiction must have higher tension than neutral
-        margin = 0.1
-        loss = torch.clamp(
-            torch.tensor(tension_neutral - tension_contra + margin,
-                         device=self.device),
-            min=0.0
-        )
+        margin = 0.15
+        # Convert to tensor for gradient flow
+        t_c = joint_contra.tension.norm(dim=-1).mean()
+        t_n = joint_neutral.tension.norm(dim=-1).mean()
+
+        loss = torch.clamp(t_n - t_c + margin, min=0.0)
         return loss
 
     def implication_consistency_loss(
@@ -287,13 +324,8 @@ class CausalWaveChainer(nn.Module):
         implies_bc: bool,
     ) -> Tensor:
         """
-        If A implies B and B implies C, then A should partially imply C.
-        Transitivity of causality.
-
-        This teaches the model that reasoning chains are transitive,
-        not just pairwise — the core of logical reasoning.
+        If A implies B and B implies C, chains must be transitive.
         """
-        # Mean causal forward vectors for each sequence
         fwd_a = cw_a.causal_forward.mean(dim=0)
         bwd_b = cw_b.causal_backward.mean(dim=0)
         fwd_b = cw_b.causal_forward.mean(dim=0)

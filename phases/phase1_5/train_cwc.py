@@ -289,8 +289,8 @@ def train(args):
     optimizer = Adam(cwc.parameters(), lr=3e-4, weight_decay=1e-5)
     scheduler = CosineAnnealingLR(optimizer, T_max=steps, eta_min=1e-5)
 
-    # Loss weights
-    λ1, λ2, λ3, λ4 = 1.0, 0.5, 0.3, 0.2
+    # Loss weights — order and contradiction boosted to break collapse
+    λ1, λ2, λ3, λ4 = 1.0, 2.0, 1.5, 0.2
 
     # ── Training loop ──
     print(f"\n── Training for {steps} steps ──\n")
@@ -463,7 +463,9 @@ def train(args):
         'phase1_hash_unchanged':  hash_ok,
     }
     save_checkpoint(1.5, ckpt_data)
+    # Also save explicitly to the underscore path the notebook expects
     ckpt_path = ROOT / 'checkpoints' / 'phase1_5.phase.pt'
+    torch.save(ckpt_data, str(ckpt_path))
     size_mb = ckpt_path.stat().st_size / 1e6 if ckpt_path.exists() else 0
     print(f"✓ Phase 1.5 checkpoint saved: {ckpt_path} ({size_mb:.1f} MB)")
 
