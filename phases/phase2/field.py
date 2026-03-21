@@ -13,6 +13,13 @@ State, energy, and mass are register_buffers (not nn.Parameters) because
 they are updated by physics (perturbation + settling), not by gradient
 descent. Only the projection layers (wave_to_location, wave_to_feature)
 require gradients during the brief warmup phase.
+
+FIX v2.1: Spatial topology collapse resolved.
+  - wave_to_field_coords now uses tanh + normalized input for better spread
+  - wave_to_location upgraded from Linear(432→3) to a 2-layer MLP
+    so it has enough capacity to learn diverse spatial mappings
+  - Input wave is L2-normalized before coordinate projection so that
+    scale variance doesn't dominate the mapping
 """
 
 import torch
@@ -64,6 +71,48 @@ class FieldLocation:
 
 
 # ─────────────────────────────────────────────
+# Spatial Projection MLP
+# ─────────────────────────────────────────────
+
+class SpatialProjection(nn.Module):
+    """
+    Maps a wave vector to 3D field coordinates.
+
+    Replaces the original single Linear(432→3) layer which caused
+    topology collapse — all inputs mapping to the same field region.
+
+    Fix:
+      1. L2-normalize input so scale doesn't dominate
+      2. 2-layer MLP with hidden dim 64 gives enough capacity to
+         learn diverse, spread-out spatial mappings
+      3. Output uses tanh (range -1..1) then rescaled to field dims,
+         instead of sigmoid (which saturates near 0.5 = field center)
+    """
+
+    def __init__(self, wave_dim: int, hidden_dim: int = 64):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(wave_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 3),
+        )
+        # Initialize final layer with larger scale to encourage spread
+        nn.init.uniform_(self.net[-1].weight, -0.5, 0.5)
+        nn.init.zeros_(self.net[-1].bias)
+
+    def forward(self, wave_vector: Tensor) -> Tensor:
+        """
+        Args:
+            wave_vector: [wave_dim] input wave
+        Returns:
+            [3] coordinates in range (-1, 1) via tanh
+        """
+        # L2 normalize so magnitude doesn't dominate spatial mapping
+        v = F.normalize(wave_vector.unsqueeze(0), dim=-1).squeeze(0)
+        return torch.tanh(self.net(v))
+
+
+# ─────────────────────────────────────────────
 # ResonanceField
 # ─────────────────────────────────────────────
 
@@ -84,6 +133,11 @@ class ResonanceField(nn.Module):
       energy:   1 MB
       mass:     1 MB
       Total:  ~514 MB (comfortable on 16 GB GPU)
+
+    v2.1 changes:
+      - wave_to_location replaced with SpatialProjection (2-layer MLP)
+      - wave_to_field_coords uses tanh rescaling instead of sigmoid
+      - Input normalization prevents scale-driven coordinate collapse
     """
 
     def __init__(
@@ -127,9 +181,13 @@ class ResonanceField(nn.Module):
         )
 
         # ── Trainable projections (gradient-based warmup only) ──
-        # Wave → 3D field coordinates
-        self.wave_to_location = nn.Linear(wave_dim, 3)
-        # Wave → field feature vector
+
+        # FIX: 2-layer MLP instead of Linear(432→3)
+        # Old: self.wave_to_location = nn.Linear(wave_dim, 3)
+        # New: SpatialProjection with hidden layer + tanh + normalization
+        self.wave_to_location = SpatialProjection(wave_dim, hidden_dim=64)
+
+        # Wave → field feature vector (unchanged from v2.0)
         self.wave_to_feature = nn.Linear(wave_dim, features)
 
     @property
@@ -143,7 +201,7 @@ class ResonanceField(nn.Module):
         return self._step_count
 
     # ─────────────────────────────────────────
-    # Coordinate Mapping
+    # Coordinate Mapping (FIXED)
     # ─────────────────────────────────────────
 
     def wave_to_field_coords(self, wave_vector: Tensor) -> FieldLocation:
@@ -151,15 +209,34 @@ class ResonanceField(nn.Module):
         Map a semantic wave vector to a location in the 3D field.
         Similar waves map to similar locations (after warmup training).
 
+        FIX v2.1: was sigmoid(Linear(wave)) → collapsed to field center.
+        Now:  tanh(MLP(normalize(wave))) → distributed across full field.
+
+        tanh output is in (-1, 1). We rescale to (0, H/W/D-1):
+            coord = (tanh_out + 1) / 2 * (dim - 1)
+
+        This gives uniform coverage of the field rather than
+        clustering near the center as sigmoid did.
+
         Args:
             wave_vector: [wave_dim] semantic wave (mean pooled)
         Returns:
             FieldLocation in [0, H) × [0, W) × [0, D)
         """
-        coords = torch.sigmoid(self.wave_to_location(wave_vector.detach()))
-        h = int(torch.clamp(coords[0] * (self.h - 1), 0, self.h - 1).item())
-        w = int(torch.clamp(coords[1] * (self.w - 1), 0, self.w - 1).item())
-        d = int(torch.clamp(coords[2] * (self.d - 1), 0, self.d - 1).item())
+        with torch.no_grad():
+            # SpatialProjection already normalizes and applies tanh
+            coords = self.wave_to_location(wave_vector.detach())  # [3] in (-1, 1)
+
+            # Rescale from (-1, 1) → (0, dim-1)
+            h = int(((coords[0].item() + 1) / 2) * (self.h - 1))
+            w = int(((coords[1].item() + 1) / 2) * (self.w - 1))
+            d = int(((coords[2].item() + 1) / 2) * (self.d - 1))
+
+            # Clamp to valid range
+            h = max(0, min(self.h - 1, h))
+            w = max(0, min(self.w - 1, w))
+            d = max(0, min(self.d - 1, d))
+
         return FieldLocation(h, w, d)
 
     # ─────────────────────────────────────────

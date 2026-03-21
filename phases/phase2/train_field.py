@@ -14,6 +14,13 @@ Training has three phases:
      - Verify no-forgetting property
      - Save phase2.phase.pt
 
+FIX v2.1: Spatial diversity loss updated to work with SpatialProjection.
+  - warmup_projections now calls field.wave_to_location(batch) directly
+    which returns tanh-normalized coords in (-1, 1)
+  - Spatial diversity loss maximizes pairwise distances in (-1,1) space
+  - Added center-avoidance term to penalize collapse toward center
+  - loss_div weight increased from 0.1 → 0.3 for stronger spread signal
+
 Usage:
     python train_field.py                       # Auto-detect device
     python train_field.py --device cuda          # Force GPU
@@ -163,7 +170,6 @@ def _fallback_texts(num_texts: int) -> list:
         "Black holes are regions of spacetime where gravity is so strong nothing can escape.",
         "The printing press invented by Gutenberg transformed the spread of knowledge in Europe.",
     ]
-    # Tile to reach num_texts
     result = []
     for i in range(num_texts):
         result.append(base[i % len(base)])
@@ -199,8 +205,36 @@ def encode_texts(
 
 
 # ─────────────────────────────────────────────
-# Phase A: Projection Warmup
+# Phase A: Projection Warmup (FIXED v2.1)
 # ─────────────────────────────────────────────
+
+def spatial_diversity_loss(coords: torch.Tensor) -> torch.Tensor:
+    """
+    Penalize spatial collapse — force coordinates to spread across field.
+
+    coords: [batch, 3] in range (-1, 1) from SpatialProjection tanh output
+
+    Two terms:
+      1. Repulsion: maximize pairwise distances between all coordinate pairs
+         so different concepts map to different field regions
+      2. Center-avoidance: penalize clustering at origin (0,0,0)
+         which is the natural attractor of tanh-initialized networks
+
+    Returns scalar loss (minimize to maximize spread).
+    """
+    # Term 1: pairwise repulsion — push coordinates apart
+    pairwise_dists = torch.cdist(coords, coords)  # [bs, bs]
+    # Mean of all pairwise distances (excluding diagonal)
+    bs = coords.shape[0]
+    mask = ~torch.eye(bs, dtype=torch.bool, device=coords.device)
+    repulsion = -pairwise_dists[mask].mean()  # maximize distance = minimize negative
+
+    # Term 2: center-avoidance — penalize collapse to origin
+    # coords are in (-1,1); we want them spread toward ±1, not clustering at 0
+    center_penalty = torch.exp(-coords.pow(2).sum(dim=-1)).mean()
+
+    return repulsion + 0.5 * center_penalty
+
 
 def warmup_projections(
     field: ResonanceField,
@@ -215,14 +249,21 @@ def warmup_projections(
     wave_to_feature: preserve pairwise cosine similarities from waves.
     wave_to_location: encourage spatial diversity (spread patterns out).
 
+    FIX v2.1:
+      - wave_to_location is now SpatialProjection (MLP + tanh + normalize)
+      - Diversity loss operates on tanh coords in (-1, 1) space
+      - loss_div weight increased to 0.3 for stronger spread signal
+      - Added center-avoidance term (see spatial_diversity_loss)
+      - Diagnostic: prints coordinate spread stats during warmup
+
     Args:
         field: the ResonanceField (projections will be updated)
         wave_batch: [N, wave_dim] pre-encoded wave vectors
         config: training configuration
         log: phase logger
     """
-    print("\n── Phase A: Projection Warmup ──")
-    log.info("Phase A: Projection warmup starting")
+    print("\n── Phase A: Projection Warmup (v2.1 — spatial diversity fix) ──")
+    log.info("Phase A: Projection warmup starting (v2.1)")
 
     optimizer = torch.optim.Adam(
         list(field.wave_to_location.parameters()) +
@@ -241,7 +282,6 @@ def warmup_projections(
 
         # ── Feature similarity preservation ──
         features = field.wave_to_feature(batch)  # [bs, features]
-        # Pairwise cosine similarity matrices
         wave_sim = F.cosine_similarity(
             batch.unsqueeze(1), batch.unsqueeze(0), dim=-1
         )  # [bs, bs]
@@ -250,30 +290,56 @@ def warmup_projections(
         )  # [bs, bs]
         loss_sim = F.mse_loss(feat_sim, wave_sim)
 
-        # ── Location spatial diversity ──
-        locations = torch.sigmoid(field.wave_to_location(batch))  # [bs, 3]
-        pairwise_dists = torch.cdist(locations, locations)  # [bs, bs]
-        loss_div = -pairwise_dists.mean()  # maximize average distance
+        # ── Location spatial diversity (FIXED) ──
+        # SpatialProjection normalizes input and returns tanh coords in (-1, 1)
+        # We call the network directly (not wave_to_field_coords which uses no_grad)
+        v_norm = F.normalize(batch, dim=-1)               # [bs, wave_dim]
+        coords = torch.tanh(field.wave_to_location.net(v_norm))  # [bs, 3]
+        loss_div = spatial_diversity_loss(coords)
 
-        # Combined loss
-        loss = loss_sim + 0.1 * loss_div
+        # Combined loss — stronger diversity weight than v2.0 (0.1 → 0.3)
+        loss = loss_sim + 0.3 * loss_div
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         if step % 100 == 0:
+            # Diagnostic: show actual coordinate spread
+            with torch.no_grad():
+                coord_std = coords.std(dim=0)
+                coord_range = coords.max(dim=0).values - coords.min(dim=0).values
             msg = (
-                f"Step {step}/{steps}: "
-                f"loss_sim={loss_sim.item():.4f}, "
-                f"loss_div={loss_div.item():.4f}, "
-                f"loss_total={loss.item():.4f}"
+                f"Warmup {step}/{steps}: "
+                f"loss_sim={loss_sim.item():.4f} "
+                f"loss_div={loss_div.item():.4f} "
+                f"coord_std=[{coord_std[0]:.3f},{coord_std[1]:.3f},{coord_std[2]:.3f}] "
+                f"coord_range=[{coord_range[0]:.3f},{coord_range[1]:.3f},{coord_range[2]:.3f}]"
             )
             print(f"  {msg}")
             log.info(msg)
 
+    # Final diagnostic: verify spread after warmup
+    with torch.no_grad():
+        sample_idx = torch.randint(0, N, (min(100, N),), device=wave_batch.device)
+        sample = wave_batch[sample_idx]
+        v_norm = F.normalize(sample, dim=-1)
+        final_coords = torch.tanh(field.wave_to_location.net(v_norm))
+        final_std = final_coords.std(dim=0)
+        final_range = final_coords.max(dim=0).values - final_coords.min(dim=0).values
+
     print(f"  ✓ Warmup complete ({steps} steps)")
-    log.success(f"Warmup complete ({steps} steps)")
+    print(f"  Final coord std:  [{final_std[0]:.3f}, {final_std[1]:.3f}, {final_std[2]:.3f}]")
+    print(f"  Final coord range: [{final_range[0]:.3f}, {final_range[1]:.3f}, {final_range[2]:.3f}]")
+
+    # Warn if still collapsed
+    if final_std.mean().item() < 0.2:
+        print("  ⚠ WARNING: Coordinates still clustered (std < 0.2). "
+              "Consider increasing warmup_steps or loss_div weight.")
+        log.info("WARNING: Spatial collapse may persist after warmup")
+    else:
+        print("  ✓ Coordinates well-spread across field")
+        log.success(f"Warmup complete — coord spread OK (mean std={final_std.mean():.3f})")
 
 
 # ─────────────────────────────────────────────
@@ -314,6 +380,19 @@ def field_formation(
     print(f"  Repetitions: {repetitions}")
     print(f"  Total perturbations: {num_patterns * repetitions}")
     log.info(f"Phase B: {num_patterns} patterns × {repetitions} reps")
+
+    # Show where patterns actually map to (diagnostic for spatial spread)
+    print(f"\n  Pattern location sample (first 10):")
+    with torch.no_grad():
+        unique_locs = set()
+        for i in range(min(10, num_patterns)):
+            loc = field.wave_to_field_coords(patterns[i])
+            unique_locs.add((loc.h, loc.w, loc.d))
+            print(f"    Pattern {i:2d} → ({loc.h:3d}, {loc.w:3d}, {loc.d:3d})")
+        collision_rate = 1.0 - len(unique_locs) / min(10, num_patterns)
+        print(f"  Collision rate (first 10): {collision_rate:.0%} "
+              f"({'⚠ HIGH — spatial collapse still present' if collision_rate > 0.3 else '✓ OK'})")
+    log.info(f"Pattern collision rate (first 10): {collision_rate:.0%}")
 
     pattern_locations = []
     total_steps = 0
@@ -435,6 +514,18 @@ def validate_field(
         for a in top:
             print(f"    {a['location']}: mass={a['mass']:.4f}, energy={a['energy']:.4f}")
 
+    # Spatial spread diagnostic
+    print(f"\n  Spatial spread of top {min(20, num_patterns)} patterns:")
+    locs_seen = []
+    with torch.no_grad():
+        for i in range(min(20, num_patterns)):
+            loc = field.wave_to_field_coords(patterns[i])
+            locs_seen.append((loc.h, loc.w, loc.d))
+    unique_locs = len(set(locs_seen))
+    print(f"  Unique locations: {unique_locs}/{min(20, num_patterns)} "
+          f"({'✓ well spread' if unique_locs > min(20, num_patterns) * 0.7 else '⚠ still some collision'})")
+    log.metric("unique_locations_20", unique_locs)
+
     return {
         'retrieval_accuracy': accuracy,
         'avg_similarity': avg_sim,
@@ -474,7 +565,7 @@ def main():
     log.info(f"Config: {config}")
 
     print("=" * 60)
-    print("  Phase 2: Resonance Field Core — Training")
+    print("  Phase 2: Resonance Field Core — Training (v2.1)")
     print("=" * 60)
     print(f"  Device: {device}")
     print(f"  Field: {config['field_h']}×{config['field_w']}×{config['field_d']}×{config['field_features']}")
@@ -503,7 +594,7 @@ def main():
     buffer_size = sum(b.numel() for b in field.buffers())
     print(f"  ✓ Field created: {total_params:,} trainable params, {buffer_size:,} buffer elements")
     print(f"  Buffer memory: ~{buffer_size * 4 / 1e6:.0f} MB (float32)")
-    log.info(f"Field: {total_params:,} params, {buffer_size:,} buffers")
+    log.info(f"Field: {total_params:,} params, {buffer_size:,} buffers (~{buffer_size*4/1e6:.0f} MB)")
 
     # ── Prepare Data ──
     texts = prepare_training_texts(num_texts=max(200, config['num_patterns'] * 2))
@@ -548,6 +639,7 @@ def main():
         },
         'attractor_catalog': val_results['catalog'].to_dict(),
         'training_config': config,
+        'version': '2.1',
     }
     save_checkpoint(2, checkpoint_state)
 
@@ -555,11 +647,11 @@ def main():
     from flux_format import save_flux
     flx_path = PROJECT_ROOT / 'checkpoints' / 'phase2.flx'
     save_flux(field, cse, str(flx_path), val_results['catalog'],
-              metadata={'steps': field.step_count})
+              metadata={'steps': field.step_count, 'version': '2.1'})
 
     # ── Summary ──
     print("\n" + "=" * 60)
-    print("  Phase 2 Training Complete!")
+    print("  Phase 2 Training Complete! (v2.1 — spatial diversity fix)")
     print("=" * 60)
     print(f"  Total time: {total_time:.1f}s ({total_time/60:.1f} min)")
     print(f"  Retrieval accuracy: {val_results['retrieval_accuracy']:.1%}")
@@ -573,7 +665,7 @@ def main():
     log.metric("total_time", f"{total_time:.1f}s")
     log.metric("retrieval_accuracy", f"{val_results['retrieval_accuracy']:.4f}")
     log.metric("num_attractors", field.num_attractors())
-    log.success("Phase 2 training complete")
+    log.success("Phase 2 v2.1 training complete")
 
 
 if __name__ == '__main__':
