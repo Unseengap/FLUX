@@ -240,7 +240,50 @@ Ready for Phase 4: True
 
 
 
+[23:33:15] 
+▶ CELL: Cell 11 — Demo 1: GR Speed vs Attention
+[23:33:15]   Started: 2026-03-21 23:33:15
+  ℹ Local checkpoint not found, trying HuggingFace Hub...
+checkpoints/phase3.phase.pt: 100%
+ 301M/301M [00:01<00:00, 436MB/s]
+  ✓ Phase 3 checkpoint downloaded from HuggingFace Hub
+✓ Phase 3 checkpoint loaded (from HuggingFace Hub)
+  ✓ Using trained GR from checkpoint
 
+=================================================================
+  Demo 1: GR vs Attention — Speed Comparison
+=================================================================
+
+   Seq Len      GR (ms)    Attn (ms)      Ratio      Scaling
+------------------------------------------------------------
+       128       96.9ms        0.3ms 345.9x slower           --
+       256      196.2ms        0.4ms 540.7x slower GR:2.0x A:1.3x
+       512      412.8ms        0.7ms 599.1x slower GR:2.1x A:1.9x
+      1024      886.0ms        1.6ms 549.2x slower GR:2.1x A:2.3x
+      2048     2104.7ms        6.6ms 319.2x slower GR:2.4x A:4.1x
+      4096     5423.9ms       28.2ms 192.5x slower GR:2.6x A:4.3x
+
+  Scaling analysis (when seq doubles):
+    O(n²) attention: growth should be ~4x per doubling
+    O(n log n) GR:   growth should be ~2x per doubling
+    GR avg growth:   2.25x
+    Attn avg growth: 2.78x
+
+  Note: GR is slower in absolute time due to Python/CPU spatial index.
+  The O(log n) advantage is in scaling rate, not constant factors.
+  A CUDA-native spatial index would close the gap at seq > 10K.
+
+  ✓ Chart saved: demo3_speed_comparison.png
+
+  Summary:
+    GR avg growth per doubling:   2.25x
+    Attn avg growth per doubling:  2.78x
+    GR is slower in absolute time (Python/CPU spatial index overhead)
+    GR scales better: ~2.2x vs ~2.8x per doubling
+
+
+
+    
 
 
 
