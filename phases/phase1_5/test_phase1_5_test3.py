@@ -156,11 +156,17 @@ def main():
     print(f"  {'✓' if deep_pass else '✗'} Transitive chains: {deep_chains}/20 (threshold: ≥ 5/20)")
     print(f"  {'✓' if time_pass else '✗'} Runtime: {elapsed:.1f}s (threshold: < 45s)")
 
-    results = PhaseResults(phase=1.5)
+    try:
+        results = PhaseResults(phase=1.5, component_name="CausalWaveChainer")
+    except TypeError:
+        results = PhaseResults(phase=1.5)
     results.add("Implication hits", hits, ">= 14/20", hits_pass)
     results.add("Transitive chain depth > 1", deep_chains, ">= 5/20", deep_pass)
     results.add("Runtime", elapsed, "< 45s", time_pass)
-    results.save()
+    try:
+        results.save()
+    except Exception as e:
+        print(f"  ℹ Results save: {e}")
 
     print(f"\n{'='*60}")
     print(f"All tests passed: {all_pass}")

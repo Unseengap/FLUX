@@ -145,12 +145,18 @@ def main():
     print(f"  {'✓' if fp_pass else '✗'} False positive rate: neutral avg={mean_neutral:.4f} (threshold: < 0.3)")
     print(f"  {'✓' if time_pass else '✗'} Runtime: {elapsed:.1f}s (threshold: < 30s)")
 
-    results = PhaseResults(phase=1.5)
+    try:
+        results = PhaseResults(phase=1.5, component_name="CausalWaveChainer")
+    except TypeError:
+        results = PhaseResults(phase=1.5)
     results.add("Contradiction detected", detected, ">= 45/50", detected_pass)
     results.add("Mean tension gap", mean_gap, "> 0.2", gap_pass)
     results.add("Neutral tension (FP)", mean_neutral, "< 0.3", fp_pass)
     results.add("Runtime", elapsed, "< 30s", time_pass)
-    results.save()
+    try:
+        results.save()
+    except Exception as e:
+        print(f"  ℹ Results save: {e}")
 
     print(f"\n{'='*60}")
     print(f"All tests passed: {all_pass}")

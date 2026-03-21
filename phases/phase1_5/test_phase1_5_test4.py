@@ -174,14 +174,20 @@ def main():
     print(f"  {'✓' if cse_unchanged else '✗'} CSE output bit-identical: max_diff={max_diff:.2e}")
     print(f"  {'✓' if hash_ok else '✗'} Phase 1 checkpoint unchanged")
 
-    results = PhaseResults(phase=1.5)
+    try:
+        results = PhaseResults(phase=1.5, component_name="CausalWaveChainer")
+    except TypeError:
+        results = PhaseResults(phase=1.5)
     results.add("CausalWave shape 608", int(shape_608_all), "True", shape_608_all)
     results.add("Phase2Wave shape 432", int(shape_432_all), "True", shape_432_all)
     results.add("Field accepts wave", int(field_ok_all), "True", field_ok_all)
     results.add("Attractor sim > 0.7", mean_sim, "> 0.7", sim_ok_all)
     results.add("CSE output unchanged", max_diff, "< 1e-6", cse_unchanged)
     results.add("Phase1 checkpoint hash", int(hash_ok), "unchanged", hash_ok)
-    results.save()
+    try:
+        results.save()
+    except Exception as e:
+        print(f"  ℹ Results save: {e}")
 
     print(f"\n{'='*60}")
     print(f"All tests passed: {all_pass}")
