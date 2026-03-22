@@ -62,17 +62,18 @@ def demo_timescale_activation():
             ma = sep['medium_activations'][step - 1]
             sa = sep['slow_activations'][step - 1]
 
-            # Visual indicators
-            f_bar = "█" * min(int(fa / sep['threshold'] * 10), 20)
-            m_bar = "█" * min(int(ma / sep['threshold'] * 10), 20)
-            s_bar = "█" * min(int(sa / sep['threshold'] * 10), 20)
+            # Visual indicators — normalize by converged fast value
+            _vis_scale = max(sep.get('fast_converged', fa), 1e-12)
+            f_bar = "█" * min(int(fa / _vis_scale * 10), 20)
+            m_bar = "█" * min(int(ma / _vis_scale * 10), 20)
+            s_bar = "█" * min(int(sa / _vis_scale * 10), 20)
 
             print(f"  {step:>6}  {fa:>10.4f}  {ma:>10.4f}  {sa:>10.4f}  | {f_bar}")
 
     # ─────────────────────────────────────────
     # Threshold crossing report
     # ─────────────────────────────────────────
-    print(f"\n  Activation Threshold Crossing (50% of input magnitude):")
+    print(f"\n  Activation Threshold Crossing (80% of converged value):")
     print(f"  " + "-" * 45)
     print(f"    Fast nodes activate at step:   {sep['fast_steps_to_activate']}")
     print(f"    Medium nodes activate at step: {sep['medium_steps_to_activate']}")
@@ -92,7 +93,14 @@ def demo_timescale_activation():
         ax.plot(steps, sep['fast_activations'], 'r-', linewidth=2, label=f'Fast (τ=0.01)', alpha=0.9)
         ax.plot(steps, sep['medium_activations'], 'g-', linewidth=2, label=f'Medium (τ=0.1)', alpha=0.9)
         ax.plot(steps, sep['slow_activations'], 'b-', linewidth=2, label=f'Slow (τ=1.0)', alpha=0.9)
-        ax.axhline(y=sep['threshold'], color='gray', linestyle='--', alpha=0.5, label='Threshold')
+        # Draw per-timescale convergence thresholds
+        frac = sep.get('threshold_fraction', 0.8)
+        for conv_key, color, lbl in [
+            ('fast_converged', 'red', f'Fast threshold ({frac:.0%})'),
+            ('slow_converged', 'blue', f'Slow threshold ({frac:.0%})'),
+        ]:
+            if conv_key in sep:
+                ax.axhline(y=sep[conv_key] * frac, color=color, linestyle='--', alpha=0.3, label=lbl)
 
         ax.set_xlabel('Processing Steps', fontsize=12)
         ax.set_ylabel('Activation Magnitude', fontsize=12)
