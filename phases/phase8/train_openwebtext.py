@@ -159,7 +159,8 @@ class OpenWebTextTrainer:
         # CSE encode (frozen)
         with torch.no_grad():
             wave = self.model.cse.encode(text)
-        wave_vec = wave.full.mean(dim=0).to(device)
+        wave_sequence = wave.full.to(device)         # [seq, 432] full wave sequence
+        wave_vec = wave_sequence.mean(dim=0)          # [432] for field/TL/memory
 
         # Thermodynamic settle (field learning — no backprop)
         with torch.no_grad():
@@ -199,7 +200,7 @@ class OpenWebTextTrainer:
         if self.use_amp:
             with torch.amp.autocast('cuda'):
                 decoder_logits = self.model.decoder(
-                    targets, wave_vec.detach(), merged,
+                    targets, wave_sequence.detach(), merged,
                     max_len=max_len,
                 )
                 # Cross-entropy: predict each byte from previous bytes + context
@@ -209,7 +210,7 @@ class OpenWebTextTrainer:
                 )
         else:
             decoder_logits = self.model.decoder(
-                targets, wave_vec.detach(), merged,
+                targets, wave_sequence.detach(), merged,
                 max_len=max_len,
             )
             decoder_loss = F.cross_entropy(
@@ -363,7 +364,8 @@ class OpenWebTextTrainer:
                     continue
 
                 wave = self.model.cse.encode(text)
-                wave_vec = wave.full.mean(dim=0).to(device)
+                wave_sequence = wave.full.to(device)
+                wave_vec = wave_sequence.mean(dim=0)
 
                 field_features, sims, locs = self.model.field.query(wave_vec, k=4)
                 combined = field_features.mean(dim=0)
@@ -379,7 +381,7 @@ class OpenWebTextTrainer:
 
                 # Sequential byte prediction via decoder
                 decoder_logits = self.model.decoder(
-                    targets, wave_vec, merged, max_len=max_len,
+                    targets, wave_sequence, merged, max_len=max_len,
                 )
                 loss = F.cross_entropy(
                     decoder_logits.view(-1, 256),

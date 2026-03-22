@@ -196,7 +196,8 @@ class CurriculumTrainer:
         """Run FLUX pipeline to get semantic context for decoder."""
         with torch.no_grad():
             wave = self.model.cse.encode(text)
-        wave_vec = wave.full.mean(dim=0).to(self.device)
+        wave_sequence = wave.full.to(self.device)    # [seq, 432] full wave sequence
+        wave_vec = wave_sequence.mean(dim=0)         # [432] for field query
 
         with torch.no_grad():
             field_features, sims, locs = self.model.field.query(wave_vec, k=4)
@@ -204,7 +205,7 @@ class CurriculumTrainer:
             cgn_out = self.model.cgn(combined)
             merged = combined + cgn_out
 
-        return wave_vec, merged
+        return wave_sequence, merged
 
     def _train_step(
         self,
@@ -226,7 +227,7 @@ class CurriculumTrainer:
         device = self.device
 
         # Get FLUX semantic context (no grad — field is frozen for curriculum)
-        wave_vec, merged = self._get_context(text)
+        wave_sequence, merged = self._get_context(text)
 
         # Prepare byte targets
         text_bytes = list(text.encode('utf-8', errors='replace'))
@@ -240,7 +241,7 @@ class CurriculumTrainer:
         if self.use_amp:
             with torch.amp.autocast('cuda'):
                 logits = self.model.decoder(
-                    targets, wave_vec.detach(), merged.detach(),
+                    targets, wave_sequence.detach(), merged.detach(),
                     max_len=max_len,
                 )
                 loss = F.cross_entropy(
@@ -248,7 +249,7 @@ class CurriculumTrainer:
                 )
         else:
             logits = self.model.decoder(
-                targets, wave_vec.detach(), merged.detach(),
+                targets, wave_sequence.detach(), merged.detach(),
                 max_len=max_len,
             )
             loss = F.cross_entropy(
@@ -297,12 +298,12 @@ class CurriculumTrainer:
         self.model.eval()
         with torch.no_grad():
             for ch in test_chars:
-                wave_vec, merged = self._get_context(ch)
+                wave_sequence, merged = self._get_context(ch)
                 target = torch.tensor(
                     list(ch.encode('utf-8')),
                     dtype=torch.long, device=self.device,
                 )
-                logits = self.model.decoder(target, wave_vec, merged)
+                logits = self.model.decoder(target, wave_sequence, merged)
                 pred = logits.argmax(dim=-1)
                 correct += (pred == target).sum().item()
                 total += target.numel()
@@ -324,12 +325,12 @@ class CurriculumTrainer:
         self.model.eval()
         with torch.no_grad():
             for word in words:
-                wave_vec, merged = self._get_context(word)
+                wave_sequence, merged = self._get_context(word)
                 target = torch.tensor(
                     list(word.encode('utf-8')),
                     dtype=torch.long, device=self.device,
                 )
-                logits = self.model.decoder(target, wave_vec, merged)
+                logits = self.model.decoder(target, wave_sequence, merged)
                 pred = logits.argmax(dim=-1)
 
                 # Check byte-level accuracy
@@ -354,7 +355,7 @@ class CurriculumTrainer:
         self.model.eval()
         with torch.no_grad():
             for prompt, expected in prompts:
-                wave_vec, merged = self._get_context(prompt + expected)
+                wave_sequence, merged = self._get_context(prompt + expected)
                 prompt_bytes = torch.tensor(
                     list(prompt.encode('utf-8')),
                     dtype=torch.long, device=self.device,
@@ -362,7 +363,7 @@ class CurriculumTrainer:
 
                 # Generate a few bytes after the prompt
                 generated = self.model.decoder.generate(
-                    wave_vec, merged, max_length=len(expected) + 5,
+                    wave_sequence, merged, max_length=len(expected) + 5,
                     temperature=0.5, prompt_bytes=prompt_bytes,
                 )
                 continuation = generated[len(prompt_bytes):]
@@ -393,14 +394,14 @@ class CurriculumTrainer:
         self.model.eval()
         with torch.no_grad():
             for prompt in prompts:
-                wave_vec, merged = self._get_context(prompt)
+                wave_sequence, merged = self._get_context(prompt)
                 prompt_bytes = torch.tensor(
                     list(prompt.encode('utf-8')),
                     dtype=torch.long, device=self.device,
                 )
 
                 generated = self.model.decoder.generate(
-                    wave_vec, merged, max_length=40,
+                    wave_sequence, merged, max_length=40,
                     temperature=0.7, prompt_bytes=prompt_bytes,
                 )
                 continuation = generated[len(prompt_bytes):]

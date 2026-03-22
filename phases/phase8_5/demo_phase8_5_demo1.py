@@ -90,12 +90,13 @@ def main():
     with torch.no_grad():
         for ch in test_chars:
             wave = model.cse.encode(ch)
-            wave_vec = wave.full.mean(dim=0).to(device)
+            wave_sequence = wave.full.to(device)
+            wave_vec = wave_sequence.mean(dim=0)
             field_features, _, _ = model.field.query(wave_vec, k=4)
             merged = field_features.mean(dim=0) + model.cgn(field_features.mean(dim=0))
 
             target = torch.tensor(list(ch.encode('utf-8')), dtype=torch.long, device=device)
-            logits = model.decoder(target, wave_vec, merged)
+            logits = model.decoder(target, wave_sequence, merged)
             pred_byte = logits.argmax(dim=-1)[0].item()
 
             expected = ch.encode('utf-8')[0]
@@ -117,12 +118,13 @@ def main():
     with torch.no_grad():
         for word in words:
             wave = model.cse.encode(word)
-            wave_vec = wave.full.mean(dim=0).to(device)
+            wave_sequence = wave.full.to(device)
+            wave_vec = wave_sequence.mean(dim=0)
             field_features, _, _ = model.field.query(wave_vec, k=4)
             merged = field_features.mean(dim=0) + model.cgn(field_features.mean(dim=0))
 
             target = torch.tensor(list(word.encode('utf-8')), dtype=torch.long, device=device)
-            logits = model.decoder(target, wave_vec, merged)
+            logits = model.decoder(target, wave_sequence, merged)
             pred_bytes = logits.argmax(dim=-1).tolist()
 
             try:

@@ -197,18 +197,19 @@ class FLUXLarge(FLUXModel):
     # Override generation to use WaveDecoder
     # ─────────────────────────────────────────────
 
-    def _get_context(self, text: str) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_context(self, text: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Run FLUX pipeline and return semantic context for generation.
 
         Returns:
-            (wave_vec [wave_dim], field_features [field_features])
+            (wave_sequence [seq, wave_dim], wave_vec [wave_dim], merged [field_features])
         """
         device = self._device_str
 
         with torch.no_grad():
             wave = self.cse.encode(text)
-        wave_vec = wave.full.mean(dim=0).to(device)
+        wave_sequence = wave.full.to(device)     # [seq, 432] — full sequence!
+        wave_vec = wave_sequence.mean(dim=0)     # [432] for field query
 
         # Field query for context features
         field_features, sims, locs = self.field.query(wave_vec, k=4)
@@ -218,7 +219,7 @@ class FLUXLarge(FLUXModel):
         cgn_out = self.cgn(combined)
         merged = combined + cgn_out
 
-        return wave_vec, merged
+        return wave_sequence, wave_vec, merged
 
     def generate_logits_sequential(self, text: str,
                                    max_len: int = 100) -> torch.Tensor:
@@ -232,14 +233,14 @@ class FLUXLarge(FLUXModel):
         Returns:
             [max_len, 256] logits sequence
         """
-        wave_vec, field_feat = self._get_context(text)
+        wave_sequence, wave_vec, field_feat = self._get_context(text)
 
         with torch.no_grad():
             target_bytes = torch.tensor(
                 list(text.encode('utf-8', errors='replace'))[:max_len],
                 dtype=torch.long, device=wave_vec.device,
             )
-            logits = self.decoder(target_bytes, wave_vec, field_feat)
+            logits = self.decoder(target_bytes, wave_sequence, field_feat)
 
         return logits
 
@@ -264,8 +265,8 @@ class FLUXLarge(FLUXModel):
         # Run prompt through full FLUX pipeline
         self.forward(prompt, learn=False)
 
-        # Get semantic context
-        wave_vec, field_feat = self._get_context(prompt)
+        # Get semantic context (full wave sequence for cross-attention)
+        wave_sequence, wave_vec, field_feat = self._get_context(prompt)
 
         # Encode prompt as bytes for seeding the decoder
         prompt_bytes = torch.tensor(
@@ -275,7 +276,7 @@ class FLUXLarge(FLUXModel):
 
         with torch.no_grad():
             generated_raw = self.decoder.generate(
-                wave_vec=wave_vec,
+                wave_sequence=wave_sequence,
                 field_features=field_feat,
                 max_length=max_length,
                 temperature=temperature,

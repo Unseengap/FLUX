@@ -6,19 +6,21 @@ and wave context). The WaveDecoder handles HOW to spell it — generating
 coherent bytes one at a time using a GRU conditioned on the semantic state.
 
 Architecture:
-    FLUX context (wave_vec + field_features)
-        → context_proj → GRU initial hidden state
-        → GRU generates bytes autoregressively:
-            input: previous byte embedding
-            output: next byte logits [256]
+    FLUX context:
+        field_features → context_proj → GRU initial hidden state
+        wave_sequence [seq, 432] → wave_proj → cross-attention K/V
+    Decoding:
+        GRU generates bytes autoregressively
+        At each step, GRU output cross-attends to the wave sequence
+        This lets the decoder focus on different input positions
+        as it generates each byte — gravitational focus.
 
 Training:
     Teacher forcing — each step receives the ACTUAL previous byte,
-    predicts the next byte. Standard cross-entropy loss on full
-    byte sequences (not histograms).
+    predicts the next byte. Standard cross-entropy loss.
 
-The decoder is small (~4M params) — the "intelligence" lives in
-the FLUX field. The decoder just needs to articulate it coherently.
+The decoder is ~5M params — the "intelligence" lives in the FLUX
+field. Cross-attention gives position-aware access to input meaning.
 """
 
 import torch
@@ -36,7 +38,8 @@ class WaveDecoder(nn.Module):
     sequence of coherent bytes.
 
     Think of it as: the field knows WHAT to say, the decoder knows
-    HOW to spell it.
+    HOW to spell it. Cross-attention lets the decoder "look at"
+    specific parts of the input at each generation step.
 
     Args:
         wave_dim: CSE wave dimension (432)
@@ -44,8 +47,9 @@ class WaveDecoder(nn.Module):
         embed_dim: Byte embedding dimension
         hidden_dim: GRU hidden dimension
         num_layers: Number of GRU layers
+        num_heads: Number of cross-attention heads
         vocab_size: Output vocabulary (256 for bytes)
-        dropout: Dropout rate between GRU layers
+        dropout: Dropout rate
     """
 
     def __init__(
@@ -55,6 +59,7 @@ class WaveDecoder(nn.Module):
         embed_dim: int = 128,
         hidden_dim: int = 512,
         num_layers: int = 2,
+        num_heads: int = 8,
         vocab_size: int = 256,
         dropout: float = 0.1,
     ):
@@ -63,15 +68,16 @@ class WaveDecoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.embed_dim = embed_dim
+        self.wave_dim = wave_dim
 
         # ── Byte embedding (input at each decode step) ──
         self.byte_embed = nn.Embedding(vocab_size + 1, embed_dim)  # +1 for BOS token
         self.BOS_TOKEN = vocab_size  # 256 = start-of-sequence
 
-        # ── Project FLUX context → GRU initial hidden state ──
-        # wave_vec [wave_dim] + field_features [field_features] → hidden × layers
+        # ── Project field context → GRU initial hidden state ──
+        # field_features [field_features] → hidden × layers
         self.context_proj = nn.Sequential(
-            nn.Linear(wave_dim + field_features, hidden_dim),
+            nn.Linear(field_features, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, hidden_dim * num_layers),
             nn.Tanh(),
@@ -86,45 +92,54 @@ class WaveDecoder(nn.Module):
             dropout=dropout if num_layers > 1 else 0.0,
         )
 
+        # ── Cross-attention: decoder attends to full wave sequence ──
+        # At each step, GRU output "looks at" specific positions in
+        # the input wave — gravitational focus.
+        self.wave_proj = nn.Linear(wave_dim, hidden_dim)
+        self.cross_attn = nn.MultiheadAttention(
+            embed_dim=hidden_dim,
+            num_heads=num_heads,
+            batch_first=True,
+            dropout=dropout,
+        )
+        self.attn_norm = nn.LayerNorm(hidden_dim)
+
         # ── Output projection → byte logits ──
         self.output_norm = nn.LayerNorm(hidden_dim)
         self.output_proj = nn.Linear(hidden_dim, vocab_size)
 
-        # ── Optional: wave injection at every step ──
-        # Allows the decoder to "look at" the semantic context at each step
-        self.wave_inject = nn.Linear(wave_dim, embed_dim)
-
-    def _init_hidden(self, wave_vec: torch.Tensor,
-                     field_features: torch.Tensor) -> torch.Tensor:
+    def _init_hidden(self, field_features: torch.Tensor) -> torch.Tensor:
         """
-        Convert FLUX semantic context into GRU initial hidden state.
+        Convert field context into GRU initial hidden state.
 
         Args:
-            wave_vec: [wave_dim] mean semantic wave from CSE
-            field_features: [field_features] from field query
+            field_features: [field_features] merged field + CGN context
 
         Returns:
             [num_layers, 1, hidden_dim] initial hidden state
         """
-        context = torch.cat([wave_vec, field_features], dim=-1)
-        h = self.context_proj(context)  # [hidden_dim * num_layers]
+        h = self.context_proj(field_features)  # [hidden_dim * num_layers]
         h = h.view(self.num_layers, 1, self.hidden_dim)  # [layers, batch=1, hidden]
         return h
 
     def forward(
         self,
         target_bytes: torch.Tensor,
-        wave_vec: torch.Tensor,
+        wave_sequence: torch.Tensor,
         field_features: torch.Tensor,
         max_len: Optional[int] = None,
     ) -> torch.Tensor:
         """
         Teacher-forced training: predict each byte given previous bytes + context.
 
+        The decoder attends to the full wave sequence at each position,
+        allowing it to focus on different parts of the input meaning
+        as it generates different bytes.
+
         Args:
             target_bytes: [seq_len] LongTensor of byte values (0-255)
-            wave_vec: [wave_dim] semantic wave from CSE
-            field_features: [field_features] from field query
+            wave_sequence: [src_seq, wave_dim] full CSE wave output
+            field_features: [field_features] merged field + CGN context
 
         Returns:
             [seq_len, 256] logits for each position
@@ -136,99 +151,108 @@ class WaveDecoder(nn.Module):
 
         device = target_bytes.device
 
-        # Initialize GRU hidden state from FLUX context
-        hidden = self._init_hidden(wave_vec, field_features)
+        # Initialize GRU hidden state from field context
+        hidden = self._init_hidden(field_features)
 
         # Build input sequence: [BOS, byte_0, byte_1, ..., byte_{n-2}]
-        # (shifted right — predict byte_i from bytes before it)
         bos = torch.full((1,), self.BOS_TOKEN, dtype=torch.long, device=device)
         input_bytes = torch.cat([bos, target_bytes[:-1]])  # [seq_len]
 
         # Embed bytes
         embedded = self.byte_embed(input_bytes).unsqueeze(0)  # [1, seq, embed]
 
-        # Add wave injection (semantic context at every step)
-        wave_signal = self.wave_inject(wave_vec).unsqueeze(0).unsqueeze(0)  # [1, 1, embed]
-        embedded = embedded + wave_signal  # broadcast over seq dim
-
         # Run GRU
-        output, _ = self.gru(embedded, hidden)  # [1, seq, hidden]
-        output = output.squeeze(0)  # [seq, hidden]
+        gru_out, _ = self.gru(embedded, hidden)  # [1, seq, hidden]
+
+        # Cross-attention: GRU output attends to full wave sequence
+        wave_kv = self.wave_proj(wave_sequence).unsqueeze(0)  # [1, src_seq, hidden]
+        attn_out, _ = self.cross_attn(
+            query=gru_out, key=wave_kv, value=wave_kv,
+        )  # [1, seq, hidden]
+
+        # Residual connection + norm
+        combined = self.attn_norm(gru_out + attn_out)  # [1, seq, hidden]
+        combined = combined.squeeze(0)  # [seq, hidden]
 
         # Project to byte logits
-        output = self.output_norm(output)
-        logits = self.output_proj(output)  # [seq, 256]
+        logits = self.output_proj(self.output_norm(combined))  # [seq, 256]
 
         return logits
 
-    def generate_init(self, wave_vec: torch.Tensor,
-                      field_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def generate_init(self, wave_sequence: torch.Tensor,
+                      field_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Initialize decoder state for autoregressive generation.
 
+        Pre-computes wave key/value projections (cached for all steps).
+
         Args:
-            wave_vec: [wave_dim] semantic wave
+            wave_sequence: [src_seq, wave_dim] full wave output
             field_features: [field_features] field context
 
         Returns:
-            (bos_logits, hidden_state) — first byte logits + GRU state
+            (bos_logits, hidden_state, wave_kv) — logits + GRU state + cached K/V
         """
-        hidden = self._init_hidden(wave_vec, field_features)
+        hidden = self._init_hidden(field_features)
+
+        # Pre-compute wave K/V (reused at every decode step)
+        wave_kv = self.wave_proj(wave_sequence).unsqueeze(0)  # [1, src_seq, hidden]
 
         # Run BOS token through
         bos = torch.full((1,), self.BOS_TOKEN, dtype=torch.long,
-                         device=wave_vec.device)
+                         device=wave_sequence.device)
         embedded = self.byte_embed(bos).unsqueeze(0)  # [1, 1, embed]
 
-        # Add wave injection
-        wave_signal = self.wave_inject(wave_vec).unsqueeze(0).unsqueeze(0)
-        embedded = embedded + wave_signal
+        gru_out, hidden = self.gru(embedded, hidden)  # [1, 1, hidden]
 
-        output, hidden = self.gru(embedded, hidden)  # [1, 1, hidden]
-        output = self.output_norm(output.squeeze(0).squeeze(0))
-        logits = self.output_proj(output)  # [256]
+        # Cross-attend to wave
+        attn_out, _ = self.cross_attn(query=gru_out, key=wave_kv, value=wave_kv)
+        combined = self.attn_norm(gru_out + attn_out).squeeze(0).squeeze(0)
+        logits = self.output_proj(self.output_norm(combined))  # [256]
 
-        return logits, hidden
+        return logits, hidden, wave_kv
 
     def generate_step(self, byte_input: torch.Tensor,
                       hidden: torch.Tensor,
-                      wave_vec: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+                      wave_kv: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Single autoregressive decode step.
+        Single autoregressive decode step with cross-attention.
 
         Args:
             byte_input: scalar or [1] byte value (0-255)
             hidden: [num_layers, 1, hidden_dim] GRU state
-            wave_vec: [wave_dim] for wave injection
+            wave_kv: [1, src_seq, hidden_dim] pre-computed wave K/V
 
         Returns:
             (logits [256], new_hidden)
         """
         embedded = self.byte_embed(byte_input.view(1, 1))  # [1, 1, embed]
 
-        # Wave injection
-        wave_signal = self.wave_inject(wave_vec).unsqueeze(0).unsqueeze(0)
-        embedded = embedded + wave_signal
+        gru_out, new_hidden = self.gru(embedded, hidden)  # [1, 1, hidden]
 
-        output, new_hidden = self.gru(embedded, hidden)
-        output = self.output_norm(output.squeeze(0).squeeze(0))
-        logits = self.output_proj(output)  # [256]
+        # Cross-attend to cached wave K/V
+        attn_out, _ = self.cross_attn(query=gru_out, key=wave_kv, value=wave_kv)
+        combined = self.attn_norm(gru_out + attn_out).squeeze(0).squeeze(0)
+        logits = self.output_proj(self.output_norm(combined))  # [256]
 
         return logits, new_hidden
 
     def generate(
         self,
-        wave_vec: torch.Tensor,
+        wave_sequence: torch.Tensor,
         field_features: torch.Tensor,
         max_length: int = 100,
         temperature: float = 0.8,
         prompt_bytes: Optional[torch.Tensor] = None,
     ) -> bytes:
         """
-        Full autoregressive generation.
+        Full autoregressive generation with cross-attention.
+
+        At each step, the decoder attends to the full wave sequence,
+        focusing on different input positions as it generates.
 
         Args:
-            wave_vec: [wave_dim] semantic context
+            wave_sequence: [src_seq, wave_dim] full CSE wave output
             field_features: [field_features] field context
             max_length: Max bytes to generate
             temperature: Sampling temperature
@@ -237,22 +261,22 @@ class WaveDecoder(nn.Module):
         Returns:
             Generated bytes
         """
-        device = wave_vec.device
+        device = wave_sequence.device
         generated = []
 
-        # Initialize from context
-        first_logits, hidden = self.generate_init(wave_vec, field_features)
+        # Initialize (pre-computes wave K/V for all steps)
+        first_logits, hidden, wave_kv = self.generate_init(wave_sequence, field_features)
 
         # If we have prompt bytes, feed them through first (teacher-forced prefix)
         if prompt_bytes is not None and len(prompt_bytes) > 0:
             for byte_val in prompt_bytes:
                 byte_t = torch.tensor([byte_val], dtype=torch.long, device=device)
-                _, hidden = self.generate_step(byte_t, hidden, wave_vec)
+                _, hidden = self.generate_step(byte_t, hidden, wave_kv)
                 generated.append(byte_val.item() if isinstance(byte_val, torch.Tensor)
                                  else byte_val)
             # Get logits for first generated byte
             last_byte = torch.tensor([prompt_bytes[-1]], dtype=torch.long, device=device)
-            logits, hidden = self.generate_step(last_byte, hidden, wave_vec)
+            logits, hidden = self.generate_step(last_byte, hidden, wave_kv)
         else:
             logits = first_logits
 
@@ -271,7 +295,7 @@ class WaveDecoder(nn.Module):
 
             # Feed back
             byte_t = torch.tensor([next_byte], dtype=torch.long, device=device)
-            logits, hidden = self.generate_step(byte_t, hidden, wave_vec)
+            logits, hidden = self.generate_step(byte_t, hidden, wave_kv)
 
         return bytes(generated)
 
@@ -280,22 +304,22 @@ class WaveDecoder(nn.Module):
 # Quick self-test
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
-    print("WaveDecoder self-test")
+    print("WaveDecoder self-test (cross-attention)")
     decoder = WaveDecoder(wave_dim=432, field_features=768)
     n_params = sum(p.numel() for p in decoder.parameters())
     print(f"  Parameters: {n_params:,}")
 
-    # Dummy inputs
-    wave = torch.randn(432)
+    # Dummy inputs — wave_sequence is [src_seq, 432], NOT collapsed
+    wave_seq = torch.randn(10, 432)  # 10-position wave sequence
     field_feat = torch.randn(768)
     target = torch.randint(0, 256, (50,))
 
     # Teacher-forced forward
-    logits = decoder(target, wave, field_feat)
+    logits = decoder(target, wave_seq, field_feat)
     print(f"  Teacher-forced: target={target.shape} → logits={logits.shape}")
 
     # Generation
-    output = decoder.generate(wave, field_feat, max_length=20)
+    output = decoder.generate(wave_seq, field_feat, max_length=20)
     print(f"  Generated: {len(output)} bytes → {output.decode('utf-8', errors='replace')!r}")
 
-    print("  ✓ WaveDecoder OK")
+    print("  ✓ WaveDecoder OK (cross-attention)")

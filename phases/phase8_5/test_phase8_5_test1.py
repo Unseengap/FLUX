@@ -82,7 +82,8 @@ def main():
         for word in words:
             # Get FLUX context
             wave = model.cse.encode(word)
-            wave_vec = wave.full.mean(dim=0).to(device)
+            wave_sequence = wave.full.to(device)
+            wave_vec = wave_sequence.mean(dim=0)
             field_features, _, _ = model.field.query(wave_vec, k=4)
             combined = field_features.mean(dim=0)
             cgn_out = model.cgn(combined)
@@ -93,7 +94,7 @@ def main():
                 list(word.encode('utf-8')),
                 dtype=torch.long, device=device,
             )
-            logits = model.decoder(target, wave_vec, merged)
+            logits = model.decoder(target, wave_sequence, merged)
             pred = logits.argmax(dim=-1)
 
             # Byte accuracy
