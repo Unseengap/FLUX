@@ -106,9 +106,10 @@ class WorkingMemory(nn.Module):
 
     def _add_single(self, wave: Tensor) -> None:
         """Add one wave vector to the rolling window."""
+        dev = next(self.parameters()).device
         wave_d = wave.detach()
         with torch.no_grad():
-            vec = self.compress(wave_d.unsqueeze(0)).squeeze(0)
+            vec = self.compress(wave_d.to(dev).unsqueeze(0)).squeeze(0)
             importance = self.importance_scorer(vec.unsqueeze(0)).squeeze().item()
 
         entry = WorkingMemoryEntry(
@@ -173,15 +174,18 @@ class WorkingMemory(nn.Module):
         if not self._entries:
             return torch.empty(0, self.wave_dim), torch.empty(0)
 
+        # Determine model device from a parameter
+        dev = next(self.parameters()).device
+
         with torch.no_grad():
             # Compress query if full-wave dimension
             if query_wave.shape[-1] == self.wave_dim:
-                q = self.compress(query_wave.unsqueeze(0))
+                q = self.compress(query_wave.to(dev).unsqueeze(0))
             else:
-                q = query_wave.unsqueeze(0)
+                q = query_wave.to(dev).unsqueeze(0)
             q = self.query_proj(q)  # [1, feature_dim]
 
-            vecs = torch.stack([e.vector for e in self._entries])  # [N, fd]
+            vecs = torch.stack([e.vector for e in self._entries]).to(dev)  # [N, fd]
             keys = self.key_proj(vecs)  # [N, feature_dim]
 
             scores = (q @ keys.T).squeeze(0) / (self.feature_dim ** 0.5)  # [N]

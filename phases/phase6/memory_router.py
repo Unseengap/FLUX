@@ -121,7 +121,7 @@ class MemoryRouter(nn.Module):
         # ── Merge tier outputs ──
         # Compute working memory contribution
         if wm_waves.numel() > 0:
-            wm_contribution = (wm_waves * torch.softmax(wm_scores, dim=0).unsqueeze(-1)).sum(dim=0)
+            wm_contribution = (wm_waves.cpu() * torch.softmax(wm_scores.cpu(), dim=0).unsqueeze(-1)).sum(dim=0)
         else:
             wm_contribution = torch.zeros(self.wave_dim)
 
@@ -151,11 +151,11 @@ class MemoryRouter(nn.Module):
         else:
             ep_contribution = torch.zeros(self.wave_dim)
 
-        # Weighted merge
+        # Weighted merge — move everything to CPU for safe combination
         merged = (
-            weights[0] * wm_contribution
-            + weights[1] * ep_contribution
-            + weights[2] * query_wave.cpu()
+            weights[0].cpu() * wm_contribution.cpu()
+            + weights[1].cpu() * ep_contribution.cpu()
+            + weights[2].cpu() * query_wave.detach().cpu()
         )
 
         return {
