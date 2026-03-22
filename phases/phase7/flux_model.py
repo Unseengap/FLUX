@@ -677,7 +677,7 @@ class FLUXModel(nn.Module):
         Returns:
             Reconstructed FLUXModel
         """
-        state = torch.load(str(path), map_location='cpu')
+        state = torch.load(str(path), map_location='cpu', weights_only=False)
         config = state['config']
 
         model = cls(config=config, device=device)
