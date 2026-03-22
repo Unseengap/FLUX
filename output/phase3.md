@@ -298,7 +298,47 @@ checkpoints/phase3.phase.pt: 100%
 
 
 
+  ✓ Phase 3 checkpoint downloaded from HuggingFace Hub
+✓ Phase 3 checkpoint loaded (from HuggingFace Hub)
+  Mass Tracker Statistics:
+  ---------------------------------------------
+    count                    : 8068
+[23:43:09]   📊 count: 8068
+    mean_mass                : 1.1208
+[23:43:09]   📊 mean_mass: 1.1207783222198486
+    max_mass                 : 4.2100
+[23:43:09]   📊 max_mass: 4.2100019454956055
+    min_mass                 : 1.1200
+[23:43:09]   📊 min_mass: 1.119999885559082
+    negative_count           : 0
+[23:43:09]   📊 negative_count: 0
 
+  Custom Pipeline Checks (honest metrics):
+  ------------------------------------------------------------------------
+  Input Text                     Recognize    LCS  Trigram  CharAcc
+  ------------------------------------------------------------------------
+  ✓ the cat sat on the mat             True  0.77    0.12    0.05
+[23:43:09]   📊 explore('the cat sat on the m'): lcs=0.77 tri=0.12
+  ✓ hello world                        True  0.91    0.00    0.00
+[23:43:09]   📊 explore('hello world'): lcs=0.91 tri=0.00
+  ✓ deep learning                      True  0.77    0.00    0.00
+[23:43:09]   📊 explore('deep learning'): lcs=0.77 tri=0.00
+  ✓ the sun rises in the east          True  0.76    0.14    0.04
+[23:43:09]   📊 explore('the sun rises in the'): lcs=0.76 tri=0.14
+  ✓ gravitational relevance            True  0.74    0.05    0.13
+[23:43:09]   📊 explore('gravitational releva'): lcs=0.74 tri=0.05
+  ✓ FLUX architecture                  True  0.65    0.00    0.00
+[23:43:10]   📊 explore('FLUX architecture'): lcs=0.65 tri=0.00
+
+  Reinforce / Contradict Concepts:
+  ---------------------------------------------
+  Before reinforce:     mean_mass = 1.1208
+  After reinforce ×5:   mean_mass = 1.1208
+  After contradict ×20: mean_mass = 1.1207
+  Negative concepts:    0
+
+  ✓ Interactive exploration complete
+[23:43:10]   ◼ CELL Cell 14 — Interactive Exploration — PASS
 
 
 
