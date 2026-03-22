@@ -53,6 +53,7 @@ from semantic_memory import SemanticMemory
 from memory_router import MemoryRouter
 from consolidation import ConsolidationProcess
 from flux_model import FLUXModel, OutputHead, FLUXResponse, FLUXStats
+from wave_decoder import WaveDecoder
 from flux_utils import (
     get_device, load_checkpoint, save_checkpoint, checkpoint_exists,
     PhaseLogger,
@@ -180,6 +181,119 @@ class FLUXLarge(FLUXModel):
         # No dimension mismatch — wave_dim stays 432 (CSE is frozen),
         # while field_features scales to 768 for more capacity.
 
+        # ── WaveDecoder: autoregressive byte-level generation ──
+        # The OutputHead predicts byte distributions for training.
+        # The WaveDecoder generates coherent byte SEQUENCES.
+        self.decoder = WaveDecoder(
+            wave_dim=merged['wave_dim'],           # 432
+            field_features=merged['field_features'],  # 768
+            embed_dim=128,
+            hidden_dim=512,
+            num_layers=2,
+            vocab_size=256,
+        ).to(device)
+
+    # ─────────────────────────────────────────────
+    # Override generation to use WaveDecoder
+    # ─────────────────────────────────────────────
+
+    def _get_context(self, text: str) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Run FLUX pipeline and return semantic context for generation.
+
+        Returns:
+            (wave_vec [wave_dim], field_features [field_features])
+        """
+        device = self._device_str
+
+        with torch.no_grad():
+            wave = self.cse.encode(text)
+        wave_vec = wave.full.mean(dim=0).to(device)
+
+        # Field query for context features
+        field_features, sims, locs = self.field.query(wave_vec, k=4)
+        combined = field_features.mean(dim=0)
+
+        # CGN processing for causal enrichment
+        cgn_out = self.cgn(combined)
+        merged = combined + cgn_out
+
+        return wave_vec, merged
+
+    def generate_logits_sequential(self, text: str,
+                                   max_len: int = 100) -> torch.Tensor:
+        """
+        Generate sequential byte logits using the WaveDecoder.
+
+        Args:
+            text: Input context text
+            max_len: Maximum output length
+
+        Returns:
+            [max_len, 256] logits sequence
+        """
+        wave_vec, field_feat = self._get_context(text)
+
+        with torch.no_grad():
+            target_bytes = torch.tensor(
+                list(text.encode('utf-8', errors='replace'))[:max_len],
+                dtype=torch.long, device=wave_vec.device,
+            )
+            logits = self.decoder(target_bytes, wave_vec, field_feat)
+
+        return logits
+
+    def generate(self, prompt: str, max_length: int = 100,
+                 temperature: float = 0.8) -> str:
+        """
+        Generate text continuation using the WaveDecoder.
+
+        The FLUX pipeline provides semantic context (WHAT to say).
+        The WaveDecoder generates coherent bytes (HOW to spell it).
+
+        Args:
+            prompt: Starting text
+            max_length: Maximum bytes to generate
+            temperature: Sampling temperature
+
+        Returns:
+            Generated text (prompt + continuation)
+        """
+        device = self._device_str
+
+        # Run prompt through full FLUX pipeline
+        self.forward(prompt, learn=False)
+
+        # Get semantic context
+        wave_vec, field_feat = self._get_context(prompt)
+
+        # Encode prompt as bytes for seeding the decoder
+        prompt_bytes = torch.tensor(
+            list(prompt.encode('utf-8', errors='replace')),
+            dtype=torch.long, device=device,
+        )
+
+        with torch.no_grad():
+            generated_raw = self.decoder.generate(
+                wave_vec=wave_vec,
+                field_features=field_feat,
+                max_length=max_length,
+                temperature=temperature,
+                prompt_bytes=prompt_bytes,
+            )
+
+        # Decode: prompt bytes + generated continuation
+        try:
+            result = (prompt.encode('utf-8') + generated_raw[len(prompt_bytes):]).decode(
+                'utf-8', errors='replace'
+            )
+        except Exception:
+            result = prompt + generated_raw[len(prompt_bytes):].decode(
+                'latin-1', errors='replace'
+            )
+
+        return result
+
     def get_scale_profile(self) -> ScaleProfile:
         """Return a profile describing this model's scale."""
         stats = self.get_stats()
@@ -216,10 +330,16 @@ class FLUXLarge(FLUXModel):
         model = cls(config=config, device=device)
 
         # Try to load Phase 7 checkpoint for knowledge transfer
-        if checkpoint_exists(7):
+        # Uses load_checkpoint() which falls back to HuggingFace Hub
+        # if the local file is missing (e.g. fresh Colab session)
+        ckpt7 = None
+        try:
             ckpt7 = load_checkpoint(7)
             print(f"  ✓ Phase 7 checkpoint loaded for knowledge transfer")
+        except FileNotFoundError:
+            print(f"  ℹ No Phase 7 checkpoint (local or HF Hub) — starting FLUXLarge from scratch")
 
+        if ckpt7 is not None:
             # Transfer compatible weights (partial load)
             transferred = 0
 
@@ -240,8 +360,6 @@ class FLUXLarge(FLUXModel):
                 print(f"  ℹ Partial transfer skipped: {e}")
 
             print(f"  ✓ Knowledge transfer complete: {transferred} components")
-        else:
-            print(f"  ℹ No Phase 7 checkpoint — starting FLUXLarge from scratch")
 
         model = model.to(device)
         stats = model.get_stats()
@@ -335,6 +453,16 @@ class FLUXLarge(FLUXModel):
                 model.output_head.load_state_dict(ckpt['output_head_state'])
             except Exception:
                 pass
+
+        # ── WaveDecoder state ──
+        if 'decoder_state_dict' in ckpt:
+            try:
+                model.decoder.load_state_dict(ckpt['decoder_state_dict'])
+                print(f"  ✓ WaveDecoder loaded from checkpoint")
+            except Exception:
+                print("  ⚠ WaveDecoder state incompatible — using fresh init (needs retraining)")
+        else:
+            print("  ℹ No WaveDecoder in checkpoint — decoder needs training")
 
         model._learning_steps = ckpt.get('learning_steps', 0)
         model = model.to(device)

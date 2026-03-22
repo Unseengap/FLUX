@@ -35,6 +35,7 @@ if str(Path(__file__).parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).parent))
 
 from flux_large import FLUXLarge, FLUX_LARGE_CONFIG
+from wave_decoder import WaveDecoder
 from flux_utils import (
     get_device, save_checkpoint, load_checkpoint, checkpoint_exists,
     PhaseLogger,
@@ -97,18 +98,21 @@ class OpenWebTextTrainer:
         grad_accum: int = 4,
         checkpoint_interval: int = 5000,
         log: Optional[PhaseLogger] = None,
+        max_seq_len: int = 512,
     ):
         self.model = model
         self.lr = lr
         self.grad_accum = grad_accum
         self.checkpoint_interval = checkpoint_interval
         self.log = log
+        self.max_seq_len = max_seq_len  # max bytes per training sample
 
-        # Only optimize output head + bridge projections
+        # Trainable: output head + bridges + decoder
         self.trainable_params = (
             list(model.output_head.parameters()) +
             list(model.wave_to_field.parameters()) +
-            list(model.field_to_wave.parameters())
+            list(model.field_to_wave.parameters()) +
+            list(model.decoder.parameters())
         )
         self.optimizer = torch.optim.AdamW(
             self.trainable_params, lr=lr, weight_decay=0.01
@@ -135,6 +139,14 @@ class OpenWebTextTrainer:
         """
         Single training step on a text document.
 
+        Two losses are computed:
+        1. Decoder loss: sequential byte prediction with teacher forcing
+           (the WaveDecoder predicts each byte given previous bytes + context)
+        2. Output head loss: next-byte prediction from field state
+           (the original output head, kept for compatibility)
+
+        The decoder loss is the PRIMARY training signal.
+
         Args:
             text: Raw text document
 
@@ -149,7 +161,7 @@ class OpenWebTextTrainer:
             wave = self.model.cse.encode(text)
         wave_vec = wave.full.mean(dim=0).to(device)
 
-        # Thermodynamic settle (field learning)
+        # Thermodynamic settle (field learning — no backprop)
         with torch.no_grad():
             settle_result = self.model.tl.settle_once(wave_vec)
             self.model._learning_steps += 1
@@ -163,36 +175,50 @@ class OpenWebTextTrainer:
             )
             self.model.working_memory.add_perturbation(wave_vec)
 
-        # Output head training (gradient-based)
+        # ── Get FLUX context (no grad through field/CGN) ──
         field_features, sims, locs = self.model.field.query(wave_vec.detach(), k=4)
         combined = field_features.mean(dim=0).detach()
-
         cgn_out = self.model.cgn(combined.detach())
-        merged = combined + cgn_out.detach()
+        merged = (combined + cgn_out).detach()
 
+        # ── Prepare byte targets ──
+        targets = self._text_to_targets(text, device)
+        if targets.numel() == 0:
+            return TrainStepResult(
+                step=self._global_step, loss=0.0, perplexity=1.0,
+                temperature=settle_result.temperature,
+                energy_delta=settle_result.energy_delta,
+                latency_ms=0.0, tokens_seen=self._tokens_seen,
+            )
+
+        # Cap sequence length for memory efficiency
+        max_len = min(len(targets), self.max_seq_len)
+        targets = targets[:max_len]
+
+        # ── Decoder training: sequential byte prediction (teacher forcing) ──
         if self.use_amp:
             with torch.amp.autocast('cuda'):
-                logits = self.model.output_head(merged, wave_context=wave_vec.detach())
-                targets = self._text_to_targets(text, device)
-                if targets.numel() > 0:
-                    target_dist = torch.zeros(256, device=device)
-                    for b in targets[:100]:
-                        target_dist[b.item()] += 1.0
-                    target_dist = target_dist / target_dist.sum().clamp(min=1e-8)
-                    loss = F.cross_entropy(logits.unsqueeze(0), target_dist.unsqueeze(0))
-                else:
-                    loss = torch.tensor(0.0, device=device)
+                decoder_logits = self.model.decoder(
+                    targets, wave_vec.detach(), merged,
+                    max_len=max_len,
+                )
+                # Cross-entropy: predict each byte from previous bytes + context
+                decoder_loss = F.cross_entropy(
+                    decoder_logits.view(-1, 256),
+                    targets.view(-1),
+                )
         else:
-            logits = self.model.output_head(merged, wave_context=wave_vec.detach())
-            targets = self._text_to_targets(text, device)
-            if targets.numel() > 0:
-                target_dist = torch.zeros(256, device=device)
-                for b in targets[:100]:
-                    target_dist[b.item()] += 1.0
-                target_dist = target_dist / target_dist.sum().clamp(min=1e-8)
-                loss = F.cross_entropy(logits.unsqueeze(0), target_dist.unsqueeze(0))
-            else:
-                loss = torch.tensor(0.0, device=device)
+            decoder_logits = self.model.decoder(
+                targets, wave_vec.detach(), merged,
+                max_len=max_len,
+            )
+            decoder_loss = F.cross_entropy(
+                decoder_logits.view(-1, 256),
+                targets.view(-1),
+            )
+
+        # Total loss (decoder is the primary signal)
+        loss = decoder_loss
 
         # Scale loss for gradient accumulation
         scaled_loss = loss / self.grad_accum
@@ -253,9 +279,16 @@ class OpenWebTextTrainer:
         t0 = time.time()
         steps_to_run = min(len(texts), max_steps) if max_steps else len(texts)
 
-        # Set cosine scheduler
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=steps_to_run, eta_min=self.lr * 0.1
+        # Warmup + cosine decay scheduler
+        warmup_steps = min(100, steps_to_run // 10)
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return max(0.01, step / max(warmup_steps, 1))
+            progress = (step - warmup_steps) / max(steps_to_run - warmup_steps, 1)
+            return max(0.1, 0.5 * (1 + math.cos(math.pi * progress)))
+
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer, lr_lambda
         )
 
         losses = []
@@ -312,6 +345,8 @@ class OpenWebTextTrainer:
         """
         Evaluate on a list of texts (no learning, no gradient).
 
+        Uses the WaveDecoder for sequential byte prediction evaluation.
+
         Args:
             texts: Evaluation texts
 
@@ -335,16 +370,22 @@ class OpenWebTextTrainer:
                 cgn_out = self.model.cgn(combined)
                 merged = combined + cgn_out
 
-                logits = self.model.output_head(merged, wave_context=wave_vec)
                 targets = self._text_to_targets(text, device)
+                if targets.numel() == 0:
+                    continue
 
-                if targets.numel() > 0:
-                    target_dist = torch.zeros(256, device=device)
-                    for b in targets[:100]:
-                        target_dist[b.item()] += 1.0
-                    target_dist = target_dist / target_dist.sum().clamp(min=1e-8)
-                    loss = F.cross_entropy(logits.unsqueeze(0), target_dist.unsqueeze(0))
-                    losses.append(loss.item())
+                max_len = min(len(targets), self.max_seq_len)
+                targets = targets[:max_len]
+
+                # Sequential byte prediction via decoder
+                decoder_logits = self.model.decoder(
+                    targets, wave_vec, merged, max_len=max_len,
+                )
+                loss = F.cross_entropy(
+                    decoder_logits.view(-1, 256),
+                    targets.view(-1),
+                )
+                losses.append(loss.item())
 
         self.model.train()
 
@@ -377,6 +418,7 @@ class OpenWebTextTrainer:
             'wave_to_field_state': self.model.wave_to_field.state_dict(),
             'field_to_wave_state': self.model.field_to_wave.state_dict(),
             'output_head_state': self.model.output_head.state_dict(),
+            'decoder_state_dict': self.model.decoder.state_dict(),
             'optimizer_state': self.optimizer.state_dict(),
             'metrics': {
                 'step': step,
@@ -412,7 +454,7 @@ def load_openwebtext_subset(max_docs: int = 10000) -> List[str]:
                 break
             text = sample.get('text', '')
             if len(text) > 50:
-                texts.append(text[:2000])  # Cap per-document length
+                texts.append(text[:4000])  # Cap per-document length
         print(f"  ✓ Loaded {len(texts):,} documents from OpenWebText")
         return texts
     except Exception as e:
