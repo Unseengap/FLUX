@@ -167,13 +167,12 @@ class OpenWebTextTrainer:
             settle_result = self.model.tl.settle_once(wave_vec)
             self.model._learning_steps += 1
 
-            # Episodic memory write
-            compressed = self.model.working_memory.compress(
-                wave_vec.unsqueeze(0)
-            ).squeeze(0)
-            self.model.episodic_memory.write(
-                compressed, fact=text[:200], causal_source="openwebtext_train"
-            )
+            # NOTE: Episodic memory writes are SKIPPED during training.
+            # Training data should NOT flood episodic memory — it drowns
+            # out explicit facts stored later via learn_fact().
+            # The field learns through thermodynamic settling above.
+            # Episodic memory is reserved for deliberate fact storage.
+
             self.model.working_memory.add_perturbation(wave_vec)
 
         # ── Get FLUX context (no grad through field/CGN) ──
