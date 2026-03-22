@@ -125,6 +125,9 @@ def main():
         causal_graph.add_arrow(src, tgt, weight=weight, reason=f"{subj} {rel} {obj}")
         print(f"  ✓ {concept_names[src]:>10} → {concept_names[tgt]:<15}  (w={weight:.2f})  {subj} {rel} {obj}")
 
+    # Register contradictory pairs
+    causal_graph.add_contradiction(2, 3)   # can_fly ⇔ cannot_fly
+
     log.metric("causal_edges", causal_graph.edge_count())
     log.metric("causal_nodes", causal_graph.node_count())
 
@@ -136,9 +139,11 @@ def main():
     trace_not_fly = causal_graph.trace_cause(3, depth=3)
     print(f"    Cannot fly? Chain: {trace_not_fly.chain}  conflict={trace_not_fly.has_conflict}")
 
-    # Conflict detection for penguin
-    summary = causal_graph.get_conflict_summary(2)
-    print(f"    'Can fly' evidence: {summary['conclusion']} (net weight={summary['net_weight']:.2f})")
+    # Entity-level conflict detection — penguin reaches both can_fly and cannot_fly
+    penguin_conflicts = causal_graph.detect_entity_conflicts(1, depth=3)  # penguin=1
+    print(f"    Penguin entity conflicts: {[(concept_names.get(a, a), concept_names.get(b, b)) for a, b in penguin_conflicts]}")
+    sparrow_conflicts = causal_graph.detect_entity_conflicts(4, depth=3)  # sparrow=4
+    print(f"    Sparrow entity conflicts: {[(concept_names.get(a, a), concept_names.get(b, b)) for a, b in sparrow_conflicts]}")
 
     # ════════════════════════════════════════════
     # Stage B: Multi-Timescale Processing

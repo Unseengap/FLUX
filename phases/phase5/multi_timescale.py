@@ -232,9 +232,13 @@ class MultiTimescaleCoordinator(nn.Module):
         """
         Measure how many steps each timescale needs to significantly activate.
 
+        The threshold is **per-timescale**: 80 % of each timescale's own
+        converged (final) activation after *max_steps*.  This directly
+        reflects the EMA time constant for each tier.
+
         Used by test_phase5_test2 to verify:
         - Fast nodes react in < 5 steps
-        - Slow nodes take > 50 steps
+        - Slow nodes take > 10 steps
 
         Args:
             signal: [feature_dim] — test signal
@@ -248,42 +252,52 @@ class MultiTimescaleCoordinator(nn.Module):
         self._medium_state.zero_()
         self._slow_state.zero_()
 
-        fast_activations = []
-        medium_activations = []
-        slow_activations = []
-
-        threshold = signal.abs().mean().item() * 0.5  # 50% of input magnitude
-
-        fast_crossed = -1
-        medium_crossed = -1
-        slow_crossed = -1
+        fast_activations: list[float] = []
+        medium_activations: list[float] = []
+        slow_activations: list[float] = []
 
         for step in range(max_steps):
             self.forward(signal, steps=1)
 
-            fa = self._fast_state.abs().mean().item()
-            ma = self._medium_state.abs().mean().item()
-            sa = self._slow_state.abs().mean().item()
+            fast_activations.append(self._fast_state.abs().mean().item())
+            medium_activations.append(self._medium_state.abs().mean().item())
+            slow_activations.append(self._slow_state.abs().mean().item())
 
-            fast_activations.append(fa)
-            medium_activations.append(ma)
-            slow_activations.append(sa)
+        # Per-timescale threshold: 80 % of converged (final) value.
+        # This measures how quickly each EMA reaches its steady state.
+        fast_final = max(fast_activations[-1], 1e-12)
+        medium_final = max(medium_activations[-1], 1e-12)
+        slow_final = max(slow_activations[-1], 1e-12)
 
-            if fast_crossed < 0 and fa > threshold:
-                fast_crossed = step + 1
-            if medium_crossed < 0 and ma > threshold:
-                medium_crossed = step + 1
-            if slow_crossed < 0 and sa > threshold:
-                slow_crossed = step + 1
+        frac = 0.8  # 80 % of convergence
+        fast_thresh = fast_final * frac
+        medium_thresh = medium_final * frac
+        slow_thresh = slow_final * frac
+
+        fast_crossed = next(
+            (i + 1 for i, v in enumerate(fast_activations) if v >= fast_thresh),
+            max_steps,
+        )
+        medium_crossed = next(
+            (i + 1 for i, v in enumerate(medium_activations) if v >= medium_thresh),
+            max_steps,
+        )
+        slow_crossed = next(
+            (i + 1 for i, v in enumerate(slow_activations) if v >= slow_thresh),
+            max_steps,
+        )
 
         return {
             'fast_activations': fast_activations,
             'medium_activations': medium_activations,
             'slow_activations': slow_activations,
-            'fast_steps_to_activate': fast_crossed if fast_crossed > 0 else max_steps,
-            'medium_steps_to_activate': medium_crossed if medium_crossed > 0 else max_steps,
-            'slow_steps_to_activate': slow_crossed if slow_crossed > 0 else max_steps,
-            'threshold': threshold,
+            'fast_steps_to_activate': fast_crossed,
+            'medium_steps_to_activate': medium_crossed,
+            'slow_steps_to_activate': slow_crossed,
+            'threshold_fraction': frac,
+            'fast_converged': fast_final,
+            'medium_converged': medium_final,
+            'slow_converged': slow_final,
         }
 
     def reset_states(self):

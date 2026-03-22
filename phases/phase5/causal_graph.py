@@ -14,7 +14,7 @@ The graph is a directed acyclic structure where:
 
 import torch
 from torch import Tensor
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, FrozenSet
 from dataclasses import dataclass, field
 
 
@@ -51,6 +51,7 @@ class CausalGraph:
         self.arrows: Dict[int, List[int]] = {}  # source_id -> list of target_ids
         self.evidence: Dict[Tuple[int, int], CausalEdge] = {}
         self._step_counter: int = 0
+        self._contradictions: Set[FrozenSet] = set()  # pairs of contradictory node IDs
 
     def add_arrow(
         self,
@@ -271,6 +272,65 @@ class CausalGraph:
         """Number of causal edges."""
         return len(self.evidence)
 
+    # ─────────────────────────────────────────────
+    # Contradiction Tracking
+    # ─────────────────────────────────────────────
+
+    def add_contradiction(self, node_a: int, node_b: int):
+        """
+        Register that node_a and node_b are mutually contradictory.
+        An entity that reaches both has a conflict.
+
+        Args:
+            node_a: first contradictory node ID
+            node_b: second contradictory node ID
+        """
+        self._contradictions.add(frozenset((node_a, node_b)))
+
+    def has_contradiction(self, node_a: int, node_b: int) -> bool:
+        """Check if two nodes are registered as contradictory."""
+        return frozenset((node_a, node_b)) in self._contradictions
+
+    def detect_entity_conflicts(self, entity: int, depth: int = 5) -> List[Tuple[int, int]]:
+        """
+        Check if *entity* can reach contradictory conclusions.
+
+        Follows causal arrows forward from *entity* up to *depth* hops
+        and checks whether any pair of reachable nodes has been
+        registered as contradictory via ``add_contradiction``.
+
+        Args:
+            entity: source node ID (e.g. 'penguin')
+            depth:  maximum forward hops
+
+        Returns:
+            List of (node_a, node_b) contradictory pairs reachable
+            from entity.  Empty list means no conflict.
+        """
+        reachable = self._find_reachable(entity, depth)
+        conflicts: List[Tuple[int, int]] = []
+        for pair in self._contradictions:
+            a, b = tuple(pair)
+            if a in reachable and b in reachable:
+                conflicts.append((a, b))
+        return conflicts
+
+    def _find_reachable(self, source: int, depth: int) -> Set[int]:
+        """Find all nodes reachable from *source* via forward causal arrows."""
+        reachable: Set[int] = set()
+        frontier = [source]
+        for _ in range(depth):
+            next_frontier: List[int] = []
+            for node in frontier:
+                for t in self.get_targets(node):
+                    if t not in reachable:
+                        reachable.add(t)
+                        next_frontier.append(t)
+            frontier = next_frontier
+            if not frontier:
+                break
+        return reachable
+
     def save_state(self) -> Dict:
         """Save graph state for checkpointing."""
         return {
@@ -287,6 +347,7 @@ class CausalGraph:
                 for k, e in self.evidence.items()
             },
             'step_counter': self._step_counter,
+            'contradictions': [sorted(tuple(p)) for p in self._contradictions],
         }
 
     def load_state(self, state: Dict):
@@ -297,3 +358,6 @@ class CausalGraph:
             edge = CausalEdge(**e_dict)
             self.evidence[(edge.source, edge.target)] = edge
         self._step_counter = state.get('step_counter', 0)
+        self._contradictions = {
+            frozenset(p) for p in state.get('contradictions', [])
+        }

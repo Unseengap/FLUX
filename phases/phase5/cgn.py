@@ -148,16 +148,18 @@ class CausalGeometryNode(nn.Module):
         )
 
         # Step 2: Distance-based influence gating
+        # Normalize by sqrt(feature_dim) to avoid curse-of-dimensionality:
+        # Raw L2 distance in 512-d ≈ 22, making exp(-22) ≈ 0.
         dist = torch.norm(bent_signal - self.orientation, dim=-1, keepdim=True)
+        dist = dist / (self.feature_dim ** 0.5)
         influence = torch.exp(-dist / max(self.radius, 1e-6))
 
         # Step 3: Mass-weighted output
         output = bent_signal * influence * self.mass
 
-        # Step 4: Time constant modulates response (fast nodes fully activate,
-        # slow nodes partially — they accumulate over many steps)
-        time_gate = 1.0 - torch.exp(torch.tensor(-1.0 / max(self.time_const, 1e-6)))
-        output = output * time_gate
+        # Note: temporal gating is handled by MultiTimescaleCoordinator EMA,
+        # not at the node level.  time_const remains as a descriptor used
+        # by the coordinator to categorise nodes into fast/medium/slow.
 
         # Track activation
         with torch.no_grad():
@@ -188,10 +190,9 @@ class CausalGeometryNode(nn.Module):
             signal_2d, self.curvature, self.orientation
         )
         dist = torch.norm(bent_signal - self.orientation, dim=-1, keepdim=True)
+        dist = dist / (self.feature_dim ** 0.5)
         influence = torch.exp(-dist / max(self.radius, 1e-6))
         output = bent_signal * influence * self.mass
-        time_gate = 1.0 - torch.exp(torch.tensor(-1.0 / max(self.time_const, 1e-6)))
-        output = output * time_gate
 
         if was_1d:
             output = output.squeeze(0)
