@@ -50,7 +50,7 @@ def test_timescale_separation():
     print(f"\n  Fast nodes activate at step:   {fast_step}")
     print(f"  Medium nodes activate at step: {medium_step}")
     print(f"  Slow nodes activate at step:   {slow_step}")
-    print(f"  Threshold: {sep['threshold']:.4f}")
+    print(f"  Threshold fraction: {sep.get('threshold_fraction', 'N/A')}")
 
     fast_ok = fast_step < 5
     slow_ok = slow_step > 10  # Relaxed from 50 due to accumulated blending

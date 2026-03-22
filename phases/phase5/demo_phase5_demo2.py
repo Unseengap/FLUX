@@ -50,7 +50,7 @@ def demo_timescale_activation():
     # ─────────────────────────────────────────
     # Print activation timeline
     # ─────────────────────────────────────────
-    print(f"\n  Activation Timeline (threshold={sep['threshold']:.4f}):")
+    print(f"\n  Activation Timeline (threshold_frac={sep.get('threshold_fraction', 0.8)}):")
     print(f"  " + "-" * 60)
     print(f"  {'Step':>6}  {'Fast':>10}  {'Medium':>10}  {'Slow':>10}")
     print(f"  " + "-" * 60)
