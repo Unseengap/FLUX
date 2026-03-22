@@ -2,13 +2,17 @@
 Phase 8: FLUXLarge — Scaled FLUX Configuration for GPT-2 Benchmark
 
 Scales the Phase 7 FLUXModel to approximately GPT-2 small (117M) parameter
-count. Uses wider wave dimensions, larger field, and more CGN nodes.
+count. Uses a larger field, more CGN nodes, and wider internal features.
+
+The CSE (Phase 1) always outputs 432-dim waves — this is fixed. FLUXLarge
+adds an upscale projection (432 → 768) so all downstream components operate
+in the larger 768-dim feature space.
 
 The scaling philosophy follows the physics paradigm:
-- Wider waves = richer semantic representation
-- Larger field = more knowledge capacity
-- More CGN nodes = finer-grained causal reasoning
-- Deeper working memory window = longer effective context
+- Larger field = more knowledge capacity (96³ vs 64³)
+- More CGN nodes = finer-grained causal reasoning (56 vs 28)
+- Wider field features = richer representations (768 vs 512)
+- Deeper working memory window = longer effective context (2048 vs 512)
 """
 
 import sys
@@ -36,7 +40,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from cse import ContinuousSemanticEncoder
-from wave_types import SemanticWave
+from wave_types import SemanticWave, TOTAL_WAVE_DIM
 from field import ResonanceField
 from gravity import GravitationalRelevance
 from thermodynamic import ThermodynamicLearner
@@ -56,16 +60,14 @@ from flux_utils import (
 
 
 # ─────────────────────────────────────────────
-# Scaled Wave Dimensions
+# CSE output dimension (fixed by Phase 1)
 # ─────────────────────────────────────────────
-WAVE_DIMS_LARGE = {
-    'phonetic':  96,
-    'syntactic': 96,
-    'semantic':  384,
-    'temporal':  128,
-    'intensity': 64,
-}
-TOTAL_WAVE_DIM_LARGE = sum(WAVE_DIMS_LARGE.values())  # 768
+CSE_WAVE_DIM = TOTAL_WAVE_DIM  # 432 — always, cannot be changed
+
+# ─────────────────────────────────────────────
+# Scaled Internal Dimensions
+# ─────────────────────────────────────────────
+INTERNAL_DIM_LARGE = 768       # Internal feature width (matches GPT-2 embed dim)
 
 # ─────────────────────────────────────────────
 # Scaled Field Dimensions
@@ -80,8 +82,9 @@ FIELD_FEATURES_LARGE = 768
 # FLUXLarge Configuration
 # ─────────────────────────────────────────────
 FLUX_LARGE_CONFIG = {
-    # CSE (Phase 1) — scaled
-    'wave_dim': TOTAL_WAVE_DIM_LARGE,      # 768
+    # CSE (Phase 1) — wave_dim stays 432 (CSE is frozen / fixed)
+    # The upscale projection handles 432 → 768
+    'wave_dim': CSE_WAVE_DIM,              # 432 — must match CSE output
     'byte_window': 8,
     'byte_stride': 1,
     'interference_radius': 6,               # wider interference
@@ -110,6 +113,7 @@ FLUX_LARGE_CONFIG = {
     'cgn_n_slow': 8,
 
     # Memory (Phase 6) — scaled
+    # wave_dim for memory = 432 (CSE output), feature_dim = 512
     'wm_window_size': 2048,
     'feature_dim': 512,
     'episodic_dim': 512,
@@ -120,6 +124,10 @@ FLUX_LARGE_CONFIG = {
     'output_vocab_size': 256,               # byte-level output
     'max_gen_length': 500,
     'temperature': 0.8,
+
+    # Internal scaling metadata
+    'internal_dim': INTERNAL_DIM_LARGE,     # 768
+    'cse_wave_dim': CSE_WAVE_DIM,           # 432 (actual CSE output)
 }
 
 
@@ -140,14 +148,18 @@ class FLUXLarge(FLUXModel):
     Scaled FLUX model targeting GPT-2 small (~117M) parameter count.
 
     Inherits from FLUXModel (Phase 7) and overrides configuration
-    to use wider waves, larger field, and more nodes.
+    to use a larger field, more nodes, and wider internal features.
+
+    The CSE always outputs 432-dim waves (Phase 1 is frozen). FLUXLarge
+    adds a learnable upscale projection (432 → 768) so all downstream
+    components can operate in a richer feature space.
 
     Key scaling changes:
-    - wave_dim: 432 → 768 (match GPT-2 embed dimension)
     - field: 64³ → 96³ (more knowledge capacity)
-    - field_features: 512 → 768
+    - field_features: 512 → 768 (wider internal representations)
     - CGN nodes: 28 → 56 (finer causal reasoning)
     - Working memory: 512 → 2048 (longer context)
+    - wave_to_field bridge: 432 → 768 (upscale from CSE output)
 
     Usage:
         model = FLUXLarge(device='cuda')
@@ -157,6 +169,16 @@ class FLUXLarge(FLUXModel):
     def __init__(self, config: Optional[Dict[str, Any]] = None, device: str = 'cpu'):
         merged = {**FLUX_LARGE_CONFIG, **(config or {})}
         super().__init__(config=merged, device=device)
+
+        # The parent FLUXModel creates all components using the config:
+        #   - CSE always outputs 432-dim (wave_dim=432 in config, matching Phase 1)
+        #   - wave_to_field bridge: nn.Linear(432, 768) — upscales to larger field
+        #   - field_to_wave bridge: nn.Linear(768, 432) — downscales back
+        #   - field: 96³ × 768 features (larger than Phase 7's 64³ × 512)
+        #   - output_head: accepts field_features=768, wave_context=432
+        #
+        # No dimension mismatch — wave_dim stays 432 (CSE is frozen),
+        # while field_features scales to 768 for more capacity.
 
     def get_scale_profile(self) -> ScaleProfile:
         """Return a profile describing this model's scale."""
@@ -201,9 +223,9 @@ class FLUXLarge(FLUXModel):
             # Transfer compatible weights (partial load)
             transferred = 0
 
-            # CSE — different wave_dim, so we can't directly load
-            # Instead we initialize fresh CSE with larger dimensions
-            print(f"  ℹ CSE: fresh init (wave_dim scaled 432 → {model.config['wave_dim']})")
+            # CSE — wave_dim=432 is the same, but we keep fresh init
+            # since CSE is frozen from Phase 1 and already correct
+            print(f"  ℹ CSE: fresh init (wave_dim={model.config['wave_dim']}, frozen Phase 1)")
 
             # For components with compatible architectures, try partial transfer
             try:

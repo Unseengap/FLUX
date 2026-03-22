@@ -40,9 +40,10 @@ FLUXLarge scales the Phase 7 model to GPT-2 small equivalence:
 
 | Component | Phase 7 (Base) | Phase 8 (Large) | Notes |
 |-----------|---------------|-----------------|-------|
-| CSE wave_dim | 432 | 768 | Match GPT-2 embed dim |
+| CSE wave_dim | 432 | 432 | Frozen Phase 1 — always 432 |
 | Field dims | 64³ | 96³ | Larger field = more capacity |
-| Field features | 512 | 768 | Match wave dim |
+| Field features | 512 | 768 | Wider internal representations |
+| wave_to_field bridge | 432→512 | 432→768 | Upscales CSE → field features |
 | GR k_neighbors | 32 | 64 | Deeper relevance search |
 | CGN fast nodes | 16 | 32 | More surface pattern capacity |
 | CGN medium nodes | 8 | 16 | More semantic capacity |
@@ -52,16 +53,19 @@ FLUXLarge scales the Phase 7 model to GPT-2 small equivalence:
 | Output vocab | 256 | 256 | Still byte-level |
 | **Target params** | ~140M | ~117M | Match GPT-2 small |
 
-### Wave Dimensions (Scaled)
+### Dimension Strategy
+
+The CSE (Phase 1) always outputs 432-dim waves — this is a frozen component.
+FLUXLarge scales the **internal** dimensions (field features, CGN, memory) to 768
+via the bridge projections `wave_to_field: nn.Linear(432, 768)`.
+
 ```python
-WAVE_DIMS_LARGE = {
-    'phonetic':  96,    # up from 64
-    'syntactic': 96,    # up from 64
-    'semantic':  384,   # up from 256
-    'temporal':  128,   # up from 32
-    'intensity': 64,    # up from 16
-}
-TOTAL_WAVE_DIM_LARGE = 768  # Sum = 768, matches GPT-2 embed dim
+# CSE output (fixed):
+CSE_WAVE_DIM = 432    # Frozen Phase 1 output, never changes
+
+# Internal scaling:
+FIELD_FEATURES = 768  # Wider representations for more capacity
+FIELD_DIMS = (96, 96, 96)  # Larger field = more knowledge storage
 ```
 
 ---
