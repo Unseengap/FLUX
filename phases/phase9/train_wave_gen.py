@@ -484,7 +484,7 @@ class Phase9Trainer:
         precomputed = []
         skipped = 0
 
-        print(f"  ℹ Pre-computing frozen pipeline outputs for up to {max_samples:,} samples...")
+        print(f"  ℹ Pre-computing frozen pipeline outputs for up to {max_samples:,} samples...", flush=True)
         t0 = time.time()
 
         for i, text in enumerate(texts):
@@ -528,7 +528,8 @@ class Phase9Trainer:
                     eta = remaining / max(rate, 0.01)
                     print(
                         f"    ... {i+1:,} texts → {len(precomputed):,} valid  "
-                        f"[{rate:.0f} text/s, ETA {eta:.0f}s]"
+                        f"[{rate:.0f} text/s, ETA {eta:.0f}s]",
+                        flush=True,
                     )
 
             except Exception:
@@ -536,7 +537,7 @@ class Phase9Trainer:
                 continue
 
         elapsed = time.time() - t0
-        print(f"  ✓ Pre-computed {len(precomputed):,} samples in {elapsed:.1f}s (skipped {skipped:,})")
+        print(f"  ✓ Pre-computed {len(precomputed):,} samples in {elapsed:.1f}s (skipped {skipped:,})", flush=True)
 
         return precomputed
 
@@ -589,6 +590,9 @@ class Phase9Trainer:
             WGStageResult with training metrics
         """
         t0 = time.time()
+        print(f"\n{'='*60}", flush=True)
+        print(f"  WaveGenerator Training — max_steps={max_steps}, precomputed={'YES' if precomputed is not None else 'NO'}", flush=True)
+        print(f"{'='*60}", flush=True)
 
         # Freeze WaveToText and WaveChunker
         for param in self.wtt.parameters():
@@ -605,10 +609,10 @@ class Phase9Trainer:
         if precomputed is None:
             precomputed = self._precompute_wg_data(texts, max_samples=total_steps + 500)
         else:
-            print(f"  ✓ Using {len(precomputed):,} pre-computed samples (skipping pre-computation)")
+            print(f"  ✓ Using {len(precomputed):,} pre-computed samples (skipping pre-computation)", flush=True)
 
         if len(precomputed) == 0:
-            print("  ✗ No valid samples after pre-computation")
+            print("  ✗ No valid samples after pre-computation", flush=True)
             return WGStageResult(
                 total_steps=0, final_loss=0.0, avg_loss=0.0,
                 wave_cosine_accuracy=0.0, total_time_seconds=time.time() - t0,
@@ -646,7 +650,7 @@ class Phase9Trainer:
             f"WaveGenerator has 0/{_total_p} trainable params! "
             f"Something froze them during pre-computation."
         )
-        print(f"  ✓ Gradient check: {_trainable}/{_total_p} generator params trainable")
+        print(f"  ✓ Gradient check: {_trainable}/{_total_p} generator params trainable", flush=True)
 
         # Quick forward test — verify grad flows
         _m0, _t0_test = precomputed[0]
@@ -659,7 +663,7 @@ class Phase9Trainer:
         )
         del _pred_test, _m0, _t0_test
 
-        print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples")
+        print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples", flush=True)
 
         # ── Training loop — pure GPU, no CPU bottleneck ──
         import random
@@ -749,12 +753,12 @@ class Phase9Trainer:
         avg_loss = sum(all_losses) / max(len(all_losses), 1)
         avg_cos = sum(cosine_accs) / max(len(cosine_accs), 1)
 
-        print(f"\n  ✓ Stage 2 complete: {total_steps} steps")
-        print(f"    Final loss: {final_loss:.4f}")
-        print(f"    Avg cosine accuracy: {avg_cos:.3f}")
-        print(f"    Pre-compute time: {precompute_time:.1f}s")
-        print(f"    Training time: {train_elapsed:.1f}s")
-        print(f"    Total time: {elapsed:.1f}s")
+        print(f"\n  ✓ Stage 2 complete: {total_steps} steps", flush=True)
+        print(f"    Final loss: {final_loss:.4f}", flush=True)
+        print(f"    Avg cosine accuracy: {avg_cos:.3f}", flush=True)
+        print(f"    Pre-compute time: {precompute_time:.1f}s", flush=True)
+        print(f"    Training time: {train_elapsed:.1f}s", flush=True)
+        print(f"    Total time: {elapsed:.1f}s", flush=True)
 
         return WGStageResult(
             total_steps=total_steps,
