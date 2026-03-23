@@ -519,7 +519,7 @@ class Phase9Trainer:
                     continue
 
                 # Store on CPU — GPU can't hold 5K+ samples + model
-                precomputed.append((merged.cpu(), wave_vec.cpu(), target_waves.cpu()))
+                precomputed.append((merged.cpu(), target_waves.cpu()))
 
                 if (i + 1) % 50 == 0:
                     elapsed_so_far = time.time() - t0
@@ -674,7 +674,7 @@ class Phase9Trainer:
         # ── Context loss weight ──
         # Wave 0 must depend on context. Without this, the model learns
         # to ignore field_context and always outputs the same first wave.
-        context_loss_weight = 0.3
+        context_loss_weight = 2.0
 
         print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples", flush=True)
         print(f"    Scheduled sampling: {ss_start:.0%}→{ss_end:.0%} (warmup={ss_warmup})", flush=True)
@@ -699,26 +699,14 @@ class Phase9Trainer:
             if idx == 0 and step > 1:
                 random.shuffle(sample_indices)
             sample_idx = sample_indices[idx]
+            merged_cpu, target_cpu = precomputed[sample_idx]
+            merged = merged_cpu.to(self.device)
+            target_waves = target_cpu.to(self.device)
 
-            # v3 format: (merged, wave_vec, target_waves)
-            # v2 format: (merged, target_waves) — backward compatible
-            sample = precomputed[sample_idx]
-            if len(sample) == 3:
-                merged_cpu, wave_vec_cpu, target_cpu = sample
-                merged = merged_cpu.to(self.device)
-                wave_vec = wave_vec_cpu.to(self.device)
-                target_waves = target_cpu.to(self.device)
-            else:
-                merged_cpu, target_cpu = sample
-                merged = merged_cpu.to(self.device)
-                wave_vec = None
-                target_waves = target_cpu.to(self.device)
-
-            # WaveGenerator forward with scheduled sampling + wave context
+            # WaveGenerator forward with scheduled sampling
             predicted_waves, confidences = self.generator(
                 merged, target_waves,
                 scheduled_sampling_p=ss_p,
-                wave_context=wave_vec,
             )
 
             # Loss: MSE + cosine distance
@@ -760,12 +748,10 @@ class Phase9Trainer:
 
             # Early logging for first steps to confirm training is running
             if step == 1:
-                base_loss = mse_loss.item() + cos_loss.item()
                 print(
                     f"  WG Step     1/{total_steps}  "
-                    f"loss={loss.item():.4f}  base={base_loss:.4f}  "
-                    f"ctx={ctx_loss.item():.4f}  cos_acc={cos_acc:.3f}  "
-                    f"ss_p={ss_p:.2f}  wc={'yes' if wave_vec is not None else 'no'}  "
+                    f"loss={loss.item():.4f}  cos_acc={cos_acc:.3f}  "
+                    f"ctx_loss={ctx_loss.item():.4f}  ss_p={ss_p:.2f}  "
                     f"(first step: {time.time()-_step1_t:.2f}s)", flush=True
                 )
             elif step == 10:
@@ -792,8 +778,6 @@ class Phase9Trainer:
                     f"  WG Step {step:>6}/{total_steps}  "
                     f"loss={avg_loss:.4f}  cos_acc={avg_cos:.3f}  "
                     f"lr={lr_now:.6f}  ss_p={ss_p:.2f}  "
-                    f"base={mse_loss.item()+cos_loss.item():.3f}  "
-                    f"ctx={ctx_loss.item():.3f}  "
                     f"[{steps_per_sec:.1f} step/s, ETA {eta:.0f}s]",
                     flush=True,
                 )
@@ -929,7 +913,6 @@ def generate_text(
             max_waves=max_waves,
             flux_model=flux_model,
             temperature=temperature,
-            wave_context=wave_vec,
         )
 
         # 3. Convert each wave to text bytes (the SPELLING — text-specific)
