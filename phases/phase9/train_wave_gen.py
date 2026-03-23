@@ -540,6 +540,22 @@ class Phase9Trainer:
 
         return precomputed
 
+    def precompute_wg_data(
+        self,
+        texts: List[str],
+        max_samples: int = 10000,
+    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+        """Public wrapper for pre-computing WG training data.
+
+        Call this in a separate cell, then pass the result to
+        train_wave_generator(precomputed=...) to skip re-computation.
+        """
+        # Freeze chunker for consistency
+        for param in self.chunker.parameters():
+            param.requires_grad = False
+        self.chunker.eval()
+        return self._precompute_wg_data(texts, max_samples=max_samples)
+
     # ─────────────────────────────────────────────
     # Stage 2: WaveGenerator Training
     # ─────────────────────────────────────────────
@@ -549,6 +565,7 @@ class Phase9Trainer:
         texts: List[str],
         max_steps: Optional[int] = None,
         log_interval: int = 50,
+        precomputed: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
     ) -> WGStageResult:
         """
         Train WaveGenerator to predict next chunk-wave from context.
@@ -561,9 +578,12 @@ class Phase9Trainer:
             3. GPU utilization goes from ~37% to ~95%
 
         Args:
-            texts: Training documents
+            texts: Training documents (ignored if precomputed is given)
             max_steps: Maximum steps (None = all data)
             log_interval: Print every N steps
+            precomputed: Pre-computed (merged, target_waves) list from
+                         precompute_wg_data(). If provided, skips the
+                         pre-computation phase entirely.
 
         Returns:
             WGStageResult with training metrics
@@ -580,9 +600,12 @@ class Phase9Trainer:
         self.chunker.eval()
         self.generator.train()
 
-        # ── Pre-compute frozen pipeline outputs ──
+        # ── Pre-compute frozen pipeline outputs (or use provided) ──
         total_steps = min(len(texts), max_steps) if max_steps else len(texts)
-        precomputed = self._precompute_wg_data(texts, max_samples=total_steps + 500)
+        if precomputed is None:
+            precomputed = self._precompute_wg_data(texts, max_samples=total_steps + 500)
+        else:
+            print(f"  ✓ Using {len(precomputed):,} pre-computed samples (skipping pre-computation)")
 
         if len(precomputed) == 0:
             print("  ✗ No valid samples after pre-computation")
@@ -682,6 +705,22 @@ class Phase9Trainer:
                 ).mean().item()
             cosine_accs.append(cos_acc)
 
+            # Early logging for first steps to confirm training is running
+            if step == 1:
+                print(
+                    f"  WG Step     1/{total_steps}  "
+                    f"loss={loss.item():.4f}  cos_acc={cos_acc:.3f}  "
+                    f"(first step: {time.time()-_step1_t:.2f}s)", flush=True
+                )
+            elif step == 10:
+                elapsed_10 = time.time() - _step1_t
+                rate_10 = 10 / max(elapsed_10, 0.01)
+                print(
+                    f"  WG Step    10/{total_steps}  "
+                    f"loss={sum(all_losses[-10:])/10:.4f}  "
+                    f"[{rate_10:.1f} step/s]", flush=True
+                )
+
             if step % log_interval == 0:
                 avg_loss = sum(all_losses[-log_interval:]) / min(
                     len(all_losses), log_interval
@@ -697,7 +736,8 @@ class Phase9Trainer:
                     f"  WG Step {step:>6}/{total_steps}  "
                     f"loss={avg_loss:.4f}  cos_acc={avg_cos:.3f}  "
                     f"lr={lr_now:.6f}  "
-                    f"[{steps_per_sec:.1f} step/s, ETA {eta:.0f}s]"
+                    f"[{steps_per_sec:.1f} step/s, ETA {eta:.0f}s]",
+                    flush=True,
                 )
                 if self.log:
                     self.log.metric(f"wg_step_{step}_loss", f"{avg_loss:.4f}")
