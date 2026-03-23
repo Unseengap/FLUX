@@ -611,11 +611,36 @@ class Phase9Trainer:
 
         precompute_time = time.time() - t0
         train_t0 = time.time()
+
+        # ── Verify gradient state after pre-computation ──
+        # _precompute_wg_data runs under torch.no_grad() — ensure it
+        # didn't leak and that the generator's params still track grad.
+        torch.set_grad_enabled(True)
+        _trainable = sum(1 for p in self.generator.parameters() if p.requires_grad)
+        _total_p = sum(1 for p in self.generator.parameters())
+        assert _trainable > 0, (
+            f"WaveGenerator has 0/{_total_p} trainable params! "
+            f"Something froze them during pre-computation."
+        )
+        print(f"  ✓ Gradient check: {_trainable}/{_total_p} generator params trainable")
+
+        # Quick forward test — verify grad flows
+        _m0, _t0_test = precomputed[0]
+        _pred_test, _ = self.generator(_m0, _t0_test[:2])
+        assert _pred_test.requires_grad, (
+            f"Generator output has no grad_fn! "
+            f"grad_enabled={torch.is_grad_enabled()}, "
+            f"context_to_wave.weight.requires_grad="
+            f"{self.generator.context_to_wave[0].weight.requires_grad}"
+        )
+        del _pred_test, _m0, _t0_test
+
         print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples")
 
         # ── Training loop — pure GPU, no CPU bottleneck ──
         import random
         sample_indices = list(range(len(precomputed)))
+        optimizer.zero_grad()
 
         for step in range(1, total_steps + 1):
             # Cycle through pre-computed data with shuffling
