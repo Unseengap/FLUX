@@ -99,7 +99,8 @@ class WaveGenerator(nn.Module):
             nn.GELU(),
             nn.LayerNorm(wave_dim * 2),
             nn.Linear(wave_dim * 2, wave_dim),
-            nn.Tanh(),  # Bounded output — waves are normalized
+            # No Tanh — let waves have natural range. Tanh compressed
+            # output to [-1,1] and killed gradients near boundaries.
         )
 
         # ── Confidence head: how sure is this prediction? ──
@@ -109,6 +110,17 @@ class WaveGenerator(nn.Module):
             nn.GELU(),
             nn.Linear(128, 1),
             nn.Sigmoid(),
+        )
+
+        # ── Wave context projection: CSE wave mean → context enrichment ──
+        # The field context (merged) alone is too abstract — it's an average
+        # of 4 field neighbors that loses the input's surface form.
+        # Adding the CSE wave mean gives direct access to what the input
+        # "sounds like" in wave space, enabling input-dependent generation.
+        self.wave_context_proj = nn.Sequential(
+            nn.Linear(wave_dim, wave_dim),
+            nn.GELU(),
+            nn.Linear(wave_dim, wave_dim),
         )
 
         # ── Learned start-of-sequence wave ──
@@ -265,6 +277,7 @@ class WaveGenerator(nn.Module):
         temperature: float = 1.0,
         skip_interference: bool = False,
         scheduled_sampling_p: float = 0.0,
+        wave_context: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Generate a sequence of waves from field context.
@@ -286,12 +299,22 @@ class WaveGenerator(nn.Module):
                 own prediction as prev_wave instead of ground truth.
                 0.0 = pure teacher forcing, 1.0 = pure free generation.
                 Ramps up during training to cure exposure bias.
+            wave_context: [432] CSE wave mean — direct surface form of
+                the input. Enriches the static field context with actual
+                input information. Critical for input-dependent generation.
 
         Returns:
             (generated_waves [N, 432], confidences [N])
         """
         max_waves = max_waves or self.max_waves
         context_wave = self.context_to_wave(field_context)  # Initial context
+
+        # Enrich with CSE wave mean — gives the generator direct access
+        # to the input's surface form, not just the field's abstract
+        # semantic neighborhood. This is the key fix for input-dependent
+        # generation (v3).
+        if wave_context is not None:
+            context_wave = context_wave + self.wave_context_proj(wave_context)
 
         generated = []
         confidences = []
@@ -359,6 +382,7 @@ class WaveGenerator(nn.Module):
         target_waves: torch.Tensor,
         skip_interference: bool = True,
         scheduled_sampling_p: float = 0.0,
+        wave_context: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Teacher-forced training forward pass (static context — no re-query).
@@ -377,6 +401,7 @@ class WaveGenerator(nn.Module):
                 (default True during training)
             scheduled_sampling_p: Probability of using own prediction
                 as prev_wave instead of ground truth (exposure bias fix)
+            wave_context: [432] CSE wave mean (input surface form)
 
         Returns:
             (predicted_waves [N, 432], confidences [N])
@@ -388,4 +413,5 @@ class WaveGenerator(nn.Module):
             flux_model=None,  # Static context during training
             skip_interference=skip_interference,
             scheduled_sampling_p=scheduled_sampling_p,
+            wave_context=wave_context,
         )
