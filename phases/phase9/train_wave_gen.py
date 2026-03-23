@@ -627,7 +627,7 @@ class Phase9Trainer:
 
         # Quick forward test — verify grad flows
         _m0, _t0_test = precomputed[0]
-        _pred_test, _ = self.generator(_m0, _t0_test[:2])
+        _pred_test, _ = self.generator(_m0.to(self.device), _t0_test[:2].to(self.device))
         assert _pred_test.requires_grad, (
             f"Generator output has no grad_fn! "
             f"grad_enabled={torch.is_grad_enabled()}, "
