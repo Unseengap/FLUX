@@ -1,32 +1,54 @@
-# Phase 9 Specification: Physics-Native Decoder (PND)
-## Replacing Borrowed Attention With FLUX's Own Physics in the Decoder
+# Phase 9 Specification: Wave-Level Generation (WLG)
+## The Universal Generation Engine — Thinking in Waves, Not Bytes
 
-> Prerequisites: Phase 8 checkpoint must exist and pass all smoke tests.
-> Copilot: Open SPECIFICATION.md + PHASE_8_SPEC.md + wave_decoder.py + this file while building.
+> Prerequisites: Phase 8 checkpoint must exist (field, GR, bridges, memory).
+> Copilot: Open SPECIFICATION.md + flux-domanant-domains.md + this file while building.
 >
-> **This is the phase where the decoder stops borrowing from Transformers and starts speaking physics.**
-> Phase 8 proved FLUX can generate bytes. Phase 9 makes that generation *sound like FLUX* —
-> gravitational focus, wave interference coherence, and thermodynamic sampling.
-> The field knows WHAT to say. The physics decoder knows HOW to say it — natively.
+> **This is the phase where FLUX stops spelling letter by letter and starts thinking in concepts.**
+> Phase 8 proved FLUX can generate bytes. Phase 9 replaces byte-by-byte generation with
+> wave-by-wave generation — the same mechanism that will later drive image, audio, molecular,
+> and sensor generation. This is not an improvement to the text decoder. This is the foundation
+> of the universal generation engine described in flux-domanant-domains.md.
+
+---
+
+## The Core Insight
+
+Phase 8's WaveDecoder generates text byte-by-byte: one GRU step per character, ~100 steps
+per sentence. This is like writing by choosing one letter at a time without knowing what
+word you're spelling. It's inherently limited and **only works for text**.
+
+Phase 9 generates **waves** — continuous 432-dim semantic vectors, each representing a
+word or phrase. Then a small last-mile module spells each wave into bytes. This is like
+thinking of the next idea and then writing it down.
+
+```
+Phase 8:  Field → GRU → b → y → t → e → s  (serial, text-only, 100 steps)
+Phase 9:  Field → wave → wave → wave → wave  (parallel-decodable, universal, ~15 steps)
+                    ↓       ↓       ↓       ↓
+                  "The"  "future"  "of"   "AI"   (last-mile WaveToText)
+```
+
+**Why this matters beyond text:** The WaveGenerator is modality-agnostic. For images,
+swap WaveToText for WaveToImage. For audio, swap for WaveToAudio. For molecules, swap
+for WaveToMol. Same generator, different last-mile decoder. One architecture for everything
+in flux-domanant-domains.md.
 
 ---
 
 ## Goal
 
-Replace the three non-physics components in the WaveDecoder with FLUX-native equivalents:
+Build a wave-level generation engine that:
 
-1. **nn.MultiheadAttention** → **Gravitational Readout** (O(log n) mass-weighted focus)
-2. **Raw GRU hidden states** → **Interference-Coherent hidden states** (constructive/destructive wave refinement)
-3. **Fixed-temperature sampling** → **Thermodynamic Sampling** (surprise-driven adaptive temperature)
+1. Generates sequences of 432-dim waves from field context (the universal part)
+2. Converts each output wave to its text bytes (the text-specific last mile)
+3. Uses ONLY physics components: gravitational relevance, wave interference, thermodynamic settling
+4. Is faster than Phase 8 (fewer steps, parallelizable last mile)
+5. Produces more coherent text (word-level generation vs byte-level)
+6. Works on CPU and GPU (no architecture that requires GPU)
 
-All three replacement components already exist in earlier phases and are battle-tested.
-This phase wires them into the decoder — no new physics invented, just physics *applied where it was missing*.
-
-### Why This Matters
-
-The Phase 8 WaveDecoder uses `nn.MultiheadAttention` — the exact mechanism FLUX was built to replace.
-Every other part of FLUX (field storage, relevance retrieval, learning, memory) uses physics.
-The decoder is the last Transformer holdout. Phase 9 completes the physics pipeline end-to-end.
+**Phase 8's WaveDecoder is NOT loaded.** It was a stepping stone — proven insufficient for
+coherent generation. Phase 9 replaces it entirely.
 
 ---
 
@@ -35,33 +57,30 @@ The decoder is the last Transformer holdout. Phase 9 completes the physics pipel
 ```
 phases/phase9/
 ├── PHASE_9_SPEC.md              ← This file (copy to phases/phase9/)
-├── physics_decoder.py           ← PhysicsWaveDecoder — build first
-├── gravity_readout.py           ← DecoderGravityReadout — build second
-├── output_interference.py       ← OutputInterference — build third
-├── thermodynamic_sampler.py     ← ThermodynamicSampler — build fourth
-├── train_physics_decoder.py     ← Fine-tune script — build fifth
-├── benchmark_decoders.py        ← A/B: Phase 8 vs Phase 9 decoder — build sixth
-├── demo_phase9_demo1.py         ← Demo: Gravity readout attention map
-├── demo_phase9_demo2.py         ← Demo: Interference coherence visualization
-├── demo_phase9_demo3.py         ← Demo: Thermodynamic sampling exploration
-├── test_phase9_test1.py         ← Test: Gravity readout retrieves correct positions
-├── test_phase9_test2.py         ← Test: Interference improves generation coherence
-├── test_phase9_test3.py         ← Test: Thermodynamic sampling vs fixed temperature
+├── wave_generator.py            ← WaveGenerator — the universal core, build FIRST
+├── wave_chunker.py              ← WaveChunker — segment CSE output into word-level chunks
+├── wave_to_text.py              ← WaveToText — last-mile wave→bytes decoder
+├── wave_sampler.py              ← ThermodynamicWaveSampler — physics-native sampling
+├── train_wave_gen.py            ← Training script (WaveGenerator + WaveToText jointly)
+├── demo_phase9_demo1.py         ← Demo: Wave-level generation vs byte-level
+├── demo_phase9_demo2.py         ← Demo: Wave sequence visualization
+├── demo_phase9_demo3.py         ← Demo: Thermodynamic sampling temperature trace
+├── test_phase9_test1.py         ← Test: Generated waves match CSE wave distribution
+├── test_phase9_test2.py         ← Test: WaveToText reconstructs known words
+├── test_phase9_test3.py         ← Test: Full pipeline produces valid English words
 ├── RESULTS_PHASE_9.md           ← Auto-generated by PhaseResults
-└── RESULTS_PHASE_9_ABLATION.md  ← Ablation: each enhancement alone + combined
 ```
 
 ---
 
-## Load Phase 8 First
+## Load Phase 8 Components (Skip the Decoder)
 
-Every Phase 9 script must begin with this block. No exceptions.
+Every Phase 9 script loads the trained FLUX components and **ignores** the WaveDecoder:
 
 ```python
 import sys
 from pathlib import Path
 
-# Add shared utils + all prior phases
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / 'phase1'))
 sys.path.insert(0, str(Path(__file__).parent.parent / 'phase2'))
@@ -73,786 +92,935 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'phase7'))
 sys.path.insert(0, str(Path(__file__).parent.parent / 'phase8'))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from flux_utils import load_checkpoint, save_checkpoint, verify_checkpoint_chain
+from flux_utils import load_checkpoint, save_checkpoint
 from flux_large import FLUXLarge
 
-def load_phase8() -> FLUXLarge:
-    """Load and verify Phase 8 checkpoint before Phase 9 starts."""
-    verify_checkpoint_chain(up_to_phase=8)
-    model = FLUXLarge.from_phase8_checkpoint(device='cpu')
+def load_phase8_components(device: str = 'cpu') -> FLUXLarge:
+    """
+    Load Phase 8 FLUX components. The WaveDecoder is NOT used.
 
-    # Smoke test
-    response = model.forward("Phase 9 smoke test", learn=False)
-    assert response.wave is not None, "Wave is None"
-    assert response.field_features is not None, "Field features are None"
-    print("  ✓ Phase 8 (FLUXLarge) loaded and verified")
+    Loads: CSE, Field, GR, TL, CGN, Memory, Bridges
+    Ignores: WaveDecoder (replaced by WaveGenerator + WaveToText)
+    """
+    model = FLUXLarge.from_phase8_checkpoint(device=device)
+
+    # Freeze everything — Phase 9 only trains the new generation modules
+    for param in model.parameters():
+        param.requires_grad = False
+
+    print("  ✓ Phase 8 components loaded (field, GR, memory, bridges)")
+    print("  ✗ WaveDecoder skipped — replaced by WaveGenerator")
     return model
 ```
 
-### What Gets Preserved From Phase 8
+---
 
-**Everything expensive is kept.** Phase 9 only replaces the decoder's cross-attention
-mechanism and adds two lightweight modules. All of these are preserved intact:
+## Architecture Overview
 
-| Component | Source | Status in Phase 9 |
-|-----------|--------|-------------------|
-| CSE (432-dim waves) | Phase 1 | Frozen ✓ |
-| Resonance Field (96³ × 768) | Phase 2 | Preserved ✓ |
-| GR masses + spatial index | Phase 3 | Preserved ✓ |
-| TL temperature dynamics | Phase 4 | Preserved ✓ |
-| CGN causal graph | Phase 5 | Preserved ✓ |
-| Three-tier memory | Phase 6 | Preserved ✓ |
-| Bridge projections (432↔768) | Phase 7/8 | Preserved ✓ |
-| Output head (768→256) | Phase 8 | Preserved ✓ |
-| GRU weights (2-layer, 512) | Phase 8 | Preserved ✓ |
-| Byte embeddings | Phase 8 | Preserved ✓ |
-| **nn.MultiheadAttention** | **Phase 8** | **REPLACED → GravityReadout** |
-| *(new)* OutputInterference | Phase 9 | **Added** |
-| *(new)* ThermodynamicSampler | Phase 9 | **Added** |
+```
+Input: "The future of artificial intelligence is"
+         │
+         ▼
+    CSE.encode()  [frozen Phase 1]
+         │
+         ▼
+    wave_sequence: [seq, 432]  — input waves from CSE
+         │
+         ├──→ Field.query()  → field_features [768]
+         ├──→ GR.forward()   → relevant context [768]
+         └──→ CGN.forward()  → causal context [768]
+                  │
+                  ▼
+            merged_context [768]
+                  │
+         ┌───────┴───────┐
+         │               │
+         ▼               ▼
+    WaveChunker     WaveGenerator
+    (segment input    (generate next
+     into word-level   waves from context
+     wave groups)      + previous waves)
+         │               │
+         │               ▼
+         │        output_waves: [N, 432]
+         │          wave₀  wave₁  wave₂  ...
+         │               │
+         │               ▼
+         │        WaveToText (per chunk, parallel)
+         │          "The" "future" "of" "AI" "is"
+         │               │
+         └───────────────┘
+                  │
+                  ▼
+            Final text output
+```
 
 ---
 
-## Enhancement 1: Gravitational Readout (Replaces nn.MultiheadAttention)
+## Component 1: WaveChunker — Segment Waves Into Word-Level Chunks
 
 ### The Problem
 
-The Phase 8 WaveDecoder uses `nn.MultiheadAttention` to let the GRU output attend
-to the input wave sequence. This is standard Transformer cross-attention — O(n²),
-uniform weight, no physics. It contradicts FLUX's principles.
+CSE outputs one wave per byte position: `[seq_len, 432]`. For "hello world" that's
+11 waves. But we want to generate at the **word level** — one wave per word/phrase.
+We need to learn how to group CSE byte-waves into word-level wave-chunks.
 
-### The Solution: DecoderGravityReadout
+### The Solution
 
-At each decode step, instead of `softmax(QK^T/√d) · V`:
-1. Project each wave position into the GR spatial index
-2. For the current GRU output (query), find k nearest wave positions via spatial tree → **O(log n)**
-3. Weight each position by `mass / distance²` — positions that appeared more often
-   (common patterns) have higher mass and attract the decoder more strongly
-4. Contradicted positions (negative mass) repel — the decoder avoids them
+The WaveChunker segments a CSE wave sequence into word-level groups by detecting
+**interference boundaries** — positions where consecutive waves have low cosine
+similarity (meaning the semantic content shifted, typically at word boundaries).
 
-This is a **drop-in replacement** for `nn.MultiheadAttention`. Same input/output shapes.
-
-### Class: DecoderGravityReadout
+This is pure physics: word boundaries are where wave coherence drops.
 
 ```python
-class DecoderGravityReadout(nn.Module):
+class WaveChunker(nn.Module):
     """
-    Gravitational cross-attention: decoder queries attend to wave
-    positions via mass-weighted spatial lookup instead of softmax.
+    Segment CSE wave sequences into word-level wave chunks.
 
-    Replaces nn.MultiheadAttention in the WaveDecoder.
+    Uses wave interference physics: word boundaries are detected where
+    consecutive waves have low cosine similarity (coherence drop).
+    Each chunk is compressed to a single 432-dim wave via learned pooling.
 
-    Physics:
-        - Wave positions with more evidence (higher mass) attract queries
-        - Contradicted positions (negative mass) repel queries
-        - Spatial index gives O(log n) lookup instead of O(n²)
-        - Gravity constant G is learned (adapts to decoder needs)
+    This is the INVERSE of WaveToText. CSE produces byte-level waves.
+    WaveChunker compresses them into word-level waves.
+    WaveToText expands word-level waves back into bytes.
 
     Args:
-        hidden_dim: Decoder GRU hidden dimension (512)
         wave_dim: CSE wave dimension (432)
-        k_neighbors: Number of wave positions to attend to (16)
-        base_mass: Starting mass for new positions
-        mass_growth_rate: How fast mass grows with access frequency
+        min_chunk_size: Minimum bytes per chunk (2)
+        max_chunk_size: Maximum bytes per chunk (20)
+        coherence_threshold: Cosine similarity below which = boundary
     """
 
     def __init__(
         self,
-        hidden_dim: int = 512,
         wave_dim: int = 432,
-        k_neighbors: int = 16,
-        base_mass: float = 1.0,
-        mass_growth_rate: float = 0.01,
+        min_chunk_size: int = 2,
+        max_chunk_size: int = 20,
+        coherence_threshold: float = 0.5,
     ):
         super().__init__()
-        self.hidden_dim = hidden_dim
-        self.k_neighbors = k_neighbors
+        self.wave_dim = wave_dim
+        self.min_chunk = min_chunk_size
+        self.max_chunk = max_chunk_size
+        self.coherence_threshold = coherence_threshold
 
-        # Project wave positions into readout space
-        self.wave_proj = nn.Linear(wave_dim, hidden_dim)
+        # Learned chunk compression: variable-length byte waves → single wave
+        self.chunk_compress = nn.Sequential(
+            nn.Linear(wave_dim, wave_dim),
+            nn.GELU(),
+            nn.Linear(wave_dim, wave_dim),
+        )
 
-        # Query projection (from GRU output)
-        self.query_proj = nn.Linear(hidden_dim, hidden_dim)
-
-        # Value projection (what gets read out)
-        self.value_proj = nn.Linear(hidden_dim, hidden_dim)
-
-        # Output projection
-        self.out_proj = nn.Linear(hidden_dim, hidden_dim)
-
-        # Learned gravity constant
-        self.G = nn.Parameter(torch.ones(1))
-
-        # Per-call mass tracker (reset per sequence, tracks access frequency)
-        self.mass_tracker = None  # Initialized in prepare()
-
-        # Spatial index for O(log n) lookup
-        self.spatial_index = None  # Initialized in prepare()
-
-    def prepare(self, wave_sequence: torch.Tensor) -> torch.Tensor:
+    def find_boundaries(self, waves: torch.Tensor) -> List[int]:
         """
-        Pre-compute wave K/V and build spatial index for a new sequence.
-        Called once per generation (cached for all decode steps).
+        Detect word boundaries using wave coherence drops.
 
         Args:
-            wave_sequence: [src_seq, wave_dim] full CSE wave output
+            waves: [seq_len, 432] CSE wave output
 
         Returns:
-            wave_kv: [src_seq, hidden_dim] projected wave positions (cached)
+            List of boundary indices (start of each new chunk)
         """
-        wave_kv = self.wave_proj(wave_sequence)  # [src_seq, hidden_dim]
+        # Cosine similarity between consecutive waves
+        cos_sim = F.cosine_similarity(waves[:-1], waves[1:], dim=-1)
 
-        # Build spatial index over wave positions
-        from spatial_index import SpatialIndex
-        self.spatial_index = SpatialIndex(
-            feature_dim=self.hidden_dim,
-            rebuild_threshold=wave_kv.shape[0] + 1,
-            device=str(wave_kv.device),
-        )
-        self.spatial_index.add(wave_kv.detach())
-        self.spatial_index._rebuild_index()
+        boundaries = [0]
+        pos = 0
+        for i in range(len(cos_sim)):
+            chunk_len = i - pos + 1
+            if chunk_len >= self.min_chunk:
+                if cos_sim[i] < self.coherence_threshold or chunk_len >= self.max_chunk:
+                    boundaries.append(i + 1)
+                    pos = i + 1
+        return boundaries
 
-        # Initialize mass tracker — all positions start with base_mass
-        from mass_tracker import MassTracker
-        self.mass_tracker = MassTracker(
-            feature_dim=self.hidden_dim,
-            base_mass=1.0,
-            growth_rate=0.01,
-            device=str(wave_kv.device),
-        )
-        self.mass_tracker.observe(wave_kv.detach())
-
-        return wave_kv
-
-    def forward(
-        self,
-        query: torch.Tensor,
-        wave_kv: torch.Tensor,
-    ) -> torch.Tensor:
+    def forward(self, waves: torch.Tensor) -> Tuple[torch.Tensor, List[Tuple[int, int]]]:
         """
-        Gravitational readout: query attends to wave positions via mass/distance².
+        Segment wave sequence into word-level chunks.
 
         Args:
-            query: [1, seq, hidden_dim] GRU output (current decode state)
-            wave_kv: [src_seq, hidden_dim] pre-computed wave K/V
+            waves: [seq_len, 432] CSE wave output
 
         Returns:
-            [1, seq, hidden_dim] attended context (same shape as nn.MHA output)
+            (chunk_waves [N, 432], spans [(start, end), ...])
         """
-        batch, seq_len, dim = query.shape
-        Q = self.query_proj(query.view(-1, dim))  # [seq, hidden]
-
-        # Find k nearest wave positions via spatial tree — O(log n)
-        neighbor_indices = self.spatial_index.search(Q, k=self.k_neighbors)
-
-        # Gather neighbor keys and values
-        V = self.value_proj(wave_kv)
-        neighbor_keys = wave_kv[neighbor_indices]      # [seq, k, hidden]
-        neighbor_values = V[neighbor_indices]           # [seq, k, hidden]
-
-        # Lookup masses for neighbor positions
-        neighbor_masses = self.mass_tracker.lookup_masses(
-            wave_kv[neighbor_indices.view(-1)].view(-1, dim)
-        ).view(Q.shape[0], self.k_neighbors)
-
-        # Gravitational weighting: mass / distance²
-        Q_exp = Q.unsqueeze(1).expand_as(neighbor_keys)
-        cosine_sim = F.cosine_similarity(Q_exp, neighbor_keys, dim=-1)
-        distances = 1.0 - cosine_sim + 1e-8
-        forces = self.G * neighbor_masses / (distances ** 2)
-
-        # Positive forces attract, negative masses repel
-        weights = F.softmax(forces, dim=-1)
-
-        # Weighted combination of values
-        attended = (weights.unsqueeze(-1) * neighbor_values).sum(dim=1)
-        output = self.out_proj(attended)
-
-        # Reinforce accessed positions (mass grows with use)
-        with torch.no_grad():
-            for idx in neighbor_indices[:, 0]:  # Top-1 accessed position
-                self.mass_tracker.reinforce(wave_kv[idx], strength=0.1)
-
-        return output.view(batch, seq_len, dim)
-```
-
-### Integration Point
-
-In `PhysicsWaveDecoder`, replace:
-```python
-# OLD (Phase 8):
-self.cross_attn = nn.MultiheadAttention(hidden_dim, num_heads, batch_first=True)
-attn_out, _ = self.cross_attn(query=gru_out, key=wave_kv, value=wave_kv)
-
-# NEW (Phase 9):
-self.gravity_readout = DecoderGravityReadout(hidden_dim, wave_dim, k_neighbors=16)
-wave_kv = self.gravity_readout.prepare(wave_sequence)  # Once per sequence
-attn_out = self.gravity_readout(query=gru_out, wave_kv=wave_kv)  # Per step
+        boundaries = self.find_boundaries(waves)
+        chunks = []
+        spans = []
+        for i in range(len(boundaries)):
+            start = boundaries[i]
+            end = boundaries[i + 1] if i + 1 < len(boundaries) else waves.shape[0]
+            chunk = waves[start:end]  # [chunk_len, 432]
+            # Compress chunk to single wave via attention pooling
+            compressed = self.chunk_compress(chunk.mean(dim=0))  # [432]
+            chunks.append(compressed)
+            spans.append((start, end))
+        chunk_waves = torch.stack(chunks)  # [N, 432]
+        return chunk_waves, spans
 ```
 
 ---
 
-## Enhancement 2: Output Interference (Coherence Between Generated Bytes)
+## Component 2: WaveGenerator — The Universal Core
 
-### The Problem
+### This is the reusable piece for ALL modalities.
 
-In Phase 8, each GRU hidden state is projected to logits independently.
-There's no interaction between nearby decode positions — no coherence enforcement.
-If position 5 generates 'h' and position 6 generates 'x', nothing says that's wrong.
+The WaveGenerator predicts the next wave given:
+1. Previous generated waves (autoregressive wave context)
+2. Field context (what the model knows)
+3. Gravitational pull from the field (what's most relevant)
 
-### The Solution: OutputInterference
-
-Apply `apply_neighborhood_interference()` from Phase 1 to the GRU hidden states
-before projecting to logits. This makes nearby decode positions influence each other:
-- **Constructive interference**: if consecutive hidden states encode similar meaning
-  (e.g., continuing a word), they reinforce each other → stronger signal
-- **Destructive interference**: if consecutive hidden states are incoherent
-  (e.g., mid-word language switch), they cancel → weaker, more uncertain logits
-
-This is the wave physics version of "coherence regularization" — but it's not
-a loss term, it's actual physical interference between output waves.
-
-### Class: OutputInterference
+**No GRU. No attention. Pure physics.**
 
 ```python
-class OutputInterference(nn.Module):
+class WaveGenerator(nn.Module):
     """
-    Apply wave interference between adjacent GRU hidden states
-    before byte logit projection. Enforces local coherence in
-    the generated byte sequence.
+    Universal wave sequence generator. Predicts the next 432-dim wave
+    from context and previous waves using FLUX physics.
 
-    Physics:
-        - Adjacent hidden states ARE waves in the decode sequence
-        - Constructive: similar meanings reinforce → confident generation
-        - Destructive: contradicting meanings cancel → uncertain generation
-        - Radius controls how far interference propagates (default: 4 positions)
-        - Scale prevents energy blowup (default: 0.1)
+    This module is MODALITY-AGNOSTIC. It generates waves. What those
+    waves represent (text, image, audio, molecules) depends on what
+    encoder created the input waves and what decoder converts the
+    output waves.
 
-    This is NOT a learned module — it's pure physics applied to hidden states.
-    The scale parameter is learnable to let the decoder control interference strength.
+    Generation mechanism:
+        1. RE-QUERY the field at each step using the latest wave → dynamic context
+        2. GR returns a NEIGHBORHOOD of attractors → multiple valid next concepts
+        3. Apply interference between previous waves → coherence signal
+        4. Combine attractor neighborhood + interference → predict next wave
+        5. Thermodynamic confidence → how certain is this prediction
+
+    Why dynamic re-query matters:
+        Static context (query once, reuse) means "Hello" always generates "Hello".
+        Dynamic re-query means each step sees the full attractor neighborhood —
+        "Hello", "Hey", "Hi" are all nearby attractors with similar mass.
+        The sampler picks one based on temperature. This is how FLUX "knows"
+        there are many ways to express the same concept.
+
+    No GRU. No attention. No Transformer components.
 
     Args:
-        hidden_dim: GRU hidden dimension (512)
-        radius: Interference propagation radius in decode steps
-        initial_scale: Starting interference strength (learnable)
-    """
-
-    def __init__(
-        self,
-        hidden_dim: int = 512,
-        radius: int = 4,
-        initial_scale: float = 0.1,
-    ):
-        super().__init__()
-        self.radius = radius
-
-        # Learnable interference scale — the decoder can dial this up or down
-        self.scale = nn.Parameter(torch.tensor(initial_scale))
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """
-        Apply neighborhood interference to GRU hidden states.
-
-        Args:
-            hidden_states: [seq_len, hidden_dim] GRU outputs (squeezed from batch)
-
-        Returns:
-            [seq_len, hidden_dim] interference-refined hidden states
-        """
-        from interference import apply_neighborhood_interference
-
-        # apply_neighborhood_interference expects [seq_len, dim]
-        refined = apply_neighborhood_interference(
-            waves=hidden_states,
-            radius=self.radius,
-            scale=self.scale.clamp(0.01, 0.5).item(),  # Bounded scale
-        )
-        return refined
-```
-
-### Integration Point
-
-In `PhysicsWaveDecoder.forward()` (teacher-forced training):
-```python
-# After GRU + gravity readout, BEFORE logit projection:
-combined = self.attn_norm(gru_out + attn_out)  # [1, seq, hidden]
-combined = combined.squeeze(0)                   # [seq, hidden]
-
-# NEW: Apply output interference for coherence
-combined = self.output_interference(combined)    # [seq, hidden]
-
-logits = self.output_proj(self.output_norm(combined))  # [seq, 256]
-```
-
-**Note:** During step-by-step generation (`generate_step`), interference is applied over
-a sliding window of the last `radius` hidden states (maintained as a buffer).
-
----
-
-## Enhancement 3: Thermodynamic Sampling (Adaptive Temperature)
-
-### The Problem
-
-Phase 8 uses a fixed temperature parameter for all generation steps:
-```python
-scaled = logits / max(temperature, 1e-8)
-probs = F.softmax(scaled, dim=-1)
-next_byte = torch.multinomial(probs, 1)
-```
-
-This means the model is equally "creative" when generating predictable text
-("The") and surprising text ("defenestration"). A physics-native sampler
-should be more exploratory when surprised, more deterministic when confident.
-
-### The Solution: ThermodynamicSampler
-
-Adapts the Phase 4 `TemperatureManager` for generation:
-
-1. **Track prediction surprise**: At each decode step, measure how spread the logit
-   distribution is (entropy). High entropy = surprise = heat up.
-2. **Adaptive temperature**: When confident (low entropy), cool down → nearly greedy.
-   When uncertain (high entropy), heat up → explore more options.
-3. **Momentum**: Temperature changes smoothly, not instantly — thermal inertia.
-4. **Contradiction avoidance**: If the last few generated bytes had high loss
-   (via teacher-forced scoring), increase temperature to escape the local minimum.
-
-### Class: ThermodynamicSampler
-
-```python
-class ThermodynamicSampler(nn.Module):
-    """
-    Thermodynamic-inspired text sampling that adapts temperature
-    based on the model's confidence at each decode step.
-
-    Instead of a fixed temperature, the system behaves like a
-    physical system settling to equilibrium:
-        - Confident predictions → cool → nearly deterministic
-        - Uncertain predictions → heat → exploratory
-        - Contradiction detected → spike → escape local minimum
-
-    This mirrors Phase 4's TemperatureManager but adapted for generation.
-
-    Args:
-        base_temperature: Baseline temperature (center of adaptation)
-        min_temperature: Floor — never fully greedy
-        max_temperature: Ceiling — never fully random
-        momentum: How quickly temperature changes (0=instant, 1=frozen)
-        entropy_sensitivity: How much entropy affects temperature
-    """
-
-    def __init__(
-        self,
-        base_temperature: float = 0.8,
-        min_temperature: float = 0.3,
-        max_temperature: float = 1.5,
-        momentum: float = 0.7,
-        entropy_sensitivity: float = 0.5,
-    ):
-        super().__init__()
-        self.base_temperature = base_temperature
-        self.min_temperature = min_temperature
-        self.max_temperature = max_temperature
-        self.momentum = momentum
-        self.entropy_sensitivity = entropy_sensitivity
-
-        # State
-        self._current_temp = base_temperature
-        self._entropy_history: List[float] = []
-        self._temp_history: List[float] = []
-
-    def reset(self):
-        """Reset state for a new generation sequence."""
-        self._current_temp = self.base_temperature
-        self._entropy_history = []
-        self._temp_history = []
-
-    def sample(self, logits: torch.Tensor) -> Tuple[int, float]:
-        """
-        Sample next byte using adaptive thermodynamic temperature.
-
-        Args:
-            logits: [vocab_size] raw logits from decoder
-
-        Returns:
-            (sampled_byte, temperature_used)
-        """
-        # Compute entropy of current distribution
-        probs_raw = F.softmax(logits, dim=-1)
-        entropy = -(probs_raw * (probs_raw + 1e-10).log()).sum().item()
-        max_entropy = math.log(logits.shape[0])  # log(256) ≈ 5.545
-        normalized_entropy = entropy / max_entropy  # [0, 1]
-
-        self._entropy_history.append(normalized_entropy)
-
-        # Compute target temperature based on entropy
-        # High entropy → high temperature (explore)
-        # Low entropy → low temperature (exploit)
-        target_temp = self.base_temperature + self.entropy_sensitivity * (
-            normalized_entropy - 0.5
-        ) * 2.0  # Scale [-1, +1] range
-
-        # Contradiction detection: entropy spike = sudden confusion
-        if len(self._entropy_history) >= 3:
-            recent = self._entropy_history[-3:]
-            entropy_jump = recent[-1] - min(recent[:-1])
-            if entropy_jump > 0.3:  # Sudden entropy spike
-                target_temp *= 1.5  # Heat spike to escape
-
-        # Apply momentum (thermal inertia)
-        self._current_temp = (
-            self.momentum * self._current_temp +
-            (1.0 - self.momentum) * target_temp
-        )
-
-        # Clamp to bounds
-        self._current_temp = max(
-            self.min_temperature,
-            min(self.max_temperature, self._current_temp)
-        )
-
-        self._temp_history.append(self._current_temp)
-
-        # Temperature-scaled sampling
-        scaled = logits / self._current_temp
-        probs = F.softmax(scaled, dim=-1)
-        next_byte = torch.multinomial(probs, 1).item()
-
-        return next_byte, self._current_temp
-
-    def get_diagnostics(self) -> Dict[str, Any]:
-        """Return sampling diagnostics for visualization."""
-        return {
-            'entropy_history': self._entropy_history.copy(),
-            'temperature_history': self._temp_history.copy(),
-            'final_temperature': self._current_temp,
-            'avg_entropy': sum(self._entropy_history) / max(1, len(self._entropy_history)),
-            'avg_temperature': sum(self._temp_history) / max(1, len(self._temp_history)),
-        }
-```
-
-### Integration Point
-
-In `PhysicsWaveDecoder.generate()`:
-```python
-# OLD (Phase 8):
-scaled = logits / max(temperature, 1e-8)
-probs = F.softmax(scaled, dim=-1)
-next_byte = torch.multinomial(probs, 1).item()
-
-# NEW (Phase 9):
-next_byte, temp_used = self.thermo_sampler.sample(logits)
-```
-
----
-
-## physics_decoder.py — The Combined PhysicsWaveDecoder
-
-This is the central class. It inherits the Phase 8 WaveDecoder's GRU backbone
-and replaces/augments three components.
-
-### Class: PhysicsWaveDecoder
-
-```python
-class PhysicsWaveDecoder(nn.Module):
-    """
-    Physics-Native Autoregressive Byte Decoder.
-
-    Inherits Phase 8's GRU backbone and byte embeddings, but replaces:
-    1. nn.MultiheadAttention → DecoderGravityReadout (O(log n), mass-weighted)
-    2. Raw hidden states → OutputInterference (wave coherence between steps)
-    3. Fixed temperature → ThermodynamicSampler (surprise-adaptive)
-
-    The GRU weights from Phase 8 are preserved — only the attention mechanism
-    is swapped and two lightweight modules added. A short fine-tune (~1,000–2,000
-    steps) re-adapts the GRU to the gravity readout signal.
-
-    Architecture:
-        field_features → context_proj → GRU initial hidden state
-        wave_sequence → DecoderGravityReadout.prepare() → spatial index + mass tracker
-        per step:
-            byte_embed → GRU → hidden_state
-            hidden_state → DecoderGravityReadout → gravity-weighted wave context
-            hidden + context → OutputInterference → coherence-refined
-            refined → output_proj → logits
-            logits → ThermodynamicSampler → next_byte
-
-    Args:
-        wave_dim: CSE wave dimension (432)
+        wave_dim: Wave dimension (432)
         field_features: Field feature dimension (768 for FLUXLarge)
-        embed_dim: Byte embedding dimension (128)
-        hidden_dim: GRU hidden dimension (512)
-        num_layers: Number of GRU layers (2)
-        k_neighbors: Gravity readout neighbors (16)
-        interference_radius: Output interference radius (4)
-        vocab_size: Output vocabulary size (256 for bytes)
-        dropout: Dropout rate (0.1)
+        max_waves: Maximum waves to generate (50)
+        k_neighbors: Gravitational readout neighbors (16)
+        interference_radius: How many previous waves influence the next (4)
     """
 
     def __init__(
         self,
         wave_dim: int = 432,
         field_features: int = 768,
-        embed_dim: int = 128,
-        hidden_dim: int = 512,
-        num_layers: int = 2,
+        max_waves: int = 50,
         k_neighbors: int = 16,
         interference_radius: int = 4,
-        vocab_size: int = 256,
-        dropout: float = 0.1,
     ):
         super().__init__()
-        self.vocab_size = vocab_size
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.embed_dim = embed_dim
         self.wave_dim = wave_dim
+        self.field_features = field_features
+        self.max_waves = max_waves
+        self.interference_radius = interference_radius
 
-        # ── Byte embedding (preserved from Phase 8) ──
-        self.byte_embed = nn.Embedding(vocab_size + 1, embed_dim)
-        self.BOS_TOKEN = vocab_size
-
-        # ── Context projection (preserved from Phase 8) ──
-        self.context_proj = nn.Sequential(
-            nn.Linear(field_features, hidden_dim),
+        # ── Context bridge: field features → wave space ──
+        self.context_to_wave = nn.Sequential(
+            nn.Linear(field_features, wave_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim * num_layers),
-            nn.Tanh(),
+            nn.Linear(wave_dim, wave_dim),
         )
 
-        # ── Autoregressive GRU (preserved from Phase 8) ──
-        self.gru = nn.GRU(
-            input_size=embed_dim,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout if num_layers > 1 else 0.0,
+        # ── Attractor selector: pick ONE attractor per step (not average) ──
+        # GR returns K neighbors. This scores them. Then we SAMPLE one.
+        # This is what makes generation truly generative (like LLM token sampling):
+        #   LLM:  softmax over vocab → sample one token
+        #   FLUX: gravity over attractors → sample one wave
+        self.attractor_scorer = nn.Sequential(
+            nn.Linear(wave_dim * 2, wave_dim),  # [current_wave + attractor] → score
+            nn.GELU(),
+            nn.Linear(wave_dim, 1),              # → scalar logit
         )
 
-        # ── Enhancement 1: Gravitational Readout (REPLACES nn.MultiheadAttention) ──
-        self.gravity_readout = DecoderGravityReadout(
-            hidden_dim=hidden_dim,
-            wave_dim=wave_dim,
-            k_neighbors=k_neighbors,
-        )
-        self.attn_norm = nn.LayerNorm(hidden_dim)
-
-        # ── Enhancement 2: Output Interference (NEW) ──
-        self.output_interference = OutputInterference(
-            hidden_dim=hidden_dim,
-            radius=interference_radius,
+        # ── Wave predictor: previous_wave + context → next_wave ──
+        # Input: [prev_wave (432) + interference_signal (432) + context (432)] = 1296
+        self.wave_predictor = nn.Sequential(
+            nn.Linear(wave_dim * 3, wave_dim * 2),
+            nn.GELU(),
+            nn.LayerNorm(wave_dim * 2),
+            nn.Linear(wave_dim * 2, wave_dim),
+            nn.Tanh(),  # Bounded output — waves are normalized
         )
 
-        # ── Enhancement 3: Thermodynamic Sampler (NEW, non-parametric) ──
-        self.thermo_sampler = ThermodynamicSampler()
+        # ── Confidence head: how sure is this prediction? ──
+        # Used by thermodynamic sampler to decide when to stop
+        self.confidence_head = nn.Sequential(
+            nn.Linear(wave_dim, 128),
+            nn.GELU(),
+            nn.Linear(128, 1),
+            nn.Sigmoid(),
+        )
 
-        # ── Output projection (preserved from Phase 8) ──
-        self.output_norm = nn.LayerNorm(hidden_dim)
-        self.output_proj = nn.Linear(hidden_dim, vocab_size)
+        # ── Learned start-of-sequence wave ──
+        self.bos_wave = nn.Parameter(torch.randn(wave_dim) * 0.01)
 
-    @classmethod
-    def from_phase8_decoder(cls, phase8_decoder, **kwargs):
+    def compute_interference_signal(self, generated_waves: List[torch.Tensor]) -> torch.Tensor:
         """
-        Construct a PhysicsWaveDecoder by transferring Phase 8 weights.
+        Compute interference from recently generated waves.
 
-        Copies: byte_embed, context_proj, gru, output_norm, output_proj
-        Fresh init: gravity_readout, output_interference, thermo_sampler
+        Nearby waves in the output sequence interfere constructively
+        (reinforcing coherent themes) or destructively (reducing
+        contradictory signals). This is Phase 1's interference
+        physics applied to the output sequence.
 
         Args:
-            phase8_decoder: WaveDecoder from Phase 8 checkpoint
+            generated_waves: List of [432] previously generated waves
 
         Returns:
-            PhysicsWaveDecoder with Phase 8 backbone + physics enhancements
+            [432] interference signal for the next position
         """
-        decoder = cls(
-            wave_dim=phase8_decoder.wave_dim,
-            field_features=phase8_decoder.context_proj[0].in_features,
-            embed_dim=phase8_decoder.embed_dim,
-            hidden_dim=phase8_decoder.hidden_dim,
-            num_layers=phase8_decoder.num_layers,
-            **kwargs,
+        if len(generated_waves) == 0:
+            return torch.zeros(self.wave_dim, device=self.bos_wave.device)
+
+        # Stack recent waves (up to interference_radius)
+        recent = generated_waves[-self.interference_radius:]
+        stacked = torch.stack(recent)  # [R, 432]
+
+        # Apply neighborhood interference
+        from interference import apply_neighborhood_interference
+        interfered = apply_neighborhood_interference(
+            stacked, radius=len(recent) - 1, scale=0.1
         )
 
-        # Transfer Phase 8 weights
-        decoder.byte_embed.load_state_dict(phase8_decoder.byte_embed.state_dict())
-        decoder.context_proj.load_state_dict(phase8_decoder.context_proj.state_dict())
-        decoder.gru.load_state_dict(phase8_decoder.gru.state_dict())
-        decoder.output_norm.load_state_dict(phase8_decoder.output_norm.state_dict())
-        decoder.output_proj.load_state_dict(phase8_decoder.output_proj.state_dict())
-        decoder.attn_norm.load_state_dict(phase8_decoder.attn_norm.state_dict())
+        # The interference signal is the last position after interference
+        return interfered[-1]
 
-        n_transferred = sum(p.numel() for p in decoder.gru.parameters())
-        n_transferred += sum(p.numel() for p in decoder.byte_embed.parameters())
-        n_transferred += sum(p.numel() for p in decoder.context_proj.parameters())
-        n_transferred += sum(p.numel() for p in decoder.output_proj.parameters())
-        n_total = sum(p.numel() for p in decoder.parameters())
+    def forward_step(
+        self,
+        prev_wave: torch.Tensor,
+        interference_signal: torch.Tensor,
+        context_wave: torch.Tensor,
+    ) -> Tuple[torch.Tensor, float]:
+        """
+        Predict the next wave from previous wave + interference + context.
 
-        print(f"  ✓ Transferred {n_transferred:,} / {n_total:,} params from Phase 8")
-        print(f"    New physics modules: {n_total - n_transferred:,} params (need training)")
+        Args:
+            prev_wave: [432] the most recent generated wave
+            interference_signal: [432] coherence signal from recent waves
+            context_wave: [432] field context projected to wave space
 
-        return decoder
+        Returns:
+            (next_wave [432], confidence [0, 1])
+        """
+        combined = torch.cat([prev_wave, interference_signal, context_wave])
+        next_wave = self.wave_predictor(combined)
+        confidence = self.confidence_head(next_wave).item()
+        return next_wave, confidence
+
+    def query_field_attractors(
+        self,
+        query_wave: torch.Tensor,
+        flux_model,
+        temperature: float = 1.0,
+    ) -> torch.Tensor:
+        """
+        Re-query the field and SAMPLE one attractor (not average them).
+
+        This is the core of true generative behavior:
+            LLM:  softmax(logits / T) → multinomial → one token
+            FLUX: softmax(scores / T) → multinomial → one attractor wave
+
+        Same prompt, different attractor sampled each time → different
+        words, different phrasings, different ideas. The field topology
+        guarantees only VALID alternatives get sampled ("keyboard" won't
+        appear in a greeting cluster).
+
+        Args:
+            query_wave: [432] the most recent wave (used as field query)
+            flux_model: FLUXLarge instance (for field + GR access)
+            temperature: Sampling temperature (higher = more diverse)
+
+        Returns:
+            [432] one sampled attractor's wave (not an average)
+        """
+        # Project wave to field space and query
+        wave_in_field = flux_model.wave_to_field(query_wave.unsqueeze(0))  # [1, 768]
+
+        # GR returns K nearest attractors weighted by mass
+        # This is O(log n) — the whole point of gravitational relevance
+        neighbors = flux_model.gr.query(
+            wave_in_field.squeeze(0),
+            k=self.k_neighbors,
+        )  # List of (feature [768], mass, distance)
+
+        if not neighbors:
+            return self.context_to_wave(wave_in_field.squeeze(0))
+
+        # Convert each neighbor to wave space and score it
+        attractor_waves = []
+        logits = []
+        for feat, mass, dist in neighbors:
+            nw = self.context_to_wave(feat)  # [432]
+            attractor_waves.append(nw)
+
+            # Score: learned relevance + physics prior (mass / distance²)
+            scorer_input = torch.cat([query_wave, nw])
+            learned_score = self.attractor_scorer(scorer_input)  # [1]
+            physics_prior = torch.log(torch.tensor(mass / max(dist ** 2, 1e-6) + 1e-8))
+            logits.append(learned_score.squeeze() + physics_prior)
+
+        # Stack and sample — THIS is the generative step
+        logits = torch.stack(logits)                          # [K]
+        probs = F.softmax(logits / max(temperature, 1e-8), dim=-1)  # [K]
+        idx = torch.multinomial(probs, 1).item()              # sample ONE
+
+        return attractor_waves[idx]  # One attractor, not an average
+
+    def generate(
+        self,
+        field_context: torch.Tensor,
+        max_waves: Optional[int] = None,
+        min_confidence: float = 0.1,
+        target_waves: Optional[torch.Tensor] = None,
+        flux_model = None,
+    ) -> Tuple[torch.Tensor, List[float]]:
+        """
+        Generate a sequence of waves from field context.
+
+        If flux_model is provided, re-queries the field at each step
+        (dynamic context — enables semantic diversity). Otherwise falls
+        back to static context (faster, but less diverse).
+
+        Args:
+            field_context: [768] merged field + CGN context (initial)
+            max_waves: Maximum waves to generate (default: self.max_waves)
+            min_confidence: Stop if confidence drops below this
+            target_waves: [N, 432] teacher-forcing targets (training only)
+            flux_model: FLUXLarge instance for dynamic field re-query
+
+        Returns:
+            (generated_waves [N, 432], confidences [N])
+        """
+        max_waves = max_waves or self.max_waves
+        context_wave = self.context_to_wave(field_context)  # Initial context
+
+        generated = []
+        confidences = []
+        prev_wave = self.bos_wave
+
+        for i in range(max_waves):
+            interference = self.compute_interference_signal(generated)
+
+            # Dynamic re-query: ask the field "what concepts live near here?"
+            # This is how the model discovers alternatives (many greetings, etc.)
+            if flux_model is not None and not self.training:
+                context_wave = self.query_field_attractors(prev_wave, flux_model)
+
+            if target_waves is not None and i < len(target_waves):
+                # Teacher forcing: use actual target wave as input
+                next_wave, conf = self.forward_step(
+                    prev_wave, interference, context_wave
+                )
+                prev_wave = target_waves[i].detach()  # Feed ground truth
+            else:
+                next_wave, conf = self.forward_step(
+                    prev_wave, interference, context_wave
+                )
+                prev_wave = next_wave.detach()
+
+            generated.append(next_wave)
+            confidences.append(conf)
+
+            # Stop if confidence drops (model is done generating)
+            if target_waves is None and conf < min_confidence:
+                break
+
+        return torch.stack(generated), confidences
+
+    def forward(
+        self,
+        field_context: torch.Tensor,
+        target_waves: torch.Tensor,
+    ) -> Tuple[torch.Tensor, List[float]]:
+        """
+        Teacher-forced training forward pass (static context — no re-query).
+
+        During training we use static context for stable gradients.
+        During inference, pass flux_model to generate() for dynamic re-query.
+
+        Args:
+            field_context: [768] merged context
+            target_waves: [N, 432] ground truth wave sequence
+
+        Returns:
+            (predicted_waves [N, 432], confidences [N])
+        """
+        return self.generate(
+            field_context,
+            max_waves=len(target_waves),
+            target_waves=target_waves,
+            flux_model=None,  # Static context during training
+        )
 ```
 
-### Key Methods
+### Parameter count: ~1.2M
 
-The `PhysicsWaveDecoder` implements the same interface as Phase 8's `WaveDecoder`:
+| Sub-module | Params |
+|------------|--------|
+| context_to_wave | 432×432 + 432×432 ≈ 373K |
+| attractor_scorer | 864×432 + 432×1 ≈ 374K |
+| wave_predictor | 1296×864 + 864×432 ≈ 1.5M |
+| confidence_head | 432×128 + 128 ≈ 55K |
+| bos_wave | 432 |
+| **Total** | **~2.3M** |
 
-| Method | Purpose | Phase 9 Difference |
-|--------|---------|-------------------|
-| `forward(target_bytes, wave_seq, field_feat)` | Teacher-forced training | Gravity readout + interference |
-| `generate_init(wave_seq, field_feat)` | Init decode state | Builds spatial index + mass tracker |
-| `generate_step(byte, hidden, wave_kv)` | Single decode step | Gravity readout + interference buffer |
-| `generate(wave_seq, field_feat, ...)` | Full generation | Thermodynamic sampling |
+---
 
-**Drop-in compatible.** `FLUXLarge` can swap `self.decoder` from `WaveDecoder` to
-`PhysicsWaveDecoder` with zero other changes.
+## Component 3: WaveToText — Last-Mile Text Decoder
+
+### This is the ONLY text-specific component.
+
+WaveToText converts a single 432-dim wave into the bytes that spell that word/phrase.
+It's a tiny module that learns "wave [432] → bytes for this chunk."
+
+Each chunk is independent — "The" doesn't depend on "future" at the spelling level.
+This means chunks decode **in parallel** during inference.
+
+```python
+class WaveToText(nn.Module):
+    """
+    Convert a single 432-dim wave into its byte representation.
+    This is the text-specific last mile — the only part that is
+    NOT reusable across modalities.
+
+    Architecture:
+        wave [432] → project to hidden → unroll bytes autoregressively
+        Simple 1-layer GRU (tiny) — only needs to spell one word,
+        not generate coherent prose. The coherence lives in WaveGenerator.
+
+    For other modalities, replace this with:
+        WaveToImage: wave → pixels
+        WaveToAudio: wave → waveform
+        WaveToMol:   wave → molecular graph
+
+    Args:
+        wave_dim: Input wave dimension (432)
+        hidden_dim: Small GRU hidden (256 — only spelling one word)
+        max_bytes: Maximum bytes per chunk (20)
+        vocab_size: Byte vocabulary (256)
+    """
+
+    def __init__(
+        self,
+        wave_dim: int = 432,
+        hidden_dim: int = 256,
+        max_bytes: int = 20,
+        vocab_size: int = 256,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.max_bytes = max_bytes
+        self.vocab_size = vocab_size
+
+        # Wave → GRU initial hidden
+        self.wave_to_hidden = nn.Linear(wave_dim, hidden_dim)
+
+        # Byte embedding
+        self.byte_embed = nn.Embedding(vocab_size + 2, 64)  # +2 for BOS, EOS
+        self.BOS = vocab_size
+        self.EOS = vocab_size + 1
+
+        # Tiny GRU — only needs to spell one word
+        self.gru = nn.GRU(input_size=64, hidden_size=hidden_dim, batch_first=True)
+
+        # Output projection
+        self.output_proj = nn.Linear(hidden_dim, vocab_size + 1)  # +1 for EOS
+
+    def forward(self, wave: torch.Tensor, target_bytes: torch.Tensor) -> torch.Tensor:
+        """
+        Teacher-forced: predict bytes for one chunk given its wave.
+
+        Args:
+            wave: [432] the wave to decode
+            target_bytes: [chunk_len] byte values for this chunk
+
+        Returns:
+            [chunk_len, 257] logits (256 bytes + EOS)
+        """
+        hidden = self.wave_to_hidden(wave).unsqueeze(0).unsqueeze(0)  # [1, 1, hidden]
+
+        # Input: BOS + target[:-1]
+        bos = torch.full((1,), self.BOS, dtype=torch.long, device=wave.device)
+        input_bytes = torch.cat([bos, target_bytes[:-1]])
+        embedded = self.byte_embed(input_bytes).unsqueeze(0)  # [1, seq, 64]
+
+        output, _ = self.gru(embedded, hidden)
+        logits = self.output_proj(output.squeeze(0))  # [seq, 257]
+        return logits
+
+    def decode(self, wave: torch.Tensor, temperature: float = 0.8) -> bytes:
+        """
+        Autoregressive: generate bytes from a wave.
+
+        Args:
+            wave: [432] the wave to decode
+            temperature: Sampling temperature
+
+        Returns:
+            Decoded bytes
+        """
+        hidden = self.wave_to_hidden(wave).unsqueeze(0).unsqueeze(0)
+        current = torch.full((1,), self.BOS, dtype=torch.long, device=wave.device)
+        result = []
+
+        for _ in range(self.max_bytes):
+            embedded = self.byte_embed(current).unsqueeze(0).unsqueeze(0)
+            output, hidden = self.gru(embedded, hidden)
+            logits = self.output_proj(output.squeeze(0).squeeze(0))
+
+            # Temperature sampling
+            scaled = logits / max(temperature, 1e-8)
+            probs = F.softmax(scaled, dim=-1)
+            next_byte = torch.multinomial(probs, 1).item()
+
+            if next_byte == self.vocab_size:  # EOS
+                break
+            if next_byte < 256:
+                result.append(next_byte)
+                current = torch.tensor([next_byte], device=wave.device)
+
+        return bytes(result)
+```
+
+### Parameter count: ~0.4M
+
+| Sub-module | Params |
+|------------|--------|
+| wave_to_hidden | 432×256 ≈ 111K |
+| byte_embed | 258×64 ≈ 17K |
+| gru | ~200K |
+| output_proj | 256×257 ≈ 66K |
+| **Total** | **~0.4M** |
+
+---
+
+## Component 4: ThermodynamicWaveSampler
+
+Adapts thermodynamic temperature dynamics for wave-level generation.
+Uses the WaveGenerator's confidence head + wave entropy to adaptively
+control exploration. Same physics as Phase 4's TemperatureManager
+but applied to wave generation.
+
+```python
+class ThermodynamicWaveSampler:
+    """
+    Adaptive sampling at the wave level using thermodynamic principles.
+
+    High confidence → low temperature → stay close to predicted wave
+    Low confidence → high temperature → add noise to explore alternatives
+    Entropy spike → heat spike → escape stuck generation
+
+    Non-parametric — no learnable weights. Pure physics.
+    """
+
+    def __init__(
+        self,
+        base_noise: float = 0.1,
+        min_noise: float = 0.01,
+        max_noise: float = 0.5,
+        momentum: float = 0.7,
+    ):
+        self.base_noise = base_noise
+        self.min_noise = min_noise
+        self.max_noise = max_noise
+        self.momentum = momentum
+        self._current_noise = base_noise
+        self._history = []
+
+    def sample_wave(
+        self,
+        predicted_wave: torch.Tensor,
+        confidence: float,
+    ) -> torch.Tensor:
+        """
+        Add thermodynamic noise to the predicted wave based on confidence.
+
+        Args:
+            predicted_wave: [432] the WaveGenerator's prediction
+            confidence: [0, 1] how certain the generator is
+
+        Returns:
+            [432] sampled wave (prediction + calibrated noise)
+        """
+        # Target noise inversely proportional to confidence
+        target_noise = self.base_noise * (1.0 - confidence)
+
+        # Apply momentum (thermal inertia)
+        self._current_noise = (
+            self.momentum * self._current_noise +
+            (1.0 - self.momentum) * target_noise
+        )
+        self._current_noise = max(self.min_noise, min(self.max_noise, self._current_noise))
+        self._history.append(self._current_noise)
+
+        # Add Gaussian noise scaled by current noise level
+        noise = torch.randn_like(predicted_wave) * self._current_noise
+        sampled = predicted_wave + noise
+
+        # Normalize to match wave distribution (unit-scale per dimension)
+        sampled = F.normalize(sampled, dim=-1) * predicted_wave.norm()
+
+        return sampled
+
+    def reset(self):
+        self._current_noise = self.base_noise
+        self._history = []
+```
+
+---
+
+## Semantic Diversity: "Many Ways to Say Hello"
+
+A critical question: if you ask FLUX to generate a greeting, does it know that
+"Hello", "Hey", "Hi", "Good morning", "What's up" are all valid?
+
+**Yes — and this falls out of the physics naturally.**
+
+The resonance field stores concepts as attractors with gravitational mass.
+Greetings form a **cluster** of nearby attractors:
+
+```
+    Field (simplified 2D slice):
+
+                 ● "Good morning" (mass 3.2)
+            ● "Hello" (mass 8.1)
+         ● "Hi" (mass 6.4)
+              ● "Hey" (mass 5.7)
+    ● "What's up" (mass 2.9)
+                                    ● "Goodbye" (mass 7.0) ← different cluster
+                                  ● "See ya" (mass 4.1)
+```
+
+When the WaveGenerator needs to produce a greeting wave, it calls
+`query_field_attractors()` which:
+
+1. **Queries GR** with the current wave → returns K nearest attractors
+2. **Gets the whole neighborhood**: "Hello", "Hi", "Hey", etc.
+3. **Scores each attractor**: learned relevance + physics prior (mass / distance²)
+4. **Builds a probability distribution** via softmax (temperature-controlled)
+5. **Samples ONE attractor** via `torch.multinomial` — not averaging, PICKING
+
+This is the exact same mechanism as LLM token sampling, just in wave space:
+
+```
+LLM:   logits [50257] → softmax/T → multinomial → one token  ("Hello")
+FLUX:  scores [K]     → softmax/T → multinomial → one wave   (wave for "Hello")
+```
+
+The ThermodynamicWaveSampler then controls the temperature:
+- **Low temperature** → distribution is peaked → strongest attractor almost always wins → "Hello"
+- **High temperature** → distribution is flat → weaker attractors have real chances → "What's up"
+- **Temperature = 0** → argmax → always the heaviest attractor → deterministic
+
+**Every generation is genuinely different.** Same prompt, same field, but
+`torch.multinomial` rolls differently each time. Run 1 might sample "Hey",
+run 2 might sample "Hello", run 3 might sample "Good morning". And that
+choice cascades forward — "Hey" leads to casual next-waves, "Good morning"
+leads to formal next-waves, because the field re-query at step 2 sees a
+different neighborhood depending on which greeting was chosen at step 1.
+
+This is NOT template-based. This is NOT random noise. This is sampling from
+the field's learned distribution of valid concepts — the physics-native
+equivalent of sampling from a softmax over vocabulary.
+
+This extends to everything, not just greetings:
+- Many ways to explain a concept (simple vs technical vs analogy)
+- Many valid next sentences in a story
+- Many synonyms for any word
+- Many solutions to a problem (in future reasoning tasks)
+
+The field IS the knowledge of alternatives. Dynamic re-query IS the mechanism
+that surfaces them. Temperature IS the dial between safe/common and creative/rare.
 
 ---
 
 ## Training Strategy
 
-### What Needs Training
+### Two-Stage Joint Training
 
-| Component | Status | Training Needed |
-|-----------|--------|-----------------|
-| GRU (2-layer, 512) | Pre-trained (Phase 8) | Fine-tune only |
-| Byte embeddings | Pre-trained (Phase 8) | Fine-tune only |
-| Context projection | Pre-trained (Phase 8) | Fine-tune only |
-| Output projection + norm | Pre-trained (Phase 8) | Fine-tune only |
-| **Gravity readout projections** | **Fresh init** | **Train from scratch** |
-| **OutputInterference scale** | **Fresh init (0.1)** | **Learn optimal scale** |
-| **ThermodynamicSampler** | **Non-parametric** | **No training (pure physics)** |
+**Stage 1: WaveToText pre-training (fast, ~30 minutes)**
 
-### Fine-Tuning Plan
+Train WaveToText in isolation: given CSE waves for known words, learn to spell them.
+This uses the WaveChunker to get (wave, bytes) pairs from the training data.
 
 ```python
-# train_physics_decoder.py
+# For each document:
+#   1. CSE encode → [seq, 432]
+#   2. WaveChunker → [(chunk_wave, "The"), (chunk_wave, "future"), ...]
+#   3. For each (wave, word):
+#      logits = wave_to_text(wave, word_bytes)
+#      loss = cross_entropy(logits, word_bytes)
+```
 
-# 1. Load Phase 8 model (all components)
-model = FLUXLarge.from_phase8_checkpoint(device=DEVICE)
+This is embarrassingly parallel — every chunk trains independently. No sequential dependency.
 
-# 2. Swap decoder
-physics_decoder = PhysicsWaveDecoder.from_phase8_decoder(model.decoder)
-model.decoder = physics_decoder
+**Stage 2: WaveGenerator training (main training, ~4-6 hours)**
 
-# 3. Freeze everything except decoder
-for name, param in model.named_parameters():
-    if 'decoder' not in name:
-        param.requires_grad = False
+Train WaveGenerator to predict next chunk-wave from previous chunk-waves + field context.
+WaveToText is frozen from Stage 1.
 
-# 4. Use differential learning rates
-optimizer = torch.optim.AdamW([
-    # Fresh gravity readout params: higher LR
-    {'params': model.decoder.gravity_readout.parameters(), 'lr': 3e-4},
-    # Pre-trained GRU/embed params: lower LR (gentle fine-tune)
-    {'params': model.decoder.gru.parameters(), 'lr': 3e-5},
-    {'params': model.decoder.byte_embed.parameters(), 'lr': 3e-5},
-    {'params': model.decoder.context_proj.parameters(), 'lr': 3e-5},
-    {'params': model.decoder.output_proj.parameters(), 'lr': 3e-5},
-    # Interference scale: moderate LR
-    {'params': [model.decoder.output_interference.scale], 'lr': 1e-3},
-])
+```python
+# For each document:
+#   1. CSE encode → [seq, 432]
+#   2. WaveChunker → chunk_waves [N, 432]
+#   3. FLUX pipeline → field_context [768]
+#   4. WaveGenerator.forward(field_context, chunk_waves) → predicted_waves [N, 432]
+#   5. loss = MSE(predicted_waves, chunk_waves) + cosine_loss
+```
 
-# 5. Short fine-tune: 1,000–2,000 steps on OpenWebText
-#    Most weights already know what to do — just adapting to gravity signal
+### Loss Functions
+
+**WaveGenerator loss (wave-to-wave):**
+```python
+# Combination of MSE (magnitude) + cosine (direction)
+mse_loss = F.mse_loss(predicted_waves, target_waves)
+cos_loss = 1.0 - F.cosine_similarity(predicted_waves, target_waves, dim=-1).mean()
+wave_loss = mse_loss + cos_loss
+```
+
+**WaveToText loss (wave-to-bytes):**
+```python
+# Standard cross-entropy per chunk
+text_loss = F.cross_entropy(logits.view(-1, 257), target_bytes_with_eos.view(-1))
 ```
 
 ### Training Data
 
-Same as Phase 8: OpenWebText subset, 512-byte sequences, streaming (no epochs).
+Same source as Phase 8: OpenWebText 50k docs, streamed.
 
-### Expected Training Time
+### Training Time Estimates
 
-- **A100**: ~30–60 minutes (1,000–2,000 steps at ~2 sec/step)
-- **T4**: ~2–3 hours
-- Much faster than Phase 8 full training (~3 hours) because most weights are frozen
+| Stage | What trains | Steps | Time (A100) |
+|-------|------------|-------|-------------|
+| Stage 1: WaveToText | Spelling only | ~50k chunks | ~30 min |
+| Stage 2: WaveGenerator | Wave prediction | ~47k docs | ~4-6 hours |
+| **Total** | | | **~5-7 hours** |
+
+Phase 8 took ~10 hours. Phase 9 is faster because:
+- ~15 wave steps per doc instead of ~100 byte steps
+- Shorter backward graph (15 steps vs 100)
+- WaveToText chunks are parallel in Stage 1
 
 ---
 
-## Benchmark: Phase 8 vs Phase 9 (A/B Comparison)
+## What Gets Preserved From Phase 8
 
-### benchmark_decoders.py
+| Component | Source | Status in Phase 9 |
+|-----------|--------|-------------------|
+| CSE (432-dim waves) | Phase 1 | Frozen ✓ |
+| Resonance Field (96³ × 768) | Phase 2/8 | Frozen ✓ |
+| GR masses + spatial index | Phase 3/8 | Frozen ✓ |
+| TL temperature dynamics | Phase 4/8 | Frozen ✓ |
+| CGN causal graph | Phase 5/8 | Frozen ✓ |
+| Three-tier memory | Phase 6/8 | Frozen ✓ |
+| Bridge projections (432↔768) | Phase 7/8 | Frozen ✓ |
+| Output head (768→256) | Phase 8 | Frozen ✓ (kept for field training signal) |
+| **WaveDecoder (GRU + MHA)** | **Phase 8** | **NOT LOADED — replaced entirely** |
+| WaveChunker | Phase 9 | **New** |
+| WaveGenerator | Phase 9 | **New (universal core)** |
+| WaveToText | Phase 9 | **New (text-specific last mile)** |
+| ThermodynamicWaveSampler | Phase 9 | **New (non-parametric)** |
 
-Side-by-side comparison on identical prompts:
+---
 
-| Metric | Method | Expected Result |
-|--------|--------|-----------------|
-| Perplexity (PTB) | Teacher-forced, real sequential | Phase 9 ≤ Phase 8 |
-| Perplexity (WikiText-2) | Teacher-forced, real sequential | Phase 9 ≤ Phase 8 |
-| Generation coherence | Bigram/trigram consistency | Phase 9 > Phase 8 |
-| Decode speed at 8k | Bytes/sec | Phase 9 > Phase 8 (O(log n) vs O(n²)) |
-| Word-level accuracy | % real English words | Phase 9 > Phase 8 |
-| Temperature adaptation | Entropy tracking | Phase 9 adapts, Phase 8 flat |
+## Full Generation Pipeline
 
-### Ablation Study (RESULTS_PHASE_9_ABLATION.md)
+```python
+def generate(prompt: str, max_waves: int = 30, temperature: float = 0.8) -> str:
+    """Phase 9 generation: think in waves, spell in bytes."""
 
-Test each enhancement alone and combined:
+    # 1. Encode prompt through FLUX pipeline
+    wave_seq, wave_vec, field_context = model._get_context(prompt)
 
-| Configuration | Gravity | Interference | Thermo Sampling | Expected PPL Change |
-|---------------|---------|-------------|-----------------|---------------------|
-| Phase 8 baseline | ✗ | ✗ | ✗ | — |
-| Gravity only | ✓ | ✗ | ✗ | -5% to -10% |
-| Interference only | ✗ | ✓ | ✗ | -2% to -5% |
-| Thermo only | ✗ | ✗ | ✓ | Neutral PPL, better text |
-| All three (Phase 9) | ✓ | ✓ | ✓ | -10% to -15% |
+    # 2. Chunk the prompt into word-level waves (to seed the generator)
+    prompt_chunks, _ = wave_chunker(wave_seq)
+
+    # 3. Generate new waves (the THINKING — universal, modality-agnostic)
+    #    Pass flux_model so each step re-queries the field for nearby attractors.
+    #    This is how the model discovers there are many ways to say "hello".
+    generated_waves, confidences = wave_generator.generate(
+        field_context=field_context,
+        max_waves=max_waves,
+        flux_model=model,  # Dynamic re-query → semantic diversity
+    )
+
+    # 4. Convert each wave to text bytes (the SPELLING — text-specific)
+    sampler = ThermodynamicWaveSampler()
+    text_parts = []
+    for wave, conf in zip(generated_waves, confidences):
+        sampled = sampler.sample_wave(wave, conf)
+        chunk_bytes = wave_to_text.decode(sampled, temperature=temperature)
+        text_parts.append(chunk_bytes.decode('utf-8', errors='replace'))
+
+    return prompt + ' '.join(text_parts)
+```
 
 ---
 
 ## Test Specifications
 
-### Test 1: Gravity Readout Retrieves Correct Positions (`test_phase9_test1.py`)
+### Test 1: Generated Waves Match CSE Distribution (`test_phase9_test1.py`)
 
-**Setup:** Feed a known sentence through CSE. Decode with gravity readout.
+**Setup:** Generate 100 wave sequences from diverse prompts.
 **Verify:**
-- Gravity readout accesses different wave positions at different decode steps
-- Mass grows for frequently accessed positions (common patterns)
-- Negative-mass positions are avoided (if any contradictions exist)
-- **Pass criterion:** Retrieved position indices vary across decode steps (not always position 0).
-  Mutual information between decode position and attended wave position > 0.1.
+- Generated waves have similar L2 norm distribution as real CSE waves
+- Cosine similarity between consecutive generated waves > 0.3 (coherent)
+- Wave dimension statistics (mean, std per component) within 2σ of CSE stats
+- **Pass criterion:** KL divergence between generated and real wave stats < 0.5
 
-### Test 2: Interference Improves Generation Coherence (`test_phase9_test2.py`)
+### Test 2: WaveToText Reconstructs Known Words (`test_phase9_test2.py`)
 
-**Setup:** Generate 100-byte sequences with and without OutputInterference.
+**Setup:** Take 500 known words, encode via CSE, chunk, decode via WaveToText.
 **Verify:**
-- Adjacent hidden states have higher cosine similarity with interference ON
-- Generated text has more valid English bigrams with interference ON
-- **Pass criterion:** Bigram validity rate WITH interference > WITHOUT by at least 5%.
-  Hidden state coherence (avg cosine similarity of consecutive states) > 0.5.
+- Word reconstruction accuracy > 80%
+- Character error rate < 0.2
+- **Pass criterion:** ≥80% of common English words correctly spelled
 
-### Test 3: Thermodynamic Sampling vs Fixed Temperature (`test_phase9_test3.py`)
+### Test 3: Full Pipeline Produces Valid English (`test_phase9_test3.py`)
 
-**Setup:** Generate from 10 diverse prompts using both sampling strategies.
+**Setup:** Generate from 20 diverse prompts using the full pipeline.
 **Verify:**
-- Thermodynamic sampler uses lower temperature for confident predictions
-- Thermodynamic sampler uses higher temperature for uncertain predictions
-- Temperature history shows correlated with entropy history
-- **Pass criterion:** Pearson correlation between entropy and temperature > 0.3.
-  Average word-level validity ≥ Phase 8 baseline.
+- ≥50% of output tokens are valid English words (dictionary check)
+- Average word length is between 3 and 8 characters (English-like)
+- Output contains spaces between words
+- **Pass criterion:** Valid word rate ≥ 50%
 
 ---
 
 ## Demo Specifications
 
-### Demo 1: Gravity Readout Attention Map (`demo_phase9_demo1.py`)
+### Demo 1: Wave-Level Generation (`demo_phase9_demo1.py`)
 
-Visual heatmap showing which wave positions the decoder attends to at each generate step.
-Compare against Phase 8's standard attention pattern. Show mass accumulation over time.
-Output: matplotlib figure saved to `gravity_readout_map.png`.
+Generate text from 5 prompts. Show:
+- The wave sequence (number of waves, average confidence)
+- Each wave decoded to its text chunk
+- Final assembled text
+- Comparison metric: valid word rate
 
-### Demo 2: Interference Coherence Visualization (`demo_phase9_demo2.py`)
+### Demo 2: Wave Sequence Visualization (`demo_phase9_demo2.py`)
 
-Side-by-side text generation:
-- Left: Phase 8 (no interference) with cosine similarity curve
-- Right: Phase 9 (with interference) with cosine similarity curve
-Show how interference smooths the hidden state sequence.
-Output: terminal rich table + matplotlib hidden state similarity plot.
+For a single generation:
+- Plot wave cosine similarities (consecutive) — shows coherence
+- Plot wave norms — shows energy per concept
+- Color-code by confidence — green=confident, red=uncertain
+- Output: matplotlib figure saved to `wave_sequence.png`
 
-### Demo 3: Thermodynamic Sampling Exploration (`demo_phase9_demo3.py`)
+### Demo 3: Thermodynamic Sampling Trace (`demo_phase9_demo3.py`)
 
-Generate text and plot:
-- Top: generated text with temperature color-coded (blue=cold, red=hot)
-- Middle: entropy history
-- Bottom: temperature history
-Show how temperature tracks model uncertainty.
-Output: matplotlib multi-panel figure saved to `thermo_sampling.png`.
+Generate with thermodynamic sampling and plot:
+- Top: generated text with confidence per word
+- Middle: noise level history
+- Bottom: confidence history
+- Output: matplotlib figure saved to `thermo_wave_sampling.png`
 
 ---
 
@@ -860,20 +1028,20 @@ Output: matplotlib multi-panel figure saved to `thermo_sampling.png`.
 
 | # | Criterion | Method | Target |
 |---|-----------|--------|--------|
-| 1 | PhysicsWaveDecoder builds and runs | Smoke test | Forward pass completes |
-| 2 | Phase 8 weights transfer correctly | `from_phase8_decoder()` | ≥ 90% of params transferred |
-| 3 | Fine-tune converges in ≤ 2,000 steps | Training loss curve | Final loss ≤ Phase 8 final loss |
-| 4 | Gravity readout is position-aware | Test 1 | MI > 0.1 between decode pos and attended pos |
-| 5 | Interference improves coherence | Test 2 | Bigram validity +5% over Phase 8 |
-| 6 | Thermo sampling adapts temperature | Test 3 | Entropy-temperature correlation > 0.3 |
-| 7 | PTB perplexity ≤ Phase 8 | Benchmark | Phase 9 PPL ≤ Phase 8 PPL |
-| 8 | Decode speed at 8k ≥ Phase 8 | Benchmark | Phase 9 ≥ Phase 8 bytes/sec at 8k |
-| 9 | All 3 tests pass | Tests 1–3 | 3/3 |
-| 10 | All 3 demos produce output | Demos 1–3 | 3/3 |
-| 11 | Ablation results documented | Ablation script | RESULTS_PHASE_9_ABLATION.md generated |
-| 12 | Checkpoint saved as phase9.phase.pt | save_checkpoint(9, ...) | File exists |
-| 13 | RESULTS_PHASE_9.md generated | PhaseResults | File exists |
-| 14 | No Transformer attention anywhere in decoder | Code audit | Zero nn.MultiheadAttention imports |
+| 1 | WaveGenerator builds and runs | Smoke test | Forward pass completes |
+| 2 | WaveChunker segments text into 3-15 word chunks | Unit test | Chunk count reasonable |
+| 3 | WaveToText reconstructs words | Test 2 | ≥80% accuracy on common words |
+| 4 | Generated waves match CSE distribution | Test 1 | KL div < 0.5 |
+| 5 | Full pipeline produces English words | Test 3 | Valid word rate ≥ 50% |
+| 6 | Training completes in < 8 hours on A100 | Training | Time measured |
+| 7 | Generation is faster than Phase 8 | Timing | Fewer total steps per sentence |
+| 8 | Works on CPU | Test | All tests pass on CPU device |
+| 9 | No nn.MultiheadAttention anywhere | Code audit | Zero Transformer imports |
+| 10 | No GRU in WaveGenerator | Code audit | GRU only in WaveToText |
+| 11 | All 3 tests pass | Tests 1-3 | 3/3 |
+| 12 | All 3 demos produce output | Demos 1-3 | 3/3 |
+| 13 | Checkpoint saved as phase9.phase.pt | save_checkpoint(9, ...) | File exists |
+| 14 | RESULTS_PHASE_9.md generated | PhaseResults | File exists |
 
 ---
 
@@ -882,19 +1050,18 @@ Output: matplotlib multi-panel figure saved to `thermo_sampling.png`.
 ```python
 {
     'phase': 9,
-    'timestamp': str,                    # ISO format
-    'config': dict,                      # FLUXLarge config + Phase 9 decoder config
-    'decoder_config': {
+    'timestamp': str,
+    'config': dict,              # FLUXLarge config + Phase 9 config
+    'phase9_config': {
         'wave_dim': 432,
         'field_features': 768,
-        'embed_dim': 128,
-        'hidden_dim': 512,
-        'num_layers': 2,
+        'max_waves': 50,
         'k_neighbors': 16,
         'interference_radius': 4,
-        'vocab_size': 256,
+        'wtt_hidden_dim': 256,
+        'wtt_max_bytes': 20,
     },
-    # All Phase 8 component states (preserved)
+    # All Phase 8 component states (frozen, preserved)
     'cse_state_dict': OrderedDict,
     'field_state_dict': OrderedDict,
     'gr_state': dict,
@@ -908,18 +1075,19 @@ Output: matplotlib multi-panel figure saved to `thermo_sampling.png`.
     'wave_to_field_state': OrderedDict,
     'field_to_wave_state': OrderedDict,
     'output_head_state': OrderedDict,
-    # Phase 9 decoder state (replaces Phase 8 decoder)
-    'physics_decoder_state_dict': OrderedDict,
+    # Phase 9 new module states
+    'wave_chunker_state_dict': OrderedDict,
+    'wave_generator_state_dict': OrderedDict,
+    'wave_to_text_state_dict': OrderedDict,
     # Metrics
     'metrics': {
-        'fine_tune_steps': int,
-        'fine_tune_loss': float,
-        'phase8_baseline_ppl': float,
-        'phase9_ppl': float,
-        'ppl_improvement': float,
-        'bigram_validity': float,
-        'entropy_temp_correlation': float,
-        'ablation_results': dict,
+        'wtt_pretraining_steps': int,
+        'wtt_word_accuracy': float,
+        'wg_training_steps': int,
+        'wg_final_loss': float,
+        'wg_wave_cosine_accuracy': float,
+        'valid_word_rate': float,
+        'total_training_time': float,
     },
 }
 ```
@@ -928,99 +1096,132 @@ Output: matplotlib multi-panel figure saved to `thermo_sampling.png`.
 
 ## Build Order
 
-Build in exactly this order — each file depends on the previous:
+Build in exactly this order:
 
-1. **gravity_readout.py** — `DecoderGravityReadout` class (uses Phase 3 SpatialIndex + MassTracker)
-2. **output_interference.py** — `OutputInterference` class (uses Phase 1 interference functions)
-3. **thermodynamic_sampler.py** — `ThermodynamicSampler` class (adapts Phase 4 TemperatureManager)
-4. **physics_decoder.py** — `PhysicsWaveDecoder` (combines all three + GRU backbone)
-5. **train_physics_decoder.py** — Fine-tune script (loads Phase 8, swaps decoder, trains)
-6. **benchmark_decoders.py** — A/B comparison script (Phase 8 vs Phase 9)
-7. **test_phase9_test1.py** — Gravity readout position awareness test
-8. **test_phase9_test2.py** — Interference coherence test
-9. **test_phase9_test3.py** — Thermodynamic sampling correlation test
-10. **demo_phase9_demo1.py** — Gravity attention map visualization
-11. **demo_phase9_demo2.py** — Interference coherence visualization
-12. **demo_phase9_demo3.py** — Thermodynamic sampling visualization
+1. **wave_chunker.py** — WaveChunker (segment CSE waves into word-level chunks)
+2. **wave_to_text.py** — WaveToText (tiny GRU that spells one word from a wave)
+3. **wave_generator.py** — WaveGenerator (universal wave sequence predictor)
+4. **wave_sampler.py** — ThermodynamicWaveSampler (confidence-adaptive noise)
+5. **train_wave_gen.py** — Two-stage training (WaveToText pre-train + WaveGenerator)
+6. **test_phase9_test1.py** — Wave distribution test
+7. **test_phase9_test2.py** — Word reconstruction test
+8. **test_phase9_test3.py** — Full pipeline English word test
+9. **demo_phase9_demo1.py** — Generation output demo
+10. **demo_phase9_demo2.py** — Wave visualization
+11. **demo_phase9_demo3.py** — Thermodynamic sampling trace
 
 ---
 
-## Key Physics Principles Honored
+## Physics Principles Honored
 
 | FLUX Principle | How Phase 9 Applies It |
-|----------------|-----------------------|
-| No all-pairs attention | Gravity readout uses O(log n) spatial lookup, not O(n²) softmax |
-| Mass = evidence | Wave positions accessed more often gain mass, attract future queries |
-| Negative mass = contradiction | Contradicted positions repel the decoder |
-| Local updates only | OutputInterference affects only ±radius positions, not whole sequence |
-| Energy minimization | ThermodynamicSampler settles to confident choices, explores when uncertain |
-| Continuous waves | GRU hidden states treated as waves with interference physics |
-| No borrowed Transformer parts | Zero uses of nn.MultiheadAttention in the decoder path |
+|----------------|----------------------|
+| No Transformer attention | WaveGenerator uses interference + field gravity, no MHA |
+| Waves are the native unit | Generation IS wave prediction, bytes are just spelling |
+| Interference = coherence | Output wave sequence uses apply_neighborhood_interference |
+| Gravitational relevance | Field context retrieved via O(log n) spatial lookup |
+| Thermodynamic settling | Wave sampling noise adapts to prediction confidence |
+| Gravitational diversity | Field re-query at each step discovers alternative attractors |
+| Modality-agnostic | WaveGenerator has zero text-specific logic |
+| Local updates only | Interference only affects ±radius positions |
+| Energy = confidence | Confidence head acts as energy measurement |
 
 ---
 
-## Estimated Parameter Counts
+## The Multi-Modal Future (Why This Matters)
+
+After Phase 9, adding a new modality requires ONLY:
+
+```
+New modality = new encoder + new last-mile decoder
+
+Vision:    ImageCSE (pixels → [N, 432] waves) + WaveToImage (wave → pixels)
+Audio:     AudioCSE (waveform → [N, 432] waves) + WaveToAudio (wave → samples)
+Molecules: MolCSE (graph → [N, 432] waves) + WaveToMol (wave → atoms)
+Sensors:   SensorCSE (timeseries → [N, 432] waves) + WaveToSignal (wave → readings)
+```
+
+The WaveGenerator, field, GR, memory, causal graph — ALL shared.
+One model. Every modality. This is the architecture from flux-domanant-domains.md.
+
+---
+
+## Parameter Summary
 
 | Module | Parameters | Status |
 |--------|-----------|--------|
-| byte_embed | ~33K | Transferred from Phase 8 |
-| context_proj | ~790K | Transferred from Phase 8 |
-| GRU (2-layer, 512) | ~2.6M | Transferred from Phase 8 |
-| output_proj + norm | ~132K | Transferred from Phase 8 |
-| attn_norm | ~1K | Transferred from Phase 8 |
-| **DecoderGravityReadout** | **~1.3M** | **New (4 Linear layers + G)** |
-| **OutputInterference scale** | **1** | **New (single learnable scalar)** |
-| **ThermodynamicSampler** | **0** | **Non-parametric** |
-| **Total** | **~4.9M** | **~3.6M transferred, ~1.3M new** |
+| WaveChunker | ~370K | New |
+| WaveGenerator | ~2.3M | New (universal core) |
+| WaveToText | ~400K | New (text last mile) |
+| ThermodynamicWaveSampler | 0 | Non-parametric |
+| **Phase 9 total new** | **~3.1M** | |
+| Phase 8 frozen components | ~75M | Preserved |
+| **Grand total** | **~78.1M** | |
 
-The new physics modules add only ~1.3M parameters. Most capacity comes from Phase 8.
+Lighter than Phase 8's decoder (~5M). Faster to train. And it's the foundation
+for every modality in the FLUX vision.
 
 ---
 
 ## Notebook
 
-A Colab notebook `notebooks/phase9_colab.ipynb` follows the standard cell structure:
+Colab notebook `notebooks/phase9_colab.ipynb` follows standard cell structure:
 
 1. Clone/pull + mount Drive
 2. Install deps
 3. Logger + hardware + secrets
-4. Load Phase 8 + build PhysicsWaveDecoder
-5. Fine-tune on OpenWebText (~1,000–2,000 steps)
-6. Save checkpoint + upload to HF Hub
-7. Test 1: Gravity readout position awareness
-8. Test 2: Interference coherence
-9. Test 3: Thermodynamic sampling
-10. Demo 1: Gravity attention map
-11. Demo 2: Interference coherence visualization
-12. Demo 3: Thermodynamic sampling exploration
-13. A/B Benchmark: Phase 8 vs Phase 9
-14. Ablation study
-15. Results summary + full log
-16. Final upload
-17. Save artifacts to Drive
+4. Load Phase 8 components (skip WaveDecoder)
+5. Stage 1: WaveToText pre-training (~30 min)
+6. Stage 2: WaveGenerator training (~4-6 hours)
+7. Save checkpoint + upload to HF Hub
+8. Test 1: Wave distribution match
+9. Test 2: Word reconstruction accuracy
+10. Test 3: Full pipeline English words
+11. Demo 1: Wave-level generation
+12. Demo 2: Wave sequence visualization
+13. Demo 3: Thermodynamic sampling trace
+14. Results summary + full log
+15. Final upload
+16. Save artifacts to Drive
 
 ---
 
 ## FAQ
 
-**Q: Why not just scale the GRU bigger?**
-A: More parameters ≠ better physics. The GRU backbone does its job (sequential state tracking).
-The problem is the cross-attention (non-physics) and the lack of output coherence. Bigger GRU
-with the same Transformer attention is still using Transformer attention.
+**Q: How does FLUX know there are many ways to greet someone?**
+A: The field stores "Hello", "Hey", "Hi", "Good morning" as nearby attractors with
+similar gravitational mass. During generation, `query_field_attractors()` re-queries
+the field at each step and builds a **probability distribution** over nearby attractors
+(mass/distance² = physics prior, plus a learned relevance score). Then it SAMPLES one
+via `torch.multinomial` — just like an LLM samples one token from softmax. Different
+runs sample different attractors → genuinely different output. This isn't noise or
+templates — it's sampling from the field's learned concept distribution. Temperature
+controls diversity: low = predictable ("Hello"), high = creative ("What's up").
+And each choice cascades: picking "Hey" at step 1 changes the field neighborhood
+at step 2 (casual context), so the divergence compounds through the sequence.
 
-**Q: Will this fix gibberish?**
-A: Phase 9 alone won't fix gibberish if the issue is insufficient training data.
-Gravity readout + interference improve WHERE the decoder looks and HOW coherent
-the output is. But fixing gibberish also requires more training data (Phase 8.5 curriculum)
-and longer training runs. Phase 9 gives the decoder better tools; curriculum gives it
-better material. They're complementary.
+**Q: Why not just make the GRU bigger?**
+A: A bigger GRU is still byte-level — 100 steps per sentence, text-only, no transfer to
+other modalities. Wave-level generation is ~15 steps, parallelizable, and works for any
+modality. It's less work that scales further.
 
-**Q: Can we stack Phase 8.5 curriculum ON TOP of Phase 9?**
-A: Yes — and that's the intended path. Phase 9 builds the physics decoder.
-Then Phase 8.5's curriculum trains it on progressively harder material.
-They address different bottlenecks (architecture vs data).
+**Q: How does WaveChunker know where words are?**
+A: It doesn't use linguistic rules. It detects wave coherence drops — positions where
+consecutive CSE waves are dissimilar. This naturally aligns with word/phrase boundaries
+because the CSE's semantic dimension shifts at word boundaries. It's physics, not NLP.
 
-**Q: What if gravity readout is slower than MHA?**
-A: At short sequences (< 128 bytes), it may be slightly slower due to spatial index
-overhead. At long sequences (> 1k), it should be faster because O(log n) << O(n²).
-The benchmark will quantify this crossover point.
+**Q: What if WaveToText can't spell words correctly?**
+A: WaveToText is pre-trained in Stage 1 specifically on (wave, word) pairs. It only needs
+to spell one word at a time from a 432-dim hint. This is a much simpler task than Phase 8's
+byte decoder which had to generate entire sentences. If a single word can't be decoded from
+its 432-dim wave, the problem is in the CSE encoding, not the decoder.
+
+**Q: Will this work on CPU?**
+A: Yes. The WaveGenerator uses Linear layers + interference (both CPU-friendly). No
+attention matrices. No large matrix multiplications. Field query uses the spatial index
+which is CPU-native (FAISS or KDTree). WaveToText's tiny GRU is 256-hidden — trivial.
+
+**Q: Can Phase 8.5 curriculum still apply?**
+A: Yes. Wave-level training uses the same data pipeline. Curriculum (simple text → harder
+text) is orthogonal to the generation architecture. If anything, curriculum works better
+with waves because simple text = shorter wave sequences = faster training per doc.
