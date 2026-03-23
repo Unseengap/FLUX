@@ -518,7 +518,8 @@ class Phase9Trainer:
                     skipped += 1
                     continue
 
-                precomputed.append((merged, target_waves))
+                # Store on CPU — GPU can't hold 5K+ samples + model
+                precomputed.append((merged.cpu(), target_waves.cpu()))
 
                 if (i + 1) % 50 == 0:
                     elapsed_so_far = time.time() - t0
@@ -648,7 +649,9 @@ class Phase9Trainer:
             if idx == 0 and step > 1:
                 random.shuffle(sample_indices)
             sample_idx = sample_indices[idx]
-            merged, target_waves = precomputed[sample_idx]
+            merged_cpu, target_cpu = precomputed[sample_idx]
+            merged = merged_cpu.to(self.device)
+            target_waves = target_cpu.to(self.device)
 
             # WaveGenerator forward (teacher-forced) — all on GPU
             predicted_waves, confidences = self.generator(
