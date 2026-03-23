@@ -47,6 +47,7 @@ from wave_chunker import WaveChunker
 from wave_generator import WaveGenerator
 from wave_to_text import WaveToText
 from wave_sampler import ThermodynamicWaveSampler
+from field_walk_generator import FieldWalkGenerator
 
 
 # ─────────────────────────────────────────────
@@ -343,6 +344,98 @@ class Phase9Trainer:
             merged = combined + cgn_out                                # [768]
 
         return merged
+
+    # ─────────────────────────────────────────────
+    # Field Population: Densify Field with Chunk-Level Attractors
+    # ─────────────────────────────────────────────
+
+    @torch.no_grad()
+    def populate_field(
+        self,
+        texts: List[str],
+        max_chunks: int = 50000,
+    ) -> Dict[str, Any]:
+        """
+        Densify the resonance field with chunk-level attractors.
+
+        Phase 7 only perturbed the field with ~60 document-level means.
+        For field-walk generation, we need word/chunk-level attractors
+        so the walker has dense stepping stones.
+
+        For each training document:
+            1. CSE encode → wave sequence
+            2. WaveChunker → chunk waves (word-level)
+            3. field.perturb(chunk_wave) → create local attractor
+            4. tl.settle_once(chunk_wave) → energy minimization
+
+        This is ~20 lines of physics. No gradients. No optimizer.
+        The field's own resistance (mass) prevents catastrophic forgetting.
+
+        Args:
+            texts: Training documents
+            max_chunks: Maximum total chunk perturbs
+
+        Returns:
+            Dict with population statistics
+        """
+        t0 = time.time()
+        total_perturbs = 0
+        attractors_before = self.model.field.num_attractors()
+
+        print(f"  ℹ Populating field with chunk-level attractors (max {max_chunks:,})...", flush=True)
+        print(f"    Field attractors before: {attractors_before:,}", flush=True)
+
+        for i, text in enumerate(texts):
+            if total_perturbs >= max_chunks:
+                break
+            if not text or len(text.strip()) < 10:
+                continue
+
+            try:
+                wave = self.model.cse.encode(text)
+                wave_seq = wave.full.to(self.device)  # [seq, 432]
+                chunk_waves, spans = self.chunker(wave_seq)
+
+                for chunk_wave in chunk_waves:
+                    if total_perturbs >= max_chunks:
+                        break
+                    # Perturb field at this chunk's location
+                    self.model.field.perturb(chunk_wave, strength=0.5)
+                    # TL settle: energy minimization around the perturbation
+                    self.model.tl.settle_once(chunk_wave)
+                    total_perturbs += 1
+
+            except Exception:
+                continue
+
+            if (i + 1) % 200 == 0:
+                elapsed = time.time() - t0
+                rate = total_perturbs / max(elapsed, 0.01)
+                print(
+                    f"    ... {i+1:,} texts → {total_perturbs:,} perturbs  "
+                    f"[{rate:.0f} perturb/s]",
+                    flush=True,
+                )
+
+        # Settle the full field to let it stabilize
+        self.model.field.settle(steps=20, dt=0.1)
+
+        attractors_after = self.model.field.num_attractors()
+        elapsed = time.time() - t0
+
+        stats = {
+            'total_perturbs': total_perturbs,
+            'attractors_before': attractors_before,
+            'attractors_after': attractors_after,
+            'new_attractors': attractors_after - attractors_before,
+            'time_seconds': elapsed,
+        }
+
+        print(f"  ✓ Field populated in {elapsed:.1f}s", flush=True)
+        print(f"    Perturbs: {total_perturbs:,}", flush=True)
+        print(f"    Attractors: {attractors_before:,} → {attractors_after:,} (+{stats['new_attractors']:,})", flush=True)
+
+        return stats
 
     # ─────────────────────────────────────────────
     # Stage 1: WaveToText Pre-Training
@@ -1247,6 +1340,61 @@ def build_phase9_modules(
     print(f"    WaveGenerator: {gen_params:>10,} params")
     print(f"    WaveToText:    {wtt_params:>10,} params")
     print(f"    Total new:     {total:>10,} params")
+
+    return chunker, generator, wtt
+
+
+def build_phase9_modules_fieldwalk(
+    device: str = 'cpu',
+    config: Optional[Dict[str, Any]] = None,
+) -> Tuple[WaveChunker, FieldWalkGenerator, WaveToText]:
+    """
+    Build FLUX-native Phase 9 modules using FieldWalkGenerator.
+
+    The FieldWalkGenerator replaces the GRU/MLP WaveGenerator with
+    a physics-based field walker. ~50 trainable params instead of ~2.4M.
+
+    Args:
+        device: Target device
+        config: Optional config overrides
+
+    Returns:
+        (wave_chunker, field_walk_generator, wave_to_text)
+    """
+    cfg = {**PHASE9_CONFIG, **(config or {})}
+
+    chunker = WaveChunker(
+        wave_dim=cfg['wave_dim'],
+        min_chunk_size=cfg['min_chunk_size'],
+        max_chunk_size=cfg['max_chunk_size'],
+        coherence_threshold=cfg['coherence_threshold'],
+    ).to(device)
+
+    generator = FieldWalkGenerator(
+        wave_dim=cfg['wave_dim'],
+        field_features=cfg['field_features'],
+        k_neighbors=cfg['k_neighbors'],
+        interference_radius=cfg['interference_radius'],
+        max_waves=cfg['max_waves'],
+    ).to(device)
+
+    wtt = WaveToText(
+        wave_dim=cfg['wave_dim'],
+        hidden_dim=cfg['wtt_hidden_dim'],
+        max_bytes=cfg['wtt_max_bytes'],
+    ).to(device)
+
+    # Parameter counts
+    chunker_params = sum(p.numel() for p in chunker.parameters())
+    gen_params = sum(p.numel() for p in generator.parameters())
+    wtt_params = sum(p.numel() for p in wtt.parameters())
+    total = chunker_params + gen_params + wtt_params
+
+    print(f"  Phase 9 modules built (FLUX-native FieldWalk):")
+    print(f"    WaveChunker:        {chunker_params:>10,} params")
+    print(f"    FieldWalkGenerator: {gen_params:>10,} params  ← ~50 learned (physics does the rest)")
+    print(f"    WaveToText:         {wtt_params:>10,} params")
+    print(f"    Total new:          {total:>10,} params")
 
     return chunker, generator, wtt
 
