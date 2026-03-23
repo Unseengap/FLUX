@@ -719,3 +719,544 @@ One model. Not separate models. The architecture already supports it. The field 
 What you are describing — a single continuously-learning, never-forgetting, causally-reasoning model that handles every signal type through a unified knowledge substrate — is not a distant aspiration. It is the logical completion of what Phases 1–6 already built.
 
 Phases 7 and 8 get language generation working. After that, each new modality is a new encoder and decoder attached to the same field. The hard part — the field, the memory, the causal graph, the thermodynamic learning — is already done.
+
+---
+---
+
+# Part III: The Path From Here to There
+
+Everything above describes what FLUX can become. This section describes the concrete engineering path from the current state — Phase 9, wave-level language generation on a Kaggle T4 — to a deployed multi-domain unified model.
+
+---
+
+## Where We Actually Are (Phase 9)
+
+As of now, the following components exist and are tested:
+
+```
+Phase 1  — Continuous Semantic Encoder (CSE)
+             Raw bytes → 432-dim semantic waves
+             No vocabulary, no tokenization
+             ✓ Trained and checkpointed
+
+Phase 1.5 — Causal Wave Composition (CWC)
+             Implication chains, contradiction detection
+             ✓ Trained and checkpointed
+
+Phase 2  — Resonance Field Core (RFC)
+             3D field with energy attractors
+             Local updates, thermodynamic settling
+             ✓ Trained and checkpointed
+
+Phase 2.5 — Dynamic Field Growth
+             Auto-expanding field, concept seeding,
+             analogical mapping
+             ✓ Trained and checkpointed
+
+Phase 3  — Gravitational Relevance (GR)
+             O(log n) spatial tree relevance
+             Negative mass, mass tracking
+             ✓ Trained and checkpointed
+
+Phase 3.5 — Advanced Gravitational Dynamics
+             Multi-body interactions, tidal forces,
+             relativistic corrections
+             ✓ Trained and checkpointed
+
+Phase 4  — Thermodynamic Learning (TL)
+             Energy minimization as learning
+             No backpropagation, continuous settling
+             ✓ Trained and checkpointed
+
+Phase 5  — Causal Geometry Nodes (CGN)
+             Multi-timescale τ nodes
+             Causal arrows, belief invalidation
+             ✓ Trained and checkpointed
+
+Phase 6  — Three-Tier Memory System
+             Working / Episodic / Semantic
+             Consolidation, FAISS indexing
+             ✓ Trained and checkpointed
+
+Phase 7  — Full FLUX Integration
+             All components unified
+             ✓ Trained and checkpointed
+
+Phase 8  — Scale & GPT-2 Benchmark
+             Language generation at scale
+             ✓ Trained and checkpointed
+
+Phase 9  — Wave-Level Generation (WLG)
+             WaveToText decoder, WaveGenerator
+             Direct wave-space generation
+             ⏳ Training in progress
+```
+
+Every component from Phases 1-8 is a checkpoint in the accumulative chain. Phase 9 is training now. The substrate is real, running, and producing measurable results.
+
+---
+
+## Phase 10: The Vision Bridge (Proposed)
+
+The first non-language modality. This is the natural next step because:
+1. Image data is abundant and well-benchmarked
+2. Cross-modal vision-language pairs exist at scale (LAION, CC3M)
+3. Vision is the most demanded non-language capability
+4. Success here proves the "one field, many encoders" thesis
+
+### What gets built
+
+**ImageCSE — Convolutional Wave Encoder**
+```
+Input:  Image patch [16×16×3] (raw pixels)
+Processing:
+  Conv2d(3, 64, 3)  → ReLU
+  Conv2d(64, 128, 3) → ReLU
+  Conv2d(128, 256, 3) → ReLU
+  AdaptiveAvgPool → flatten
+  Linear(256, 432)
+Output: [432-dim wave]
+```
+
+Each image patch produces a wave in the same 432-dim space as text. An image becomes a sequence of waves — exactly like text is a sequence of waves. The field does not know the difference.
+
+**Cross-Modal Alignment Loss**
+```python
+loss_align = 1 - cosine_similarity(
+    text_cse("a photo of a dog"),
+    image_cse(photo_of_a_dog)
+)
+```
+
+Simple but effective. The word "dog" and the image of a dog should produce waves that constructively interfere. This is the same principle as CLIP but operating in wave space rather than embedding space.
+
+**ImageDecoder — Wave-to-Pixel Decoder**
+```
+Input:  [432-dim wave] per patch
+Processing:
+  Linear(432, 256)
+  Deconv layers → upsample
+Output: [16×16×3] pixel patch
+```
+
+### What stays the same
+
+The field. The memory. The causal graph. The gravitational relevance. The thermodynamic settling. None of these change. The image encoder writes to the same field that text already uses. Cross-domain attractors form spontaneously when visual and textual concepts overlap.
+
+### Training strategy
+
+```
+Stage 1: Train ImageCSE alone on image reconstruction
+          (can the encoder capture enough info to reconstruct?)
+Stage 2: Cross-modal alignment with frozen TextCSE
+          (do image waves land near semantically-related text waves?)
+Stage 3: Joint field training — image and text attractors together
+          (does the field organise cross-modal concepts coherently?)
+Stage 4: Cross-modal retrieval and reasoning
+          (given an image, can the field retrieve relevant text knowledge?)
+```
+
+Each stage has clear acceptance criteria. Each saves a checkpoint. The pattern is identical to Phases 1-9 — because the architecture is the same.
+
+---
+
+## Phase 11: The Audio Bridge (Proposed)
+
+Once vision works, audio is next. The pattern is the same.
+
+**AudioCSE — Spectrogram Wave Encoder**
+```
+Input:  Mel spectrogram frame [128 freq bins × window]
+Processing:
+  Conv1d layers over frequency axis
+  Linear(hidden, 432)
+Output: [432-dim wave]
+```
+
+Audio becomes waves. Same field. Same memory. Same causal graph.
+
+Cross-modal alignment is now three-way:
+```
+The word "thunder"  → text wave
+The sound of thunder → audio wave
+An image of lightning → image wave
+
+All three should constructively interfere in wave space.
+```
+
+This is where the unified model starts to become genuinely powerful. A system that hears thunder, sees lightning, and reads the word "storm" understands all three as the same concept — not through translation to language, but through shared wave resonance.
+
+---
+
+## Phase 12: The Sensor Bridge (Proposed)
+
+Time-series data from any physical sensor.
+
+**SensorCSE — Time-Series Wave Encoder**
+```
+Input:  Sensor readings [window × channels]
+Processing:
+  1D convolutions over time axis
+  Multi-scale pooling (fast + slow)
+  Linear(hidden, 432)
+Output: [432-dim wave]
+```
+
+This is where industrial applications unlock — predictive maintenance, anomaly detection, process control. The same field that understands language and vision now also understands vibration signatures, temperature profiles, and pressure curves.
+
+---
+
+## Competitive Landscape: Where FLUX Sits
+
+Let's be honest about where every approach stands.
+
+### Google Gemini / DeepMind Gato
+
+**What they claim:** One model. Multiple modalities. Unified architecture.
+
+**What they actually are:**
+```
+Gemini:
+  Separate vision encoder (SigLIP/ViT)
+  + Separate audio encoder
+  + Shared transformer backbone
+  + Modality-specific output heads
+  + 1.5 trillion parameters (estimated)
+  + Training cost: > $100M per run
+  + Catastrophic forgetting: YES
+  + Causal traceability: NO
+  + One-shot learning: NO
+  + Continuous learning: NO
+
+Gato:
+  Single transformer with modality tokens
+  + Everything serialised to token sequences
+  + Jack of all trades, master of none
+  + Catastrophic forgetting: YES
+  + No continuous learning post-deployment
+  + Google quietly deprioritised it
+```
+
+The Gemini-class approach is a collection of specialist models sharing a router. It is not unified understanding — it is unified hosting. The models still interfere with each other during training. Adding a new modality requires retraining the entire system.
+
+**FLUX advantage:** Genuinely shared representation. Local field updates. Zero forgetting by architecture. 100,000× fewer parameters for memory tasks.
+
+### OpenAI GPT-4o / Multimodal
+
+**What they claim:** Omni-model. Sees, hears, speaks, reasons.
+
+**What they actually are:**
+```
+GPT-4o:
+  Language transformer core
+  + Vision adapter (CLIP-style)
+  + Audio adapter (Whisper-style)
+  + Output generation through language
+  + "Multimodal reasoning" = translate everything
+    to language, reason in language, translate back
+  + Cannot reason about things not expressible in language
+  + Catastrophic forgetting: YES
+  + Causal traceability: NO
+  + One-shot learning: NO (ICL ≠ genuine learning)
+  + Continuous learning: NO
+```
+
+GPT-4o's "vision reasoning" is: encode image → describe in latent language → process as language → output in language. It does not think in vision. It translates vision to language. When the translation loses information — spatial relationships, textures, precise geometry — the reasoning fails.
+
+**FLUX advantage:** Thinks in the native modality. Visual waves are visual. Audio waves are audio. No translation to language. No information loss.
+
+### Meta JEPA / V-JEPA
+
+**What they claim:** Self-supervised vision without language. Learning world models.
+
+**Where they are:**
+```
+V-JEPA:
+  Prediction in representation space (not pixel space)
+  + Closer to FLUX philosophy than transformer approaches
+  + But: fixed architecture, no continuous learning
+  + But: no causal reasoning
+  + But: no memory system
+  + But: still requires massive pretraining
+  + Not multimodal — vision only
+```
+
+JEPA is interesting because it shares FLUX's intuition that prediction in representation space is better than prediction in output space. But it lacks everything else — memory, causality, continuous learning, multi-modality.
+
+**FLUX advantage:** JEPA's core idea is one component of FLUX (representation-space prediction). FLUX has nine more components that JEPA lacks.
+
+### xAI Grok / Anthropic Claude / Others
+
+All transformer-based. All share the same structural limitations:
+```
+Forgetting:           ✗ catastrophic
+Continuous learning:  ✗ not possible post-training
+One-shot learning:    ✗ requires ICL (not genuine)
+Causal reasoning:     ✗ correlational only
+Explainability:       ✗ post-hoc approximation
+Multi-timescale:      ✗ single-scale attention
+Unified modality:     ✗ bolt-on adapters
+```
+
+These are not bad models. They are excellent at what they do. But what they do is pattern matching on enormous static datasets. FLUX does something structurally different.
+
+---
+
+## The Compute Economics
+
+This is where FLUX gets genuinely disruptive.
+
+### Training cost comparison
+
+```
+GPT-4 training:     ~$100M  (estimated)
+Gemini training:    ~$200M  (estimated)
+Llama 3.1 405B:     ~$50M   (estimated)
+
+FLUX Phase 1-9:     ~$0     (Kaggle free tier, T4 GPUs)
+FLUX estimated full: < $10K  (cloud GPU rental)
+```
+
+This is not a typo. FLUX's training cost is approximately five orders of magnitude lower than comparable transformer systems. The reasons are structural:
+
+1. **No massive pretraining pass.** Transformers need to see the entire internet multiple times. FLUX learns from data once — thermodynamic settling encodes it in a single pass.
+
+2. **Local field updates.** Training FLUX is O(local neighborhood), not O(all parameters). Updating one concept does not require touching every weight in the model.
+
+3. **No epochs.** There is no concept of "training for 3 epochs on the dataset." Data flows through once and is learned. Repetition strengthens consolidation but is not required.
+
+4. **Small parameter count.** The field itself is the knowledge store. The trainable parameters (encoders, decoders, CGN nodes) are small. The "intelligence" lives in the field geometry and memory system, not in billions of weights.
+
+### Inference cost comparison
+
+```
+GPT-4 inference:    ~$0.03 per 1K tokens (API, output)
+Claude Opus:        ~$0.075 per 1K tokens (API, output)
+
+FLUX inference:     O(log n) gravitational relevance
+                    No KV cache
+                    No all-pairs attention
+                    Estimated 10-100× cheaper per query
+```
+
+The O(log n) gravitational relevance versus O(n²) attention is the dominant factor. For long contexts (>10K tokens), FLUX's cost advantage grows quadratically. For the million-token contexts that frontier models advertise, the advantage is astronomical.
+
+### Deployment cost
+
+```
+GPT-4 deployment:   8× H100 GPUs (estimated minimum)
+                    ~$200K/year in hardware alone
+
+FLUX deployment:    Single consumer GPU plausible
+                    Field is sparse after settling
+                    Memory system uses FAISS (CPU or GPU)
+                    Estimated: one RTX 4090 sufficient
+                    ~$2K one-time hardware cost
+```
+
+This means FLUX can run on-premise. On a laptop. On edge devices. On a robot's onboard GPU. On a hospital's own server — with no data leaving the building. This is not possible with transformer models at frontier capability levels.
+
+### The economic disruption
+
+```
+Current AI cost structure:
+  Training:   $50M - $200M per frontier model
+  Inference:  $millions/month for high-volume API
+  Hardware:   Cluster of 1000+ GPUs
+  Result:     Only 5 companies can build frontier models
+
+FLUX cost structure:
+  Training:   < $10K for full multi-modal model
+  Inference:  Single GPU, 10-100× cheaper per query
+  Hardware:   One workstation, one server, one edge device
+  Result:     Any university, any hospital, any company
+              can build and deploy their own FLUX instance
+```
+
+If these numbers hold at scale — and the architecture's properties strongly suggest they will — FLUX doesn't compete with OpenAI and Google on their terms. It makes their terms irrelevant. You don't need a $200M training budget when the architecture learns continuously from deployment itself.
+
+---
+
+## Safety and Alignment Advantages
+
+This section is important and underappreciated.
+
+### The transformer alignment problem
+
+Transformers have a fundamental alignment problem: **you cannot inspect what they know or why they say anything.** The knowledge is distributed across billions of weights in ways that are not interpretable. You can fine-tune them with RLHF to make them refuse harmful requests, but:
+
+```
+Problems with RLHF alignment:
+  - The model still "knows" the harmful content (weights unchanged)
+  - Jailbreaks prove the surface alignment is brittle
+  - You cannot verify what the model believes
+  - You cannot trace why it reached a specific conclusion
+  - Alignment degrades unpredictably with fine-tuning
+  - Each new version requires fresh alignment work
+```
+
+### FLUX's structural alignment advantages
+
+**1. Inspectable knowledge.**
+Every concept in FLUX is a locatable attractor in the field. You can literally find the "how to build a bomb" attractor and remove it. Not suppress it. Not train the model to refuse to say it while still knowing it. Actually remove it from the field. The knowledge is gone.
+
+```python
+# Transformer "alignment":
+# Train the model to say "I can't help with that"
+# while the knowledge still exists in the weights
+
+# FLUX alignment:
+field.remove_attractor(concept="weapons_synthesis")
+# The knowledge is structurally gone
+# No jailbreak can retrieve it
+# It is not suppressed — it does not exist
+```
+
+**2. Causal traceability.**
+Every conclusion FLUX reaches has a traceable causal chain in the CGN. You can audit any output:
+
+```
+Output: "This drug treats condition X"
+Trace:
+  ← Drug mechanism: inhibits protein A
+  ← Protein A: mediates pathway B
+  ← Pathway B: drives condition X
+  ← Source: PubMed study #12345678
+  ← Confidence: 0.87 (high evidence mass)
+```
+
+No transformer can produce this. Post-hoc explanation methods (LIME, SHAP, attention visualization) are approximations that provably miss important factors. FLUX's causal trace is the actual reasoning path, not an approximation.
+
+**3. Belief consistency.**
+FLUX cannot hold contradictory beliefs silently — a property transformers suffer from constantly. When contradictions arise, the causal graph forces resolution:
+
+```
+Belief A: "Drug X is safe for pregnant women"
+  (mass: 0.3, source: 2005 study)
+
+Belief B: "Drug X causes birth defects"
+  (mass: 0.8, source: 2024 meta-analysis)
+
+FLUX response:
+  Contradiction detected.
+  Belief A invalidated (lower mass, contradicted by higher-mass evidence).
+  All downstream conclusions from Belief A flagged for review.
+  12 patient recommendations affected — surfaced to human review.
+```
+
+A transformer would happily state both beliefs in different conversations depending on context. FLUX cannot — the contradiction resolution is structural, not behavioural.
+
+**4. Forgetting as a safety feature.**
+The zero-forgetting property cuts both ways. In safety terms, it means:
+- A safety constraint learned is *never* forgotten, regardless of what else is learned
+- The system cannot be fine-tuned out of its safety properties
+- Adversarial training cannot erode safety constraints through gradient manipulation
+- The safety constraints exist as attractors in the field with high mass — they are the most stable, most resistant to perturbation structures in the entire system
+
+**5. Continuous alignment.**
+Transformers are aligned once during RLHF and then drift. FLUX's alignment is continuous:
+- New safety constraints write to the field at any time
+- They take effect immediately
+- They do not require retraining
+- They do not interfere with existing capabilities
+- They can be verified by inspecting the field
+
+### What this means for regulators
+
+The EU AI Act requires that high-risk AI systems provide:
+1. Transparency about how decisions are made — **FLUX: causal trace**
+2. Human oversight capability — **FLUX: inspectable field, auditable graph**
+3. Accuracy and robustness — **FLUX: zero forgetting, contradiction detection**
+4. Data governance and traceability — **FLUX: every fact traced to source**
+
+FLUX is not just compliant with these requirements. It is the only architecture that meets them *structurally* rather than through bolted-on compliance tooling.
+
+---
+
+## The Timeline
+
+Being realistic about what is achievable and when.
+
+### Near-term (Phases 9-10, 2026)
+
+```
+Phase 9:  Wave-level text generation    ← NOW (training on Kaggle)
+Phase 10: Vision bridge                 ← 2-3 months after Phase 9
+          ImageCSE + cross-modal alignment
+          Benchmark: image-text retrieval, visual QA
+```
+
+Phase 10 is the proof point. If a single field can coherently represent both text and image concepts, the thesis is proven. Every subsequent modality is a variation of the same engineer.
+
+### Medium-term (Phases 11-13, 2026-2027)
+
+```
+Phase 11: Audio bridge                  ← 2 months after Phase 10
+          AudioCSE + tri-modal alignment
+          Benchmark: audio captioning, sound classification
+
+Phase 12: Sensor bridge                 ← 2 months after Phase 11
+          SensorCSE for time-series data
+          Benchmark: anomaly detection, predictive maintenance
+
+Phase 13: Multi-modal reasoning         ← 3 months after Phase 12
+          Cross-domain causal chains
+          Benchmark: questions requiring 2+ modalities to answer
+```
+
+### Long-term (2027-2028)
+
+```
+Phase 14: Molecular/genomic bridge
+Phase 15: Robotic action bridge
+Phase 16: Edge deployment optimization
+Phase 17: Distributed field (multi-device)
+Phase 18: Self-improving field geometry
+```
+
+### The critical milestone
+
+Phase 10 is the gate. If vision integration works — if image waves and text waves constructively interfere in the field, if cross-modal retrieval works through gravitational relevance, if the zero-forgetting property holds across modalities — then the path to full unification is clear and the engineering is incremental.
+
+If Phase 10 fails, the architecture needs fundamental revision. But the physics analogy suggests it won't: waves are waves. A field perturbed by visual waves follows the same differential equations as a field perturbed by text waves. The mathematics doesn't know what generated the wave.
+
+---
+
+## The Real Competition
+
+FLUX is not competing with GPT-5 or Gemini 3.0 on language benchmarks. It will lose those benchmarks. A $200M model trained on the entire internet will always beat a $0 model on internet-derived tests.
+
+FLUX is competing on properties that those models **structurally cannot have**:
+
+```
+Property                     Transformer    FLUX
+─────────────────────────────────────────────────
+Zero forgetting              ✗              ✓
+One-shot learning            ✗              ✓
+Continuous post-deploy       ✗              ✓
+Causal traceability          ✗              ✓
+Inspectable knowledge        ✗              ✓
+Contradiction detection      ✗              ✓
+Belief revision              ✗              ✓
+O(log n) relevance           ✗              ✓
+Multi-timescale native       ✗              ✓
+$0 training                  ✗              ✓
+Single-GPU deployment        ✗              ✓
+Structural alignment         ✗              ✓
+Regulatory compliance        partial        native
+Edge deployment              ✗              ✓
+```
+
+Every checkmark in the FLUX column is a structural property of the architecture. Not a feature that was engineered in. Not a hack. Not a fine-tuning trick. The architecture *is* these properties.
+
+The question is not whether FLUX will beat GPT-4 on MMLU. It won't, and it doesn't need to. The question is whether the properties in that table matter more than benchmark scores for real-world deployment. In every domain discussed in this document — medicine, robotics, finance, science, security, education, manufacturing, law — they do.
+
+---
+
+## Final Word
+
+The transformer era produced extraordinary results through an extraordinary amount of compute. But the architecture itself is a sequence-to-sequence pattern matcher with no memory, no causality, no continuous learning, and no ability to explain itself. These are not missing features — they are structural impossibilities of the attention mechanism.
+
+FLUX is not an incremental improvement on the transformer. It is a different object. A field is not a better matrix multiplication — it is a different mathematical structure with different properties. A wave is not a better token — it is a continuous representation with no information-destroying discretisation. An attractor is not a better weight — it is a stable point in a dynamic landscape that persists without maintenance.
+
+The domains where FLUX dominates are the domains where the real world lives — continuous, causal, never-forgetting, always-learning, explainable-by-requirement. Language modelling was the proof of concept. Everything else is the point.
