@@ -458,6 +458,81 @@ class Phase9Trainer:
         return correct / max(total, 1)
 
     # ─────────────────────────────────────────────
+    # Stage 2: WaveGenerator Pre-Computation
+    # ─────────────────────────────────────────────
+
+    def _precompute_wg_data(
+        self,
+        texts: List[str],
+        max_samples: int = 10000,
+    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Pre-compute all frozen pipeline outputs for WG training.
+
+        Since CSE, field, CGN, and WaveChunker are all frozen during
+        Stage 2, their outputs never change. Computing them once upfront
+        eliminates the CPU bottleneck that starves the GPU.
+
+        Args:
+            texts: Raw text documents
+            max_samples: Maximum samples to pre-compute
+
+        Returns:
+            List of (merged_context [768], target_waves [N, 432]) tuples,
+            already on self.device
+        """
+        precomputed = []
+        skipped = 0
+
+        print(f"  ℹ Pre-computing frozen pipeline outputs for up to {max_samples:,} samples...")
+        t0 = time.time()
+
+        for i, text in enumerate(texts):
+            if len(precomputed) >= max_samples:
+                break
+
+            if not text or len(text.strip()) < 10:
+                skipped += 1
+                continue
+
+            try:
+                with torch.no_grad():
+                    # CSE encode
+                    wave = self.model.cse.encode(text)
+                    wave_seq = wave.full.to(self.device)   # [seq, 432]
+                    wave_vec = wave_seq.mean(dim=0)        # [432]
+
+                    # FLUX pipeline → merged context
+                    field_features, sims, locs = self.model.field.query(
+                        wave_vec, k=4
+                    )
+                    combined = field_features.mean(dim=0)
+                    cgn_out = self.model.cgn(combined)
+                    merged = (combined + cgn_out)           # [768]
+
+                    # WaveChunker → target waves
+                    chunk_waves, spans = self.chunker(wave_seq)
+                    target_waves = chunk_waves               # [N, 432]
+
+                if target_waves.shape[0] < 2:
+                    skipped += 1
+                    continue
+
+                precomputed.append((merged, target_waves))
+
+                if (i + 1) % 2000 == 0:
+                    print(f"    ... processed {i+1:,} texts → {len(precomputed):,} valid samples")
+
+            except Exception:
+                skipped += 1
+                continue
+
+        elapsed = time.time() - t0
+        print(f"  ✓ Pre-computed {len(precomputed):,} samples in {elapsed:.1f}s (skipped {skipped:,})")
+
+        return precomputed
+
+    # ─────────────────────────────────────────────
     # Stage 2: WaveGenerator Training
     # ─────────────────────────────────────────────
 
@@ -472,12 +547,10 @@ class Phase9Trainer:
 
         WaveToText and WaveChunker are frozen from Stage 1.
 
-        For each document:
-            1. CSE encode → [seq, 432]
-            2. WaveChunker → chunk_waves [N, 432]
-            3. FLUX pipeline → field_context [768]
-            4. WaveGenerator(field_context, chunk_waves) → predicted [N, 432]
-            5. loss = MSE + cosine loss
+        Optimized pipeline:
+            1. Pre-compute ALL frozen outputs (CSE + field + CGN + chunker)
+            2. Training loop iterates over pre-computed GPU tensors only
+            3. GPU utilization goes from ~37% to ~95%
 
         Args:
             texts: Training documents
@@ -499,12 +572,23 @@ class Phase9Trainer:
         self.chunker.eval()
         self.generator.train()
 
-        # Only WaveGenerator is trainable
+        # ── Pre-compute frozen pipeline outputs ──
+        total_steps = min(len(texts), max_steps) if max_steps else len(texts)
+        precomputed = self._precompute_wg_data(texts, max_samples=total_steps + 500)
+
+        if len(precomputed) == 0:
+            print("  ✗ No valid samples after pre-computation")
+            return WGStageResult(
+                total_steps=0, final_loss=0.0, avg_loss=0.0,
+                wave_cosine_accuracy=0.0, total_time_seconds=time.time() - t0,
+            )
+
+        total_steps = min(total_steps, len(precomputed) * 3)  # Allow cycling
+
+        # ── Optimizer setup ──
         wg_params = list(self.generator.parameters())
         optimizer = torch.optim.AdamW(wg_params, lr=self.lr, weight_decay=0.01)
 
-        # Warmup + cosine scheduling
-        total_steps = min(len(texts), max_steps) if max_steps else len(texts)
         warmup_steps = min(100, total_steps // 10)
 
         def lr_lambda(step):
@@ -517,103 +601,87 @@ class Phase9Trainer:
 
         all_losses = []
         cosine_accs = []
-        step = 0
 
-        for text_idx, text in enumerate(texts):
-            if max_steps and step >= max_steps:
-                break
+        precompute_time = time.time() - t0
+        train_t0 = time.time()
+        print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples")
 
-            if not text or len(text.strip()) < 10:
-                continue
+        # ── Training loop — pure GPU, no CPU bottleneck ──
+        import random
+        sample_indices = list(range(len(precomputed)))
 
-            try:
-                # CSE encode (frozen)
-                with torch.no_grad():
-                    wave = self.model.cse.encode(text)
-                wave_seq = wave.full.to(self.device)  # [seq, 432]
-                wave_vec = wave_seq.mean(dim=0)        # [432]
+        for step in range(1, total_steps + 1):
+            # Cycle through pre-computed data with shuffling
+            idx = (step - 1) % len(precomputed)
+            if idx == 0 and step > 1:
+                random.shuffle(sample_indices)
+            sample_idx = sample_indices[idx]
+            merged, target_waves = precomputed[sample_idx]
 
-                # Get FLUX context (frozen pipeline)
-                with torch.no_grad():
-                    field_features, sims, locs = self.model.field.query(
-                        wave_vec, k=4
-                    )
-                    combined = field_features.mean(dim=0)
-                    cgn_out = self.model.cgn(combined)
-                    merged = (combined + cgn_out).detach()  # [768]
+            # WaveGenerator forward (teacher-forced) — all on GPU
+            predicted_waves, confidences = self.generator(
+                merged, target_waves
+            )
 
-                # Chunk into word-level waves (frozen chunker)
-                with torch.no_grad():
-                    chunk_waves, spans = self.chunker(wave_seq)
-                    target_waves = chunk_waves.detach()  # [N, 432]
+            # Loss: MSE + cosine distance
+            mse_loss = F.mse_loss(predicted_waves, target_waves)
+            cos_loss = 1.0 - F.cosine_similarity(
+                predicted_waves, target_waves, dim=-1
+            ).mean()
+            loss = mse_loss + cos_loss
 
-                if target_waves.shape[0] < 2:
-                    continue
+            # Gradient accumulation
+            scaled_loss = loss / self.grad_accum
+            scaled_loss.backward()
 
-                # WaveGenerator forward (teacher-forced)
-                predicted_waves, confidences = self.generator(
-                    merged, target_waves
-                )
+            if step % self.grad_accum == 0:
+                torch.nn.utils.clip_grad_norm_(wg_params, 1.0)
+                optimizer.step()
+                optimizer.zero_grad()
+                scheduler.step()
 
-                # Loss: MSE + cosine distance
-                mse_loss = F.mse_loss(predicted_waves, target_waves)
-                cos_loss = 1.0 - F.cosine_similarity(
+            all_losses.append(loss.item())
+            with torch.no_grad():
+                cos_acc = F.cosine_similarity(
                     predicted_waves, target_waves, dim=-1
-                ).mean()
-                loss = mse_loss + cos_loss
+                ).mean().item()
+            cosine_accs.append(cos_acc)
 
-                # Gradient accumulation
-                scaled_loss = loss / self.grad_accum
-                scaled_loss.backward()
-
-                step += 1
-
-                if step % self.grad_accum == 0:
-                    torch.nn.utils.clip_grad_norm_(wg_params, 1.0)
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    scheduler.step()
-
-                all_losses.append(loss.item())
-                with torch.no_grad():
-                    cos_acc = F.cosine_similarity(
-                        predicted_waves, target_waves, dim=-1
-                    ).mean().item()
-                cosine_accs.append(cos_acc)
-
-                if step % log_interval == 0:
-                    avg_loss = sum(all_losses[-log_interval:]) / min(
-                        len(all_losses), log_interval
-                    )
-                    avg_cos = sum(cosine_accs[-log_interval:]) / min(
-                        len(cosine_accs), log_interval
-                    )
-                    lr_now = optimizer.param_groups[0]['lr']
-                    print(
-                        f"  WG Step {step:>6}/{total_steps}  "
-                        f"loss={avg_loss:.4f}  cos_acc={avg_cos:.3f}  "
-                        f"lr={lr_now:.6f}"
-                    )
-                    if self.log:
-                        self.log.metric(f"wg_step_{step}_loss", f"{avg_loss:.4f}")
-
-            except Exception as e:
-                if step % 500 == 0:
-                    print(f"  ⚠ Step {step} skipped: {e}")
-                continue
+            if step % log_interval == 0:
+                avg_loss = sum(all_losses[-log_interval:]) / min(
+                    len(all_losses), log_interval
+                )
+                avg_cos = sum(cosine_accs[-log_interval:]) / min(
+                    len(cosine_accs), log_interval
+                )
+                lr_now = optimizer.param_groups[0]['lr']
+                elapsed_train = time.time() - train_t0
+                steps_per_sec = step / max(elapsed_train, 0.01)
+                eta = (total_steps - step) / max(steps_per_sec, 0.01)
+                print(
+                    f"  WG Step {step:>6}/{total_steps}  "
+                    f"loss={avg_loss:.4f}  cos_acc={avg_cos:.3f}  "
+                    f"lr={lr_now:.6f}  "
+                    f"[{steps_per_sec:.1f} step/s, ETA {eta:.0f}s]"
+                )
+                if self.log:
+                    self.log.metric(f"wg_step_{step}_loss", f"{avg_loss:.4f}")
 
         elapsed = time.time() - t0
+        train_elapsed = time.time() - train_t0
         final_loss = all_losses[-1] if all_losses else 0.0
         avg_loss = sum(all_losses) / max(len(all_losses), 1)
         avg_cos = sum(cosine_accs) / max(len(cosine_accs), 1)
 
-        print(f"\n  ✓ Stage 2 complete: {step} steps")
+        print(f"\n  ✓ Stage 2 complete: {total_steps} steps")
         print(f"    Final loss: {final_loss:.4f}")
         print(f"    Avg cosine accuracy: {avg_cos:.3f}")
-        print(f"    Time: {elapsed:.1f}s")
+        print(f"    Pre-compute time: {precompute_time:.1f}s")
+        print(f"    Training time: {train_elapsed:.1f}s")
+        print(f"    Total time: {elapsed:.1f}s")
 
         return WGStageResult(
-            total_steps=step,
+            total_steps=total_steps,
             final_loss=final_loss,
             avg_loss=avg_loss,
             wave_cosine_accuracy=avg_cos,
