@@ -342,23 +342,82 @@ class FLUXLarge(FLUXModel):
 
         if ckpt7 is not None:
             # Transfer compatible weights (partial load)
+            # Phase 7 → FLUXLarge dimension map:
+            #   CSE:        432 → 432  (IDENTICAL — transfers perfectly)
+            #   Field:      64³×512 → 96³×768  (incompatible)
+            #   Bridges:    432→512 → 432→768  (incompatible)
+            #   OutputHead: 512 → 768  (incompatible)
+            #   CausalGraph: architecture-independent (transfers)
+            #   TL state:   architecture-independent (transfers)
             transferred = 0
 
-            # CSE — wave_dim=432 is the same, but we keep fresh init
-            # since CSE is frozen from Phase 1 and already correct
-            print(f"  ℹ CSE: fresh init (wave_dim={model.config['wave_dim']}, frozen Phase 1)")
+            # CSE — wave_dim=432 is identical in Phase 7 and FLUXLarge
+            if 'cse_state_dict' in ckpt7:
+                try:
+                    model.cse.load_state_dict(ckpt7['cse_state_dict'])
+                    transferred += 1
+                    print(f"  ✓ CSE transferred (wave_dim=432, trained Phase 1 weights)")
+                except Exception as e:
+                    print(f"  ⚠ CSE transfer failed: {e} — using fresh init")
+            else:
+                # Fallback: try loading Phase 1 checkpoint directly for CSE
+                try:
+                    ckpt1 = load_checkpoint(1)
+                    if 'state_dict' in ckpt1:
+                        model.cse.load_state_dict(ckpt1['state_dict'])
+                        transferred += 1
+                        print(f"  ✓ CSE transferred from Phase 1 checkpoint")
+                except Exception:
+                    print(f"  ℹ CSE: fresh init (no trained weights found)")
 
             # For components with compatible architectures, try partial transfer
             try:
+                if 'tl_state' in ckpt7:
+                    try:
+                        model.tl.load_state(ckpt7['tl_state'])
+                        transferred += 1
+                        print(f"  ✓ ThermodynamicLearner state transferred")
+                    except Exception:
+                        print(f"  ℹ TL: fresh init (state incompatible)")
+
                 if 'gr_state' in ckpt7:
-                    # GR state is architecture-independent (mass tracking)
-                    print(f"  ℹ GR: fresh init (feature_dim scaled)")
+                    print(f"  ℹ GR: fresh init (feature_dim scaled 512→768)")
+
                 if 'causal_graph_state' in ckpt7:
                     model.causal_graph.load_state(ckpt7['causal_graph_state'])
                     transferred += 1
                     print(f"  ✓ Causal graph transferred")
+
+                if 'episodic_memory_state' in ckpt7:
+                    try:
+                        model.episodic_memory.load_state(ckpt7['episodic_memory_state'])
+                        transferred += 1
+                        print(f"  ✓ Episodic memory transferred")
+                    except Exception:
+                        print(f"  ℹ Episodic memory: fresh init (incompatible)")
+
+                if 'semantic_memory_state' in ckpt7:
+                    try:
+                        model.semantic_memory.load_state(ckpt7['semantic_memory_state'])
+                        transferred += 1
+                        print(f"  ✓ Semantic memory transferred")
+                    except Exception:
+                        print(f"  ℹ Semantic memory: fresh init (incompatible)")
             except Exception as e:
                 print(f"  ℹ Partial transfer skipped: {e}")
+
+            # Components that are dimension-incompatible (512→768)
+            skipped = []
+            if 'field_state_dict' in ckpt7:
+                skipped.append('Field (64³×512 → 96³×768)')
+            if 'wave_to_field_state' in ckpt7:
+                skipped.append('wave_to_field (432→512 → 432→768)')
+            if 'field_to_wave_state' in ckpt7:
+                skipped.append('field_to_wave (512→432 → 768→432)')
+            if 'output_head_state' in ckpt7:
+                skipped.append('OutputHead (512 → 768)')
+            if skipped:
+                print(f"  ℹ Skipped (dim mismatch): {', '.join(skipped)}")
 
             print(f"  ✓ Knowledge transfer complete: {transferred} components")
 
