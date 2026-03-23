@@ -665,6 +665,7 @@ class Phase9Trainer:
         import random
         sample_indices = list(range(len(precomputed)))
         optimizer.zero_grad()
+        _step1_t = time.time()
 
         for step in range(1, total_steps + 1):
             # Cycle through pre-computed data with shuffling
