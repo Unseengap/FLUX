@@ -47,11 +47,9 @@ def main():
         print("  ✓ Phase 9 loaded from checkpoint")
     except Exception as e:
         print(f"  ⚠ No Phase 9 checkpoint ({e})")
-        print("  ℹ Using fresh FLUXLarge + fresh Phase 9 modules")
-        from flux_large import FLUXLarge
-        model = FLUXLarge(device=device)
-        for param in model.parameters():
-            param.requires_grad = False
+        print("  ℹ Loading best available checkpoint + fresh Phase 9 modules")
+        from train_wave_gen import build_flux_for_phase9
+        model = build_flux_for_phase9(device=device)
         chunker, generator, wtt = build_phase9_modules(device=device)
 
     prompt = "The future of artificial intelligence is transforming the world"

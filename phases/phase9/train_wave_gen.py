@@ -50,6 +50,69 @@ from wave_sampler import ThermodynamicWaveSampler
 
 
 # ─────────────────────────────────────────────
+# Build FLUXLarge with Checkpoint Cascade
+# ─────────────────────────────────────────────
+
+def build_flux_for_phase9(device: str = 'cpu') -> FLUXLarge:
+    """
+    Build FLUXLarge by loading the best available checkpoint.
+
+    Phase 9 is a PEER to Phase 8, not a continuation. Both build on
+    Phase 7 (which contains all trained components: CSE, field, GR,
+    TL, CGN, memory, bridges from Phases 1-7).
+
+    Phase 8 added a WaveDecoder (byte-level generation).
+    Phase 9 adds WaveGenerator + WaveToText (wave-level generation).
+    They are independent approaches to generation.
+
+    Cascade order:
+        1. Phase 7 checkpoint → primary dependency (has all Phases 1-7)
+        2. Phase 8 checkpoint → legacy fallback (has Phase 7 weights inside)
+        3. Fresh init → untrained (last resort)
+
+    Args:
+        device: Target device
+
+    Returns:
+        FLUXLarge with the best available pre-trained weights, frozen
+    """
+    model = None
+
+    # Try Phase 7 first — this is Phase 9's TRUE dependency.
+    # Phase 7 has all trained components: CSE, field, GR, TL, CGN, memory, bridges.
+    # Phase 9 builds its own generation on top of these, parallel to Phase 8.
+    if model is None:
+        try:
+            model = FLUXLarge.from_phase7_checkpoint(device=device)
+            print("  ✓ Loaded Phase 7 checkpoint (CSE, field, GR, TL, CGN, memory, bridges)")
+            print("  ℹ Phase 9 builds wave-level generation on Phase 7 foundation")
+        except Exception as e:
+            print(f"  ℹ No Phase 7 checkpoint: {e}")
+
+    # Legacy fallback: Phase 8 contains Phase 7's weights + a WaveDecoder we don't use.
+    # If Phase 7 isn't available, Phase 8 can provide the same base weights.
+    if model is None:
+        try:
+            model = FLUXLarge.from_phase8_checkpoint(device=device)
+            print("  ✓ Loaded Phase 8 checkpoint as fallback (contains Phase 7 weights)")
+            print("  ✗ WaveDecoder ignored — Phase 9 replaces it")
+        except Exception as e:
+            print(f"  ℹ No Phase 8 checkpoint: {e}")
+
+    # Last resort: fresh init (untrained — will produce poor results)
+    if model is None:
+        print("  ⚠ No checkpoints available — using fresh FLUXLarge (untrained)")
+        print("    Wave generation quality will be limited without trained CSE/field")
+        model = FLUXLarge(device=device)
+
+    # Freeze all base model params — Phase 9 only trains new generation modules
+    for param in model.parameters():
+        param.requires_grad = False
+
+    return model
+
+
+# ─────────────────────────────────────────────
 # Phase 9 Configuration
 # ─────────────────────────────────────────────
 PHASE9_CONFIG = {
@@ -755,9 +818,8 @@ def load_phase9_modules(
     ckpt = load_checkpoint(9)
     p9cfg = ckpt.get('phase9_config', PHASE9_CONFIG)
 
-    # Build fresh FLUXLarge, then load component states from the Phase 9
+    # Build FLUXLarge and load component states from the Phase 9
     # checkpoint itself (which contains all frozen component states).
-    # No Phase 8 checkpoint dependency.
     model_config = ckpt.get('config', FLUX_LARGE_CONFIG)
     model = FLUXLarge(config=model_config, device=device)
 
@@ -855,14 +917,9 @@ if __name__ == '__main__':
     device = get_device()
     log = PhaseLogger(phase=9)
 
-    # Load Phase 8 components (WaveDecoder is ignored)
+    # Load best available checkpoint (Phase 8 → Phase 7 → fresh)
     log.separator("Loading FLUX Components")
-    model = FLUXLarge(device=device)
-    for param in model.parameters():
-        param.requires_grad = False
-    print("  ✓ Fresh FLUXLarge built (CSE, field, GR, memory, bridges)")
-    print("  ℹ Phase 9 trains WaveGenerator + WaveToText from scratch")
-    print("  ✗ WaveDecoder skipped — replaced by WaveGenerator")
+    model = build_flux_for_phase9(device=device)
 
     # Build Phase 9 modules
     log.separator("Building Phase 9 Modules")
