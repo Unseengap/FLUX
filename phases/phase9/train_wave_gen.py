@@ -520,8 +520,15 @@ class Phase9Trainer:
 
                 precomputed.append((merged, target_waves))
 
-                if (i + 1) % 2000 == 0:
-                    print(f"    ... processed {i+1:,} texts → {len(precomputed):,} valid samples")
+                if (i + 1) % 50 == 0:
+                    elapsed_so_far = time.time() - t0
+                    rate = (i + 1) / max(elapsed_so_far, 0.01)
+                    remaining = max_samples - len(precomputed)
+                    eta = remaining / max(rate, 0.01)
+                    print(
+                        f"    ... {i+1:,} texts → {len(precomputed):,} valid  "
+                        f"[{rate:.0f} text/s, ETA {eta:.0f}s]"
+                    )
 
             except Exception:
                 skipped += 1
