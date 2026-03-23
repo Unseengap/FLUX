@@ -263,6 +263,7 @@ class WaveGenerator(nn.Module):
         target_waves: Optional[torch.Tensor] = None,
         flux_model=None,
         temperature: float = 1.0,
+        skip_interference: bool = False,
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Generate a sequence of waves from field context.
@@ -278,6 +279,8 @@ class WaveGenerator(nn.Module):
             target_waves: [N, 432] teacher-forcing targets (training only)
             flux_model: FLUXLarge instance for dynamic field re-query
             temperature: Sampling temperature for field re-query
+            skip_interference: If True, zero out interference signal
+                (faster training — skips O(N^2) Python loop)
 
         Returns:
             (generated_waves [N, 432], confidences [N])
@@ -288,9 +291,13 @@ class WaveGenerator(nn.Module):
         generated = []
         confidences = []
         prev_wave = self.bos_wave
+        _zero_interference = torch.zeros(self.wave_dim, device=self.bos_wave.device)
 
         for i in range(max_waves):
-            interference = self.compute_interference_signal(generated)
+            if skip_interference:
+                interference = _zero_interference
+            else:
+                interference = self.compute_interference_signal(generated)
 
             # Dynamic re-query: ask the field "what concepts live near here?"
             if flux_model is not None and not self.training:
@@ -337,6 +344,7 @@ class WaveGenerator(nn.Module):
         self,
         field_context: torch.Tensor,
         target_waves: torch.Tensor,
+        skip_interference: bool = True,
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Teacher-forced training forward pass (static context — no re-query).
@@ -344,9 +352,15 @@ class WaveGenerator(nn.Module):
         During training we use static context for stable gradients.
         During inference, pass flux_model to generate() for dynamic re-query.
 
+        By default, interference is SKIPPED during training to avoid
+        the O(N^2) Python loop bottleneck (~10s/step → ~10ms/step).
+        Interference is still used during inference via generate().
+
         Args:
             field_context: [768] merged context
             target_waves: [N, 432] ground truth wave sequence
+            skip_interference: Skip interference computation for speed
+                (default True during training)
 
         Returns:
             (predicted_waves [N, 432], confidences [N])
@@ -356,4 +370,5 @@ class WaveGenerator(nn.Module):
             max_waves=len(target_waves),
             target_waves=target_waves,
             flux_model=None,  # Static context during training
+            skip_interference=skip_interference,
         )
