@@ -73,28 +73,31 @@ class WaveToText(nn.Module):
         target_bytes: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Teacher-forced: predict bytes for one chunk given its wave.
+        Teacher-forced: predict bytes + EOS for one chunk given its wave.
 
         Args:
             wave: [432] the wave to decode
             target_bytes: [chunk_len] byte values for this chunk (0..255)
 
         Returns:
-            [chunk_len, 257] logits (256 bytes + EOS)
+            [chunk_len+1, 257] logits (256 bytes + EOS)
+            Targets should be: byte_0, byte_1, ..., byte_{n-1}, EOS
         """
         # Project wave → GRU initial hidden [1, 1, hidden_dim]
         hidden = self.wave_to_hidden(wave).unsqueeze(0).unsqueeze(0)
 
-        # Build input sequence: BOS followed by target[:-1]
+        # Build input sequence: BOS followed by all target bytes
+        # Input:  [BOS, byte_0, byte_1, ..., byte_{n-1}]  (length = chunk_len + 1)
+        # Target: [byte_0, byte_1, ..., byte_{n-1}, EOS]  (length = chunk_len + 1)
         bos = torch.full(
             (1,), self.BOS, dtype=torch.long, device=wave.device
         )
-        input_seq = torch.cat([bos, target_bytes[:-1]])  # [chunk_len]
-        embedded = self.byte_embed(input_seq).unsqueeze(0)  # [1, chunk_len, 64]
+        input_seq = torch.cat([bos, target_bytes])  # [chunk_len + 1]
+        embedded = self.byte_embed(input_seq).unsqueeze(0)  # [1, chunk_len+1, 64]
 
         # Run GRU
-        output, _ = self.gru(embedded, hidden)  # [1, chunk_len, hidden_dim]
-        logits = self.output_proj(output.squeeze(0))  # [chunk_len, 257]
+        output, _ = self.gru(embedded, hidden)  # [1, chunk_len+1, hidden_dim]
+        logits = self.output_proj(output.squeeze(0))  # [chunk_len+1, 257]
 
         return logits
 
@@ -119,32 +122,33 @@ class WaveToText(nn.Module):
         batch_size = waves.shape[0]
         max_len = max(t.shape[0] for t in target_list)
 
-        # Pad targets to max_len  (pad value = EOS = 257, but for CE we use -100 ignore)
+        # +1 so there is always room for the EOS target after the last byte
+        seq_len = max_len + 1
+
+        # Pad targets to seq_len  (pad value = -100 = CE ignore)
         padded_targets = torch.full(
-            (batch_size, max_len), -100, dtype=torch.long, device=device
+            (batch_size, seq_len), -100, dtype=torch.long, device=device
         )
         padded_inputs = torch.full(
-            (batch_size, max_len), self.BOS, dtype=torch.long, device=device
+            (batch_size, seq_len), self.BOS, dtype=torch.long, device=device
         )
 
         for i, t in enumerate(target_list):
             length = t.shape[0]
+            # Target: byte_0, byte_1, ..., byte_{n-1}, EOS
             padded_targets[i, :length] = t
-            # Input: BOS + target[:-1]
-            if length > 1:
-                padded_inputs[i, 1:length] = t[:-1]
-            # Position 0 is already BOS
+            padded_targets[i, length] = self.vocab_size  # EOS always present
 
-        # Append EOS to targets where sequences end
-        for i, t in enumerate(target_list):
-            length = t.shape[0]
-            if length < max_len:
-                padded_targets[i, length] = self.vocab_size  # EOS token in output space
+            # Input: BOS, byte_0, byte_1, ..., byte_{n-1}
+            # (shifted right — last input is the last real byte, predicting EOS)
+            if length > 0:
+                padded_inputs[i, 1:length + 1] = t
+            # Position 0 is already BOS
 
         # Wave → hidden [1, B, hidden_dim]
         hidden = self.wave_to_hidden(waves).unsqueeze(0)  # [1, B, hidden_dim]
 
-        # Embed inputs [B, max_len, 64]
+        # Embed inputs [B, seq_len, 64]
         embedded = self.byte_embed(padded_inputs)
 
         # GRU forward [B, max_len, hidden_dim]
