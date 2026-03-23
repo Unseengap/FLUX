@@ -663,7 +663,22 @@ class Phase9Trainer:
         )
         del _pred_test, _m0, _t0_test
 
+        # ── Scheduled sampling schedule ──
+        # Start with pure teacher forcing, linearly ramp to 50% own-prediction
+        # by the end of training. This cures exposure bias: the model learns
+        # to handle its own imperfect predictions, not just perfect inputs.
+        ss_start = 0.0    # Start: 100% teacher forced
+        ss_end = 0.5      # End: 50% use own prediction
+        ss_warmup = total_steps // 5  # Don't start SS until 20% through
+
+        # ── Context loss weight ──
+        # Wave 0 must depend on context. Without this, the model learns
+        # to ignore field_context and always outputs the same first wave.
+        context_loss_weight = 2.0
+
         print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples", flush=True)
+        print(f"    Scheduled sampling: {ss_start:.0%}→{ss_end:.0%} (warmup={ss_warmup})", flush=True)
+        print(f"    Context loss weight: {context_loss_weight:.1f}x on Wave 0", flush=True)
 
         # ── Training loop — pure GPU, no CPU bottleneck ──
         import random
@@ -672,6 +687,13 @@ class Phase9Trainer:
         _step1_t = time.time()
 
         for step in range(1, total_steps + 1):
+            # ── Scheduled sampling probability for this step ──
+            if step < ss_warmup:
+                ss_p = ss_start
+            else:
+                progress = (step - ss_warmup) / max(total_steps - ss_warmup, 1)
+                ss_p = ss_start + (ss_end - ss_start) * progress
+
             # Cycle through pre-computed data with shuffling
             idx = (step - 1) % len(precomputed)
             if idx == 0 and step > 1:
@@ -681,9 +703,10 @@ class Phase9Trainer:
             merged = merged_cpu.to(self.device)
             target_waves = target_cpu.to(self.device)
 
-            # WaveGenerator forward (teacher-forced) — all on GPU
+            # WaveGenerator forward with scheduled sampling
             predicted_waves, confidences = self.generator(
-                merged, target_waves
+                merged, target_waves,
+                scheduled_sampling_p=ss_p,
             )
 
             # Loss: MSE + cosine distance
@@ -691,7 +714,20 @@ class Phase9Trainer:
             cos_loss = 1.0 - F.cosine_similarity(
                 predicted_waves, target_waves, dim=-1
             ).mean()
-            loss = mse_loss + cos_loss
+
+            # Context loss: extra penalty on Wave 0
+            # Forces context_to_wave to actually differentiate inputs.
+            # Without this, the model ignores context and always predicts
+            # the same first wave for every input.
+            wave0_mse = F.mse_loss(predicted_waves[0], target_waves[0])
+            wave0_cos = 1.0 - F.cosine_similarity(
+                predicted_waves[0].unsqueeze(0),
+                target_waves[0].unsqueeze(0),
+                dim=-1,
+            ).mean()
+            ctx_loss = (wave0_mse + wave0_cos) * context_loss_weight
+
+            loss = mse_loss + cos_loss + ctx_loss
 
             # Gradient accumulation
             scaled_loss = loss / self.grad_accum
@@ -715,6 +751,7 @@ class Phase9Trainer:
                 print(
                     f"  WG Step     1/{total_steps}  "
                     f"loss={loss.item():.4f}  cos_acc={cos_acc:.3f}  "
+                    f"ctx_loss={ctx_loss.item():.4f}  ss_p={ss_p:.2f}  "
                     f"(first step: {time.time()-_step1_t:.2f}s)", flush=True
                 )
             elif step == 10:
@@ -740,7 +777,7 @@ class Phase9Trainer:
                 print(
                     f"  WG Step {step:>6}/{total_steps}  "
                     f"loss={avg_loss:.4f}  cos_acc={avg_cos:.3f}  "
-                    f"lr={lr_now:.6f}  "
+                    f"lr={lr_now:.6f}  ss_p={ss_p:.2f}  "
                     f"[{steps_per_sec:.1f} step/s, ETA {eta:.0f}s]",
                     flush=True,
                 )

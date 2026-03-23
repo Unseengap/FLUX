@@ -264,6 +264,7 @@ class WaveGenerator(nn.Module):
         flux_model=None,
         temperature: float = 1.0,
         skip_interference: bool = False,
+        scheduled_sampling_p: float = 0.0,
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Generate a sequence of waves from field context.
@@ -281,6 +282,10 @@ class WaveGenerator(nn.Module):
             temperature: Sampling temperature for field re-query
             skip_interference: If True, zero out interference signal
                 (faster training — skips O(N^2) Python loop)
+            scheduled_sampling_p: Probability [0,1] of using the model's
+                own prediction as prev_wave instead of ground truth.
+                0.0 = pure teacher forcing, 1.0 = pure free generation.
+                Ramps up during training to cure exposure bias.
 
         Returns:
             (generated_waves [N, 432], confidences [N])
@@ -292,6 +297,8 @@ class WaveGenerator(nn.Module):
         confidences = []
         prev_wave = self.bos_wave
         _zero_interference = torch.zeros(self.wave_dim, device=self.bos_wave.device)
+
+        import random as _rand
 
         for i in range(max_waves):
             if skip_interference:
@@ -310,7 +317,13 @@ class WaveGenerator(nn.Module):
                 next_wave, conf = self.forward_step(
                     prev_wave, interference, context_wave
                 )
-                prev_wave = target_waves[i].detach()
+                # Scheduled sampling: with probability p, use own prediction
+                # instead of ground truth as the next prev_wave.
+                # This forces the model to handle its own errors.
+                if scheduled_sampling_p > 0 and _rand.random() < scheduled_sampling_p:
+                    prev_wave = next_wave.detach()
+                else:
+                    prev_wave = target_waves[i].detach()
             else:
                 next_wave, conf = self.forward_step(
                     prev_wave, interference, context_wave
@@ -345,6 +358,7 @@ class WaveGenerator(nn.Module):
         field_context: torch.Tensor,
         target_waves: torch.Tensor,
         skip_interference: bool = True,
+        scheduled_sampling_p: float = 0.0,
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Teacher-forced training forward pass (static context — no re-query).
@@ -361,6 +375,8 @@ class WaveGenerator(nn.Module):
             target_waves: [N, 432] ground truth wave sequence
             skip_interference: Skip interference computation for speed
                 (default True during training)
+            scheduled_sampling_p: Probability of using own prediction
+                as prev_wave instead of ground truth (exposure bias fix)
 
         Returns:
             (predicted_waves [N, 432], confidences [N])
@@ -371,4 +387,5 @@ class WaveGenerator(nn.Module):
             target_waves=target_waves,
             flux_model=None,  # Static context during training
             skip_interference=skip_interference,
+            scheduled_sampling_p=scheduled_sampling_p,
         )
