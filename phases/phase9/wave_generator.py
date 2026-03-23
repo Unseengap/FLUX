@@ -1,19 +1,21 @@
 """
-Phase 9 — WaveGenerator: Universal Wave Sequence Generator
+Phase 9 — WaveGenerator v2: GRU-Based Wave Sequence Generator
 
 Predicts the next 432-dim wave from context and previous waves using
-FLUX physics. This module is MODALITY-AGNOSTIC — it generates waves.
-What those waves represent (text, image, audio, molecules) depends on
-what encoder created the input waves and what decoder converts them.
+a GRU recurrent core that carries temporal state across steps.
+
+Key changes from v1 (MLP):
+    - GRU replaces stateless MLP → carries hidden state (no more mode collapse)
+    - Interference signal replaced by GRU hidden state (implicit temporal memory)
+    - Dynamic field re-query at inference for semantic diversity
+    - Confidence derived from GRU features (richer than wave features alone)
 
 Generation mechanism:
-    1. RE-QUERY the field at each step using the latest wave → dynamic context
-    2. GR returns a NEIGHBORHOOD of attractors → multiple valid next concepts
-    3. Apply interference between previous waves → coherence signal
-    4. Combine attractor neighborhood + interference → predict next wave
-    5. Thermodynamic confidence → how certain is this prediction
-
-No GRU. No attention. No Transformer components.
+    1. Project field context (768) → wave space (432)
+    2. GRU processes [prev_wave + context_wave] → hidden state → next_wave
+    3. Hidden state carries temporal coherence between steps
+    4. At inference: RE-QUERY field at each step → dynamic context
+    5. Thermodynamic confidence → when to stop generating
 """
 
 import sys
@@ -44,13 +46,20 @@ from interference import apply_neighborhood_interference
 
 class WaveGenerator(nn.Module):
     """
-    Universal wave sequence generator. Predicts the next 432-dim wave
-    from context and previous waves using FLUX physics.
+    GRU-based universal wave sequence generator. Predicts the next
+    432-dim wave from context and previous waves using a recurrent
+    core that maintains temporal state across steps.
 
     This module is MODALITY-AGNOSTIC. It generates waves. What those
     waves represent (text, image, audio, molecules) depends on what
     encoder created the input waves and what decoder converts the
     output waves.
+
+    Key architectural choice: GRU hidden state replaces the explicit
+    interference signal from v1. The hidden state naturally accumulates
+    sequential context (what concepts were already generated, what
+    themes are developing), eliminating the stateless MLP problem that
+    caused mode collapse to repetitive outputs.
 
     Args:
         wave_dim: Wave dimension (432)
@@ -58,6 +67,8 @@ class WaveGenerator(nn.Module):
         max_waves: Maximum waves to generate (50)
         k_neighbors: Gravitational readout neighbors (16)
         interference_radius: How many previous waves influence the next (4)
+        gru_hidden: GRU hidden dimension (512)
+        gru_layers: Number of GRU layers (1)
     """
 
     def __init__(
@@ -67,6 +78,8 @@ class WaveGenerator(nn.Module):
         max_waves: int = 50,
         k_neighbors: int = 16,
         interference_radius: int = 4,
+        gru_hidden: int = 512,
+        gru_layers: int = 1,
     ):
         super().__init__()
         self.wave_dim = wave_dim
@@ -74,12 +87,31 @@ class WaveGenerator(nn.Module):
         self.max_waves = max_waves
         self.k_neighbors = k_neighbors
         self.interference_radius = interference_radius
+        self.gru_hidden = gru_hidden
+        self.gru_layers = gru_layers
 
         # ── Context bridge: field features → wave space ──
         self.context_to_wave = nn.Sequential(
             nn.Linear(field_features, wave_dim),
             nn.GELU(),
             nn.Linear(wave_dim, wave_dim),
+        )
+
+        # ── GRU core: carries temporal state between wave predictions ──
+        # Input: [prev_wave (432) + context_wave (432)] = 864
+        # Hidden state naturally replaces interference signal — accumulates
+        # sequential context (themes, coherence, what was already said).
+        self.wave_gru = nn.GRU(
+            input_size=wave_dim * 2,
+            hidden_size=gru_hidden,
+            num_layers=gru_layers,
+            batch_first=False,
+        )
+
+        # ── GRU output → next wave prediction ──
+        self.gru_to_wave = nn.Sequential(
+            nn.Linear(gru_hidden, wave_dim),
+            nn.Tanh(),  # Bounded output — waves are normalized
         )
 
         # ── Attractor selector: picks ONE attractor per step ──
@@ -92,20 +124,10 @@ class WaveGenerator(nn.Module):
             nn.Linear(wave_dim, 1),              # → scalar logit
         )
 
-        # ── Wave predictor: previous_wave + interference + context → next_wave ──
-        # Input: [prev_wave (432) + interference_signal (432) + context (432)] = 1296
-        self.wave_predictor = nn.Sequential(
-            nn.Linear(wave_dim * 3, wave_dim * 2),
-            nn.GELU(),
-            nn.LayerNorm(wave_dim * 2),
-            nn.Linear(wave_dim * 2, wave_dim),
-            nn.Tanh(),  # Bounded output — waves are normalized
-        )
-
         # ── Confidence head: how sure is this prediction? ──
-        # Used by thermodynamic sampler to decide when to stop
+        # Fed from GRU hidden features (richer than wave alone)
         self.confidence_head = nn.Sequential(
-            nn.Linear(wave_dim, 128),
+            nn.Linear(gru_hidden, 128),
             nn.GELU(),
             nn.Linear(128, 1),
             nn.Sigmoid(),
@@ -115,25 +137,48 @@ class WaveGenerator(nn.Module):
         self.bos_wave = nn.Parameter(torch.randn(wave_dim) * 0.01)
 
     # ─────────────────────────────────────────────
-    # Interference Signal
+    # Hidden State Management
+    # ─────────────────────────────────────────────
+
+    def init_hidden(self, device: Optional[str] = None) -> torch.Tensor:
+        """
+        Initialize GRU hidden state to zeros.
+
+        Args:
+            device: Target device (defaults to bos_wave's device)
+
+        Returns:
+            [gru_layers, 1, gru_hidden] zero tensor
+        """
+        if device is None:
+            device = self.bos_wave.device
+        return torch.zeros(
+            self.gru_layers, 1, self.gru_hidden, device=device
+        )
+
+    # ─────────────────────────────────────────────
+    # Interference Signal (Utility — for inference enrichment)
     # ─────────────────────────────────────────────
 
     def compute_interference_signal(
         self, generated_waves: List[torch.Tensor]
     ) -> torch.Tensor:
         """
-        Compute interference from recently generated waves.
+        Compute interference delta from recently generated waves.
 
-        Nearby waves in the output sequence interfere constructively
-        (reinforcing coherent themes) or destructively (reducing
-        contradictory signals). This is Phase 1's interference
-        physics applied to the output sequence.
+        Returns the DELTA (difference) caused by wave interference,
+        not the full interfered wave. This isolates the coherence
+        signal from the wave identity.
+
+        Note: In v2, this is a utility method. The GRU hidden state
+        is the primary mechanism for temporal coherence. Interference
+        can optionally enrich inference but is not used during training.
 
         Args:
             generated_waves: List of [432] previously generated waves
 
         Returns:
-            [432] interference signal for the next position
+            [432] interference delta for the next position
         """
         if len(generated_waves) == 0:
             return torch.zeros(self.wave_dim, device=self.bos_wave.device)
@@ -147,8 +192,9 @@ class WaveGenerator(nn.Module):
             stacked, radius=max(len(recent) - 1, 1), scale=0.1
         )
 
-        # The interference signal is the last position after interference
-        return interfered[-1]
+        # Return DELTA: how interference changed the last wave
+        # (v1 returned interfered[-1] which contaminated the signal)
+        return interfered[-1] - stacked[-1]
 
     # ─────────────────────────────────────────────
     # Single Step Prediction
@@ -157,24 +203,37 @@ class WaveGenerator(nn.Module):
     def forward_step(
         self,
         prev_wave: torch.Tensor,
-        interference_signal: torch.Tensor,
         context_wave: torch.Tensor,
-    ) -> Tuple[torch.Tensor, float]:
+        hidden: torch.Tensor,
+    ) -> Tuple[torch.Tensor, float, torch.Tensor]:
         """
-        Predict the next wave from previous wave + interference + context.
+        Predict the next wave using GRU.
+
+        The GRU hidden state carries temporal context from all
+        previous steps — this is what prevents mode collapse.
 
         Args:
             prev_wave: [432] the most recent generated wave
-            interference_signal: [432] coherence signal from recent waves
             context_wave: [432] field context projected to wave space
+            hidden: [gru_layers, 1, gru_hidden] GRU hidden state
 
         Returns:
-            (next_wave [432], confidence [0, 1])
+            (next_wave [432], confidence float, new_hidden [layers, 1, hidden])
         """
-        combined = torch.cat([prev_wave, interference_signal, context_wave])
-        next_wave = self.wave_predictor(combined)
-        confidence = self.confidence_head(next_wave).item()
-        return next_wave, confidence
+        # GRU input: [prev_wave + context_wave] → [1, 1, 864]
+        gru_input = torch.cat([prev_wave, context_wave]).unsqueeze(0).unsqueeze(0)
+
+        # GRU step — hidden state carries temporal memory
+        gru_out, new_hidden = self.wave_gru(gru_input, hidden)
+        gru_feat = gru_out.squeeze(0).squeeze(0)  # [gru_hidden]
+
+        # Project GRU features → next wave
+        next_wave = self.gru_to_wave(gru_feat)  # [432]
+
+        # Confidence from GRU features (richer than wave alone)
+        confidence = self.confidence_head(gru_feat).item()
+
+        return next_wave, confidence, new_hidden
 
     # ─────────────────────────────────────────────
     # Dynamic Field Re-Query (Inference Only)
@@ -207,9 +266,6 @@ class WaveGenerator(nn.Module):
         device = query_wave.device
 
         # Query the field directly with the 432-dim wave
-        # field.query() expects wave_dim (432) — it uses its own
-        # wave_to_field_coords (432→3) and wave_to_feature (432→768)
-        # internally. Do NOT project to 768 first — that's a dimension mismatch.
         try:
             field_feats, sims, locs = flux_model.field.query(
                 query_wave, k=self.k_neighbors
@@ -263,15 +319,18 @@ class WaveGenerator(nn.Module):
         target_waves: Optional[torch.Tensor] = None,
         flux_model=None,
         temperature: float = 1.0,
-        skip_interference: bool = False,
         scheduled_sampling_p: float = 0.0,
+        skip_interference: bool = False,  # Deprecated, ignored (kept for compat)
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Generate a sequence of waves from field context.
 
+        GRU hidden state carries temporal context across steps,
+        replacing the explicit interference signal from v1.
+
         If flux_model is provided, re-queries the field at each step
         (dynamic context — enables semantic diversity). Otherwise falls
-        back to static context (faster, but less diverse).
+        back to static context (faster, used during training).
 
         Args:
             field_context: [768] merged field + CGN context (initial)
@@ -280,32 +339,28 @@ class WaveGenerator(nn.Module):
             target_waves: [N, 432] teacher-forcing targets (training only)
             flux_model: FLUXLarge instance for dynamic field re-query
             temperature: Sampling temperature for field re-query
-            skip_interference: If True, zero out interference signal
-                (faster training — skips O(N^2) Python loop)
             scheduled_sampling_p: Probability [0,1] of using the model's
                 own prediction as prev_wave instead of ground truth.
                 0.0 = pure teacher forcing, 1.0 = pure free generation.
-                Ramps up during training to cure exposure bias.
+            skip_interference: Deprecated, ignored (GRU replaces interference)
 
         Returns:
             (generated_waves [N, 432], confidences [N])
         """
         max_waves = max_waves or self.max_waves
-        context_wave = self.context_to_wave(field_context)  # Initial context
+        device = self.bos_wave.device
+        context_wave = self.context_to_wave(field_context)  # Initial context [432]
+
+        # Initialize GRU hidden state — this IS the temporal memory
+        hidden = self.init_hidden(device)
 
         generated = []
         confidences = []
         prev_wave = self.bos_wave
-        _zero_interference = torch.zeros(self.wave_dim, device=self.bos_wave.device)
 
         import random as _rand
 
         for i in range(max_waves):
-            if skip_interference:
-                interference = _zero_interference
-            else:
-                interference = self.compute_interference_signal(generated)
-
             # Dynamic re-query: ask the field "what concepts live near here?"
             if flux_model is not None and not self.training:
                 context_wave = self.query_field_attractors(
@@ -314,8 +369,8 @@ class WaveGenerator(nn.Module):
 
             if target_waves is not None and i < len(target_waves):
                 # Teacher forcing: predict from prev, but feed ground truth
-                next_wave, conf = self.forward_step(
-                    prev_wave, interference, context_wave
+                next_wave, conf, hidden = self.forward_step(
+                    prev_wave, context_wave, hidden
                 )
                 # Scheduled sampling: with probability p, use own prediction
                 # instead of ground truth as the next prev_wave.
@@ -325,8 +380,8 @@ class WaveGenerator(nn.Module):
                 else:
                     prev_wave = target_waves[i].detach()
             else:
-                next_wave, conf = self.forward_step(
-                    prev_wave, interference, context_wave
+                next_wave, conf, hidden = self.forward_step(
+                    prev_wave, context_wave, hidden
                 )
                 prev_wave = next_wave.detach()
 
@@ -339,10 +394,10 @@ class WaveGenerator(nn.Module):
 
         if len(generated) == 0:
             # Safety: always generate at least one wave
-            next_wave, conf = self.forward_step(
+            next_wave, conf, hidden = self.forward_step(
                 self.bos_wave,
-                torch.zeros(self.wave_dim, device=self.bos_wave.device),
                 context_wave,
+                hidden,
             )
             generated.append(next_wave)
             confidences.append(conf)
@@ -357,26 +412,24 @@ class WaveGenerator(nn.Module):
         self,
         field_context: torch.Tensor,
         target_waves: torch.Tensor,
-        skip_interference: bool = True,
         scheduled_sampling_p: float = 0.0,
+        skip_interference: bool = True,  # Deprecated, ignored (kept for compat)
     ) -> Tuple[torch.Tensor, List[float]]:
         """
         Teacher-forced training forward pass (static context — no re-query).
 
+        GRU hidden state carries temporal context — no need for
+        explicit interference computation during training.
+
         During training we use static context for stable gradients.
         During inference, pass flux_model to generate() for dynamic re-query.
-
-        By default, interference is SKIPPED during training to avoid
-        the O(N^2) Python loop bottleneck (~10s/step → ~10ms/step).
-        Interference is still used during inference via generate().
 
         Args:
             field_context: [768] merged context
             target_waves: [N, 432] ground truth wave sequence
-            skip_interference: Skip interference computation for speed
-                (default True during training)
             scheduled_sampling_p: Probability of using own prediction
                 as prev_wave instead of ground truth (exposure bias fix)
+            skip_interference: Deprecated, ignored (GRU handles temporal state)
 
         Returns:
             (predicted_waves [N, 432], confidences [N])
@@ -386,6 +439,5 @@ class WaveGenerator(nn.Module):
             max_waves=len(target_waves),
             target_waves=target_waves,
             flux_model=None,  # Static context during training
-            skip_interference=skip_interference,
             scheduled_sampling_p=scheduled_sampling_p,
         )
