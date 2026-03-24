@@ -406,34 +406,28 @@ class Phase9Trainer:
                     self.model.tl.settle_once(chunk_wave)
                     total_perturbs += 1
 
+                    # Log every 10 perturbs so output is never silent
+                    if total_perturbs == 1:
+                        elapsed = time.time() - t0
+                        print(
+                            f"    ... 1st perturb done in {elapsed:.2f}s",
+                            flush=True,
+                        )
+                    elif total_perturbs % 10 == 0:
+                        elapsed = time.time() - t0
+                        rate = total_perturbs / max(elapsed, 0.01)
+                        pct = total_perturbs / max_chunks * 100
+                        eta = (max_chunks - total_perturbs) / max(rate, 0.01)
+                        print(
+                            f"    ... {total_perturbs:,}/{max_chunks:,} perturbs ({pct:.0f}%)  "
+                            f"[{rate:.1f} perturb/s, ETA {eta:.0f}s]",
+                            flush=True,
+                        )
+
             except Exception:
                 continue
 
             _texts_processed += 1
-
-            # Early feedback: log after 1st text, then every 25 texts
-            if _texts_processed == 1:
-                elapsed = time.time() - t0
-                print(
-                    f"    ... 1st text done: {total_perturbs} chunks in {elapsed:.1f}s  "
-                    f"(~{total_perturbs/max(elapsed,0.01):.0f} perturb/s)",
-                    flush=True,
-                )
-                _est_total_time = (max_chunks / max(total_perturbs, 1)) * elapsed
-                print(
-                    f"    ℹ Estimated total time: ~{_est_total_time/60:.0f} min for {max_chunks:,} perturbs",
-                    flush=True,
-                )
-            elif _texts_processed % 25 == 0:
-                elapsed = time.time() - t0
-                rate = total_perturbs / max(elapsed, 0.01)
-                pct = total_perturbs / max_chunks * 100
-                eta = (max_chunks - total_perturbs) / max(rate, 0.01)
-                print(
-                    f"    ... {_texts_processed:,} texts → {total_perturbs:,}/{max_chunks:,} perturbs ({pct:.0f}%)  "
-                    f"[{rate:.0f} perturb/s, ETA {eta:.0f}s]",
-                    flush=True,
-                )
 
         # Settle the full field to let it stabilize
         self.model.field.settle(steps=20, dt=0.1)
