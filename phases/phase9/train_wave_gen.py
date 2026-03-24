@@ -54,26 +54,126 @@ from field_walk_generator import FieldWalkGenerator
 # Build FLUXModel with Phase 7 Checkpoint (Native 512-dim)
 # ─────────────────────────────────────────────
 
+def _load_model_from_phase7_checkpoint(device: str = 'cpu') -> FLUXModel:
+    """
+    Load FLUXModel directly from phase7.phase.pt checkpoint.
+
+    The Phase 7 checkpoint contains ALL trained component states INCLUDING
+    bridge projections (wave_to_field, field_to_wave) and the output head.
+
+    IMPORTANT: FLUXModel.from_checkpoints() only loads phases 1-6 individually.
+    The bridges are nn.Linear layers created in FLUXModel.__init__() and only
+    trained during Phase 7 (Stage A: Output Head + Bridge). They are saved in
+    phase7.phase.pt but NOT in any of the Phase 1-6 checkpoints. Using
+    from_checkpoints() leaves bridges at random init (cosine ~0.003).
+
+    Args:
+        device: Target device
+
+    Returns:
+        FLUXModel with all Phase 7 trained weights
+    """
+    from gravity import GravitationalRelevance
+
+    ckpt7 = load_checkpoint(7)  # Downloads from HF if not local
+    config = ckpt7.get('config', None)
+    model = FLUXModel(config=config, device=device)
+
+    # ── Load ALL component states from Phase 7 checkpoint ──
+    loaded = []
+
+    # Phase 1: CSE
+    if 'cse_state_dict' in ckpt7:
+        model.cse.load_state_dict(ckpt7['cse_state_dict'])
+        model.cse.eval()
+        for p in model.cse.parameters():
+            p.requires_grad = False
+        loaded.append('CSE')
+
+    # Phase 2: Field (includes trained wave_to_feature)
+    if 'field_state_dict' in ckpt7:
+        model.field.load_state_dict(ckpt7['field_state_dict'])
+        loaded.append('Field')
+
+    # Phase 3: GR
+    if 'gr_state' in ckpt7:
+        try:
+            model.gr = GravitationalRelevance.load_state(ckpt7['gr_state'], device=device)
+            loaded.append('GR')
+        except Exception:
+            pass
+
+    # Phase 4: TL
+    if 'tl_state' in ckpt7:
+        model.tl.load_state(ckpt7['tl_state'])
+        loaded.append('TL')
+
+    # Phase 5: CGN + CausalGraph
+    if 'cgn_state' in ckpt7:
+        model.cgn.load_state(ckpt7['cgn_state'])
+        loaded.append('CGN')
+    if 'causal_graph_state' in ckpt7:
+        model.causal_graph.load_state(ckpt7['causal_graph_state'])
+
+    # Phase 6: Memory
+    if 'working_memory_state' in ckpt7:
+        try:
+            model.working_memory.load_state_memory(ckpt7['working_memory_state'])
+        except Exception:
+            pass
+    if 'episodic_memory_state' in ckpt7:
+        model.episodic_memory.load_state(ckpt7['episodic_memory_state'])
+    if 'semantic_memory_state' in ckpt7:
+        try:
+            model.semantic_memory.load_state(ckpt7['semantic_memory_state'])
+        except Exception:
+            pass
+    if 'router_state' in ckpt7:
+        try:
+            model.memory_router.load_state(ckpt7['router_state'])
+        except Exception:
+            pass
+    loaded.append('Memory')
+
+    # ── Phase 7 TRAINED bridges (THE KEY DIFFERENCE vs from_checkpoints) ──
+    if 'wave_to_field_state' in ckpt7:
+        model.wave_to_field.load_state_dict(ckpt7['wave_to_field_state'])
+        loaded.append('wave_to_field')
+    else:
+        print("  ⚠ wave_to_field_state NOT in Phase 7 checkpoint — bridge untrained!")
+
+    if 'field_to_wave_state' in ckpt7:
+        model.field_to_wave.load_state_dict(ckpt7['field_to_wave_state'])
+        loaded.append('field_to_wave')
+    else:
+        print("  ⚠ field_to_wave_state NOT in Phase 7 checkpoint — bridge untrained!")
+
+    if 'output_head_state' in ckpt7:
+        model.output_head.load_state_dict(ckpt7['output_head_state'])
+        loaded.append('OutputHead')
+
+    model._learning_steps = ckpt7.get('learning_steps', 0)
+    model = model.to(device)
+
+    print(f"  ✓ Loaded from phase7.phase.pt: {', '.join(loaded)}")
+    return model
+
+
 def build_flux_for_phase9(device: str = 'cpu') -> FLUXModel:
     """
     Build FLUXModel by loading Phase 7 checkpoint NATIVELY.
 
-    Phase 9 loads FLUXModel (512-dim field_features) directly from Phase 7,
-    NOT FLUXLarge (768-dim). This ensures ALL bridge projections and the
-    field state are the TRAINED Phase 7 weights — no dimension mismatches,
-    no random re-initialization.
+    Phase 9 loads FLUXModel (512-dim field_features) directly from the
+    phase7.phase.pt checkpoint, NOT via from_checkpoints() which only
+    assembles phases 1-6 and leaves bridges at random init.
 
-    Phase 8 FLUXLarge scaled field_features from 512→768, which caused
-    from_phase7_checkpoint() to SKIP loading wave_to_field, field_to_wave,
-    field state, and GR — leaving them all randomly initialized. This broke
-    the entire field round-trip pipeline.
-
-    By using FLUXModel natively:
-      - wave_to_field (432→512): TRAINED from Phase 7
-      - field_to_wave (512→432): TRAINED from Phase 7
-      - field.wave_to_feature (432→512): TRAINED from Phase 2/7
-      - field state (64³×512): TRAINED attractors from Phase 7
-      - GR (512-dim): TRAINED from Phase 3/7
+    The Phase 7 checkpoint contains ALL trained component states:
+      - wave_to_field (432→512): TRAINED in Phase 7 Stage A
+      - field_to_wave (512→432): TRAINED in Phase 7 Stage A
+      - field.wave_to_feature (432→512): TRAINED from Phase 2
+      - field state (64³×512): TRAINED attractors from Phase 2/7
+      - GR (512-dim): TRAINED from Phase 3
+      - output_head: TRAINED in Phase 7 Stage A
 
     Args:
         device: Target device
@@ -83,19 +183,25 @@ def build_flux_for_phase9(device: str = 'cpu') -> FLUXModel:
     """
     model = None
 
-    # Load Phase 7 FLUXModel natively — ALL weights transfer (512-dim)
+    # PRIMARY: Load from Phase 7 checkpoint (has trained bridges)
     try:
-        model = FLUXModel.from_checkpoints(device=device)
-        print("  ✓ Loaded FLUXModel with Phase 1-7 trained weights (native 512-dim)")
-        print("  ✓ All bridges trained: wave_to_field(432→512), field_to_wave(512→432)")
-        print("  ✓ Field state loaded: 64³×512 with trained attractors")
+        model = _load_model_from_phase7_checkpoint(device=device)
+        print("  ✓ Loaded FLUXModel from phase7.phase.pt (all bridges trained)")
     except Exception as e:
-        print(f"  ✗ Could not load Phase 7 components: {e}")
+        print(f"  ⚠ Could not load phase7.phase.pt: {e}")
 
-    # Last resort: fresh init (untrained — will produce poor results)
+    # FALLBACK: Assemble from phases 1-6 (bridges will be random!)
+    if model is None:
+        try:
+            model = FLUXModel.from_checkpoints(device=device)
+            print("  ⚠ Loaded via from_checkpoints() — bridges are UNTRAINED (random init)")
+            print("    wave_to_field and field_to_wave were not trained in phases 1-6")
+        except Exception as e:
+            print(f"  ✗ Could not load phase components: {e}")
+
+    # LAST RESORT: Fresh init
     if model is None:
         print("  ⚠ No checkpoints available — using fresh FLUXModel (untrained)")
-        print("    Wave generation quality will be limited without trained CSE/field")
         model = FLUXModel(device=device)
 
     # ── Validate bridge round-trip (catch untrained bridges early) ──
@@ -109,7 +215,7 @@ def build_flux_for_phase9(device: str = 'cpu') -> FLUXModel:
                 _test_wave.unsqueeze(0), _roundtrip.unsqueeze(0)
             ).item()
             if _cos > 0.2:
-                print(f"  ✓ Bridge round-trip sanity check: cosine={_cos:.3f} (trained)")
+                print(f"  ✓ Bridge round-trip sanity: cosine={_cos:.3f} (trained)")
             else:
                 print(f"  ⚠ Bridge round-trip cosine={_cos:.3f} — bridges may be untrained")
     except Exception:
