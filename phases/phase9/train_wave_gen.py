@@ -385,6 +385,7 @@ class Phase9Trainer:
         print(f"  ℹ Populating field with chunk-level attractors (max {max_chunks:,})...", flush=True)
         print(f"    Field attractors before: {attractors_before:,}", flush=True)
 
+        _texts_processed = 0
         for i, text in enumerate(texts):
             if total_perturbs >= max_chunks:
                 break
@@ -408,12 +409,29 @@ class Phase9Trainer:
             except Exception:
                 continue
 
-            if (i + 1) % 200 == 0:
+            _texts_processed += 1
+
+            # Early feedback: log after 1st text, then every 25 texts
+            if _texts_processed == 1:
+                elapsed = time.time() - t0
+                print(
+                    f"    ... 1st text done: {total_perturbs} chunks in {elapsed:.1f}s  "
+                    f"(~{total_perturbs/max(elapsed,0.01):.0f} perturb/s)",
+                    flush=True,
+                )
+                _est_total_time = (max_chunks / max(total_perturbs, 1)) * elapsed
+                print(
+                    f"    ℹ Estimated total time: ~{_est_total_time/60:.0f} min for {max_chunks:,} perturbs",
+                    flush=True,
+                )
+            elif _texts_processed % 25 == 0:
                 elapsed = time.time() - t0
                 rate = total_perturbs / max(elapsed, 0.01)
+                pct = total_perturbs / max_chunks * 100
+                eta = (max_chunks - total_perturbs) / max(rate, 0.01)
                 print(
-                    f"    ... {i+1:,} texts → {total_perturbs:,} perturbs  "
-                    f"[{rate:.0f} perturb/s]",
+                    f"    ... {_texts_processed:,} texts → {total_perturbs:,}/{max_chunks:,} perturbs ({pct:.0f}%)  "
+                    f"[{rate:.0f} perturb/s, ETA {eta:.0f}s]",
                     flush=True,
                 )
 
@@ -479,10 +497,17 @@ class Phase9Trainer:
         total_chunks = 0
         correct_words = 0
         total_words = 0
+        _total_steps_est = max_steps or len(texts) * 5  # rough estimate
+
+        print(f"\n{'='*60}", flush=True)
+        print(f"  Stage 1: WaveToText Pre-Training — max_steps={max_steps}, batch_size={batch_size}", flush=True)
+        print(f"  Training texts: {len(texts):,}  |  log_interval: {log_interval}", flush=True)
+        print(f"{'='*60}", flush=True)
 
         # Collect chunks from all documents
-        print("  ℹ Stage 1: Collecting (wave, word) pairs...")
+        print("  ℹ Collecting (wave, word) pairs...", flush=True)
         chunk_pairs: List[Tuple[torch.Tensor, torch.Tensor]] = []
+        _step1_t = time.time()
 
         for text_idx, text in enumerate(texts):
             if max_steps and step >= max_steps:
@@ -532,14 +557,41 @@ class Phase9Trainer:
 
                 all_losses.append(loss.item())
 
+                # Early logging for first steps
+                if step == 1:
+                    print(
+                        f"  WTT Step     1  "
+                        f"loss={loss.item():.4f}  "
+                        f"chunks={total_chunks:,}  "
+                        f"(first step: {time.time()-_step1_t:.2f}s)",
+                        flush=True,
+                    )
+                elif step == 10:
+                    _e10 = time.time() - _step1_t
+                    print(
+                        f"  WTT Step    10  "
+                        f"loss={sum(all_losses[-10:])/10:.4f}  "
+                        f"chunks={total_chunks:,}  "
+                        f"[{10/_e10:.1f} step/s]",
+                        flush=True,
+                    )
+
                 if step % log_interval == 0:
                     avg_loss = sum(all_losses[-log_interval:]) / min(
                         len(all_losses), log_interval
                     )
+                    elapsed_train = time.time() - _step1_t
+                    steps_per_sec = step / max(elapsed_train, 0.01)
+                    _est_total = max_steps or (step * len(texts) / max(text_idx + 1, 1))
+                    eta = (_est_total - step) / max(steps_per_sec, 0.01)
+                    _loss_trend = '↓' if len(all_losses) > log_interval and avg_loss < sum(all_losses[-2*log_interval:-log_interval]) / log_interval else '→'
                     print(
                         f"  WTT Step {step:>6}  "
-                        f"loss={avg_loss:.4f}  "
-                        f"chunks={total_chunks:,}"
+                        f"loss={avg_loss:.4f} {_loss_trend}  "
+                        f"chunks={total_chunks:,}  "
+                        f"[{steps_per_sec:.1f} step/s, "
+                        f"elapsed {elapsed_train:.0f}s, ETA ~{eta:.0f}s]",
+                        flush=True,
                     )
                     if self.log:
                         self.log.metric(f"wtt_step_{step}_loss", f"{avg_loss:.4f}")
@@ -562,16 +614,19 @@ class Phase9Trainer:
             total_chunks += len(chunk_pairs)
 
         # Evaluate word accuracy on a small subset
+        print(f"\n  ℹ Evaluating WTT word accuracy on 50 texts...", flush=True)
         word_acc = self._evaluate_wtt_accuracy(texts[:50])
 
         elapsed = time.time() - t0
         final_loss = all_losses[-1] if all_losses else 0.0
         avg_loss = sum(all_losses) / max(len(all_losses), 1)
 
-        print(f"\n  ✓ Stage 1 complete: {step} steps, {total_chunks:,} chunks")
-        print(f"    Final loss: {final_loss:.4f}")
-        print(f"    Word accuracy: {word_acc:.1%}")
-        print(f"    Time: {elapsed:.1f}s")
+        print(f"\n  ✓ Stage 1 complete: {step} steps, {total_chunks:,} chunks", flush=True)
+        print(f"    Final loss:    {final_loss:.4f}", flush=True)
+        print(f"    Average loss:  {avg_loss:.4f}", flush=True)
+        print(f"    Word accuracy: {word_acc:.1%}", flush=True)
+        print(f"    Total time:    {elapsed:.1f}s ({elapsed/60:.1f} min)", flush=True)
+        print(f"    Throughput:    {step/max(elapsed,0.01):.1f} step/s, {total_chunks/max(elapsed,0.01):.0f} chunks/s", flush=True)
 
         return WTTStageResult(
             total_steps=step,
@@ -647,6 +702,7 @@ class Phase9Trainer:
         skipped = 0
 
         print(f"  ℹ Pre-computing frozen pipeline outputs for up to {max_samples:,} samples...", flush=True)
+        print(f"    Pipeline: CSE → wave_to_field → GR → CGN → field.query → WaveChunker", flush=True)
         t0 = time.time()
 
         for i, text in enumerate(texts):
@@ -679,14 +735,28 @@ class Phase9Trainer:
                 # Store on CPU — GPU can't hold 5K+ samples + model
                 precomputed.append((merged.cpu(), target_waves.cpu(), wave_vec.cpu()))
 
-                if (i + 1) % 50 == 0:
+                # Early feedback after 1st sample
+                if len(precomputed) == 1:
+                    _e1 = time.time() - t0
+                    _chunks1 = target_waves.shape[0]
+                    print(
+                        f"    ... 1st sample done: {_chunks1} chunks in {_e1:.2f}s",
+                        flush=True,
+                    )
+                    _est_total = _e1 * max_samples
+                    print(
+                        f"    ℹ Estimated total: ~{_est_total/60:.0f} min for {max_samples:,} samples",
+                        flush=True,
+                    )
+                elif (len(precomputed)) % 500 == 0 or (len(precomputed) < 500 and (len(precomputed)) % 50 == 0):
                     elapsed_so_far = time.time() - t0
-                    rate = (i + 1) / max(elapsed_so_far, 0.01)
+                    rate = len(precomputed) / max(elapsed_so_far, 0.01)
                     remaining = max_samples - len(precomputed)
                     eta = remaining / max(rate, 0.01)
+                    pct = len(precomputed) / max_samples * 100
                     print(
-                        f"    ... {i+1:,} texts → {len(precomputed):,} valid  "
-                        f"[{rate:.0f} text/s, ETA {eta:.0f}s]",
+                        f"    ... {len(precomputed):,}/{max_samples:,} samples ({pct:.0f}%)  "
+                        f"[{rate:.1f} sample/s, elapsed {elapsed_so_far:.0f}s, ETA {eta:.0f}s]",
                         flush=True,
                     )
 
@@ -695,7 +765,9 @@ class Phase9Trainer:
                 continue
 
         elapsed = time.time() - t0
-        print(f"  ✓ Pre-computed {len(precomputed):,} samples in {elapsed:.1f}s (skipped {skipped:,})", flush=True)
+        _rate_final = len(precomputed) / max(elapsed, 0.01)
+        print(f"  ✓ Pre-computed {len(precomputed):,} samples in {elapsed:.1f}s ({elapsed/60:.1f} min)", flush=True)
+        print(f"    Rate: {_rate_final:.1f} samples/s  |  Skipped: {skipped:,}", flush=True)
 
         return precomputed
 
@@ -1052,9 +1124,18 @@ class Phase9Trainer:
         optimizer = torch.optim.AdamW(joint_params, lr=self.lr * 0.5, weight_decay=0.01)
 
         all_losses = []
+        all_mse = []
+        all_wtt_losses = []
         cosine_accs = []
+        _skipped = 0
         import random
         sample_indices = list(range(len(precomputed)))
+        train_t0 = time.time()
+
+        _wg_params_n = sum(p.numel() for p in self.generator.parameters() if p.requires_grad)
+        _wtt_params_n = sum(p.numel() for p in self.wtt.parameters() if p.requires_grad)
+        print(f"  Trainable: WG {_wg_params_n:,} + WTT {_wtt_params_n:,} = {_wg_params_n+_wtt_params_n:,} params", flush=True)
+        print(f"  LR: {self.lr * 0.5:.6f}  |  Grad accum: {self.grad_accum}  |  SS: 0.5", flush=True)
 
         for step in range(1, total_steps + 1):
             idx = (step - 1) % len(precomputed)
@@ -1062,52 +1143,38 @@ class Phase9Trainer:
                 random.shuffle(sample_indices)
             sample_idx = sample_indices[idx]
             merged_cpu, target_cpu, wave_vec_cpu = precomputed[sample_idx]
-            
+
             merged = merged_cpu.to(self.device)
             target_waves = target_cpu.to(self.device)
 
-            # 1. Forward WG (use scheduled sampling to reduce exposure bias)
-            predicted_waves, _ = self.generator(
-                merged, target_waves, 
-                scheduled_sampling_p=0.5
-            )
-
-            # 2. Forward WTT using PREDICTED waves (gradients flow to WG)
-            # We need byte targets for these chunks. Note: target_waves correspond to
-            # specific byte chunks. We need to run chunker with bytes again to get targets.
-            # But the precomputation dropped the bytes!
-            # For simplicity, we just use a small MSE loss to keep WG on track, 
-            # and a cosine term. Wait, we can't easily get the byte targets here without
-            # running the full text again.
-            
-            # Since Stage 3 was requested to have joint fine tuning, let's just re-run 
-            # the text for this step to get exact byte chunks.
+            # Re-run text to get byte targets for WTT loss
             text = texts[sample_idx % len(texts)]
             try:
                 wave = self.model.cse.encode(text)
                 wave_seq = wave.full.to(self.device)
                 text_bytes = text.encode('utf-8', errors='replace')
                 pairs = self.chunker.chunk_with_bytes(wave_seq, text_bytes)
-                
+
                 if len(pairs) < 2:
+                    _skipped += 1
                     continue
-                    
+
                 target_waves_fresh = torch.stack([p[0] for p in pairs]).to(self.device)
                 targets_batch = [p[1] for p in pairs]
-                
+
                 wave_vec = wave_seq.mean(dim=0)
                 merged = self._compute_merged_context(wave_vec)
-                
+
                 # Predict
                 predicted_waves, _ = self.generator(merged, target_waves_fresh, scheduled_sampling_p=0.5)
-                
+
                 # Ensure we only use up to len(targets_batch) predictions
                 pred_len = min(len(predicted_waves), len(targets_batch))
                 wtt_loss = self.wtt.forward_batch(predicted_waves[:pred_len], targets_batch[:pred_len])
-                
+
                 mse_loss = F.mse_loss(predicted_waves[:pred_len], target_waves_fresh[:pred_len])
                 cos_loss = 1.0 - F.cosine_similarity(predicted_waves[:pred_len], target_waves_fresh[:pred_len], dim=-1).mean()
-                
+
                 # Combined loss: wave matching + text decoding
                 loss = mse_loss + cos_loss + (0.5 * wtt_loss)
 
@@ -1121,30 +1188,59 @@ class Phase9Trainer:
                     optimizer.zero_grad()
 
                 all_losses.append(loss.item())
+                all_mse.append(mse_loss.item())
+                all_wtt_losses.append(wtt_loss.item())
                 cos_acc = F.cosine_similarity(predicted_waves[:pred_len], target_waves_fresh[:pred_len], dim=-1).mean().item()
                 cosine_accs.append(cos_acc)
-                
+
             except Exception:
+                _skipped += 1
                 continue
+
+            # Early logging
+            if step == 1:
+                print(
+                    f"  Joint Step     1/{total_steps}  "
+                    f"loss={loss.item():.4f}  mse={mse_loss.item():.4f}  "
+                    f"wtt_loss={wtt_loss.item():.4f}  cos_acc={cos_acc:.3f}  "
+                    f"(first step: {time.time()-train_t0:.2f}s)",
+                    flush=True,
+                )
 
             if step % log_interval == 0:
                 avg_loss = sum(all_losses[-log_interval:]) / max(len(all_losses[-log_interval:]), 1)
                 avg_cos = sum(cosine_accs[-log_interval:]) / max(len(cosine_accs[-log_interval:]), 1)
+                avg_mse = sum(all_mse[-log_interval:]) / max(len(all_mse[-log_interval:]), 1)
+                avg_wtt = sum(all_wtt_losses[-log_interval:]) / max(len(all_wtt_losses[-log_interval:]), 1)
+                elapsed_train = time.time() - train_t0
+                steps_per_sec = step / max(elapsed_train, 0.01)
+                eta = (total_steps - step) / max(steps_per_sec, 0.01)
                 print(
                     f"  Joint Step {step:>6}/{total_steps}  "
-                    f"loss={avg_loss:.4f}  cos_acc={avg_cos:.3f}",
+                    f"loss={avg_loss:.4f}  mse={avg_mse:.4f}  wtt={avg_wtt:.4f}  "
+                    f"cos_acc={avg_cos:.3f}  "
+                    f"[{steps_per_sec:.1f} step/s, elapsed {elapsed_train:.0f}s, ETA {eta:.0f}s]",
                     flush=True,
                 )
+                if self.log:
+                    self.log.metric(f"joint_step_{step}_loss", f"{avg_loss:.4f}")
 
+        print(f"\n  ℹ Evaluating WTT word accuracy on 50 texts...", flush=True)
         wtt_acc = self._evaluate_wtt_accuracy(texts[:50])
         avg_loss = sum(all_losses) / max(len(all_losses), 1)
         avg_cos = sum(cosine_accs) / max(len(cosine_accs), 1)
+        avg_mse_final = sum(all_mse) / max(len(all_mse), 1)
+        avg_wtt_final = sum(all_wtt_losses) / max(len(all_wtt_losses), 1)
         elapsed = time.time() - t0
-        
-        print(f"\n  ✓ Stage 3 complete: {step} steps", flush=True)
-        print(f"    Joint Average Loss: {avg_loss:.4f}", flush=True)
-        print(f"    Average Cosine Acc: {avg_cos:.3f}", flush=True)
-        print(f"    WTT Word Accuracy : {wtt_acc:.1%}", flush=True)
+        train_elapsed = time.time() - train_t0
+
+        print(f"\n  ✓ Stage 3 complete: {step} steps ({_skipped} skipped)", flush=True)
+        print(f"    Combined loss: {avg_loss:.4f}  (mse={avg_mse_final:.4f} + wtt={avg_wtt_final:.4f})", flush=True)
+        print(f"    Cosine Acc:    {avg_cos:.3f}", flush=True)
+        print(f"    WTT Word Acc:  {wtt_acc:.1%}", flush=True)
+        print(f"    Training time: {train_elapsed:.1f}s ({train_elapsed/60:.1f} min)", flush=True)
+        print(f"    Total time:    {elapsed:.1f}s ({elapsed/60:.1f} min)", flush=True)
+        print(f"    Throughput:    {step/max(train_elapsed,0.01):.1f} step/s", flush=True)
 
         return JointStageResult(
             total_steps=total_steps,
