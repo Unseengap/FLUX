@@ -293,6 +293,20 @@ class Phase9Trainer:
         self.log = log
         self.device = flux_model._device_str
 
+        # ── Align field's projection with the trained bridge ──
+        # field.wave_to_feature is a random nn.Linear(432, 768) that was
+        # never gradient-trained. model.wave_to_field is the TRAINED bridge
+        # from Phase 7. If they differ, field.query returns features in a
+        # different space than model.field_to_wave expects → broken round-trip.
+        # Fix: copy trained weights into field so all projections are aligned.
+        try:
+            with torch.no_grad():
+                flux_model.field.wave_to_feature.weight.copy_(flux_model.wave_to_field.weight)
+                flux_model.field.wave_to_feature.bias.copy_(flux_model.wave_to_field.bias)
+            print(f"  ✓ Aligned field.wave_to_feature ← model.wave_to_field (trained bridge)")
+        except Exception as e:
+            print(f"  ⚠ Could not align bridges: {e}")
+
     # ─────────────────────────────────────────────
     # Pipeline Helper
     # ─────────────────────────────────────────────
@@ -384,6 +398,11 @@ class Phase9Trainer:
         t0 = time.time()
         total_perturbs = 0
         attractors_before = self.model.field.num_attractors()
+
+        # Re-align bridge in case field was reset between __init__ and populate
+        with torch.no_grad():
+            self.model.field.wave_to_feature.weight.copy_(self.model.wave_to_field.weight)
+            self.model.field.wave_to_feature.bias.copy_(self.model.wave_to_field.bias)
 
         print(f"  ℹ Populating field with chunk-level attractors (max {max_chunks:,})...", flush=True)
         print(f"    Field attractors before: {attractors_before:,}", flush=True)
