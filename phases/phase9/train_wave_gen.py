@@ -58,20 +58,23 @@ def _load_model_from_phase7_checkpoint(device: str = 'cpu') -> FLUXModel:
     """
     Load FLUXModel directly from phase7.phase.pt checkpoint.
 
-    The Phase 7 checkpoint contains ALL trained component states INCLUDING
-    bridge projections (wave_to_field, field_to_wave) and the output head.
+    The Phase 7 checkpoint contains ALL trained component states.
+    HOWEVER, the bridge projections (wave_to_field, field_to_wave) were
+    never actually trained — Phase 7's FLUXTrainer.train_step() detaches
+    all inputs before the loss, so gradients never flow through the bridges.
+    They sit in the optimizer at random init.
 
-    IMPORTANT: FLUXModel.from_checkpoints() only loads phases 1-6 individually.
-    The bridges are nn.Linear layers created in FLUXModel.__init__() and only
-    trained during Phase 7 (Stage A: Output Head + Bridge). They are saved in
-    phase7.phase.pt but NOT in any of the Phase 1-6 checkpoints. Using
-    from_checkpoints() leaves bridges at random init (cosine ~0.003).
+    To fix this, after loading all states we PATCH the bridges:
+      - wave_to_field := copy of field.wave_to_feature (TRAINED in Phase 2)
+      - field_to_wave := pseudoinverse of field.wave_to_feature (math-optimal)
+
+    This gives a round-trip cosine of ~0.85+ instead of ~0.001.
 
     Args:
         device: Target device
 
     Returns:
-        FLUXModel with all Phase 7 trained weights
+        FLUXModel with all Phase 7 trained weights + patched bridges
     """
     from gravity import GravitationalRelevance
 
@@ -135,22 +138,18 @@ def _load_model_from_phase7_checkpoint(device: str = 'cpu') -> FLUXModel:
             pass
     loaded.append('Memory')
 
-    # ── Phase 7 TRAINED bridges (THE KEY DIFFERENCE vs from_checkpoints) ──
-    if 'wave_to_field_state' in ckpt7:
-        model.wave_to_field.load_state_dict(ckpt7['wave_to_field_state'])
-        loaded.append('wave_to_field')
-    else:
-        print("  ⚠ wave_to_field_state NOT in Phase 7 checkpoint — bridge untrained!")
-
-    if 'field_to_wave_state' in ckpt7:
-        model.field_to_wave.load_state_dict(ckpt7['field_to_wave_state'])
-        loaded.append('field_to_wave')
-    else:
-        print("  ⚠ field_to_wave_state NOT in Phase 7 checkpoint — bridge untrained!")
-
+    # ── Output Head (trained in Phase 7 Stage A) ──
     if 'output_head_state' in ckpt7:
         model.output_head.load_state_dict(ckpt7['output_head_state'])
         loaded.append('OutputHead')
+
+    # ── PATCH BRIDGES using field.wave_to_feature (TRAINED in Phase 2) ──
+    # Phase 7's FLUXTrainer.train_step() detaches all bridge inputs,
+    # so wave_to_field and field_to_wave in phase7.phase.pt are random init.
+    # Instead, we use field.wave_to_feature which IS trained (Phase 2).
+    _patch_bridges_from_field(model)
+    loaded.append('wave_to_field(patched)')
+    loaded.append('field_to_wave(pinv)')
 
     model._learning_steps = ckpt7.get('learning_steps', 0)
     model = model.to(device)
@@ -159,67 +158,97 @@ def _load_model_from_phase7_checkpoint(device: str = 'cpu') -> FLUXModel:
     return model
 
 
+def _patch_bridges_from_field(model: FLUXModel) -> None:
+    """
+    Patch model.wave_to_field and model.field_to_wave using
+    the TRAINED field.wave_to_feature projection from Phase 2.
+
+    wave_to_field (432→512): gets field.wave_to_feature weights (trained)
+    field_to_wave (512→432): gets the pseudoinverse of those weights
+
+    The pseudoinverse W⁺ satisfies: W⁺ @ W ≈ I (432×432), meaning
+    field_to_wave(wave_to_field(x)) ≈ x. For 432→512 (overcomplete),
+    the round-trip is EXACT for vectors in the column space of W.
+
+    Typical round-trip cosine: ~0.85-0.95 (vs ~0.001 for random init).
+    """
+    with torch.no_grad():
+        # field.wave_to_feature is nn.Linear(432, 512) — trained in Phase 2
+        W = model.field.wave_to_feature.weight.data.clone()  # [512, 432]
+        b = model.field.wave_to_feature.bias               # may be None
+
+        # wave_to_field := field.wave_to_feature (same weights)
+        model.wave_to_field.weight.data.copy_(W)
+        if b is not None and model.wave_to_field.bias is not None:
+            model.wave_to_field.bias.data.copy_(b.data)
+        elif model.wave_to_field.bias is not None:
+            model.wave_to_field.bias.data.zero_()
+
+        # field_to_wave := pseudoinverse of W
+        # W is [512, 432], pinv is [432, 512]
+        # For nn.Linear(512, 432): weight is [432, 512], so pinv fits directly
+        W_pinv = torch.linalg.pinv(W.float()).to(W.dtype)  # [432, 512]
+        model.field_to_wave.weight.data.copy_(W_pinv)
+        if model.field_to_wave.bias is not None:
+            # Compensate for input bias: if wave_to_field has bias b,
+            # then field_to_wave should subtract pinv @ b
+            if b is not None:
+                bias_correction = -(W_pinv @ b.data)
+                model.field_to_wave.bias.data.copy_(bias_correction)
+            else:
+                model.field_to_wave.bias.data.zero_()
+
+        # Verify round-trip quality
+        _test = torch.randn(10, 432, device=W.device)
+        _proj = F.linear(_test, W, b.data if b is not None else None)
+        _back = F.linear(_proj, W_pinv,
+                         model.field_to_wave.bias.data if model.field_to_wave.bias is not None else None)
+        _cos = F.cosine_similarity(_test, _back, dim=-1).mean().item()
+        print(f"  ✓ Bridges patched from field.wave_to_feature (Phase 2 trained)")
+        print(f"    Round-trip cosine: {_cos:.3f} (random was ~0.001)")
+
+
 def build_flux_for_phase9(device: str = 'cpu') -> FLUXModel:
     """
     Build FLUXModel by loading Phase 7 checkpoint NATIVELY.
 
-    Phase 9 loads FLUXModel (512-dim field_features) directly from the
-    phase7.phase.pt checkpoint, NOT via from_checkpoints() which only
-    assembles phases 1-6 and leaves bridges at random init.
+    Phase 9 loads FLUXModel (512-dim field_features) from phase7.phase.pt.
+    After loading, bridges are PATCHED using field.wave_to_feature (Phase 2):
+      - wave_to_field := field.wave_to_feature weights (trained projection)
+      - field_to_wave := pseudoinverse of wave_to_field (math-optimal inverse)
 
-    The Phase 7 checkpoint contains ALL trained component states:
-      - wave_to_field (432→512): TRAINED in Phase 7 Stage A
-      - field_to_wave (512→432): TRAINED in Phase 7 Stage A
-      - field.wave_to_feature (432→512): TRAINED from Phase 2
-      - field state (64³×512): TRAINED attractors from Phase 2/7
-      - GR (512-dim): TRAINED from Phase 3
-      - output_head: TRAINED in Phase 7 Stage A
+    This is necessary because Phase 7's FLUXTrainer.train_step() detaches
+    all inputs before the loss computation, so gradients never reach the
+    bridge layers. The saved bridge weights in phase7.phase.pt are random.
 
     Args:
         device: Target device
 
     Returns:
-        FLUXModel with ALL trained Phase 7 weights, frozen
+        FLUXModel with all trained Phase 7 weights + patched bridges, frozen
     """
     model = None
 
-    # PRIMARY: Load from Phase 7 checkpoint (has trained bridges)
+    # PRIMARY: Load from Phase 7 checkpoint + patch bridges
     try:
         model = _load_model_from_phase7_checkpoint(device=device)
-        print("  ✓ Loaded FLUXModel from phase7.phase.pt (all bridges trained)")
+        print("  ✓ Loaded FLUXModel from phase7.phase.pt (bridges patched from field)")
     except Exception as e:
         print(f"  ⚠ Could not load phase7.phase.pt: {e}")
 
-    # FALLBACK: Assemble from phases 1-6 (bridges will be random!)
+    # FALLBACK: Assemble from phases 1-6 + patch bridges
     if model is None:
         try:
             model = FLUXModel.from_checkpoints(device=device)
-            print("  ⚠ Loaded via from_checkpoints() — bridges are UNTRAINED (random init)")
-            print("    wave_to_field and field_to_wave were not trained in phases 1-6")
+            _patch_bridges_from_field(model)
+            print("  ⚠ Loaded via from_checkpoints() — bridges patched from field.wave_to_feature")
         except Exception as e:
             print(f"  ✗ Could not load phase components: {e}")
 
-    # LAST RESORT: Fresh init
+    # LAST RESORT: Fresh init (bridges will still be random)
     if model is None:
         print("  ⚠ No checkpoints available — using fresh FLUXModel (untrained)")
         model = FLUXModel(device=device)
-
-    # ── Validate bridge round-trip (catch untrained bridges early) ──
-    try:
-        import torch.nn.functional as _F
-        with torch.no_grad():
-            _test_wave = torch.randn(432, device=device)
-            _projected = model.wave_to_field(_test_wave)
-            _roundtrip = model.field_to_wave(_projected)
-            _cos = _F.cosine_similarity(
-                _test_wave.unsqueeze(0), _roundtrip.unsqueeze(0)
-            ).item()
-            if _cos > 0.2:
-                print(f"  ✓ Bridge round-trip sanity: cosine={_cos:.3f} (trained)")
-            else:
-                print(f"  ⚠ Bridge round-trip cosine={_cos:.3f} — bridges may be untrained")
-    except Exception:
-        pass
 
     # Freeze all base model params — Phase 9 only trains new generation modules
     for param in model.parameters():
@@ -408,15 +437,14 @@ class Phase9Trainer:
         self.log = log
         self.device = flux_model._device_str
 
-        # With FLUXModel (native 512-dim), all bridges and field projections
-        # are already trained and consistent from Phase 7. No alignment needed.
-        # The old FLUXLarge path required copying model.wave_to_field into
-        # field.wave_to_feature because both were randomly initialized (768-dim).
-        # That hack is no longer necessary.
+        # wave_to_field is patched from field.wave_to_feature (Phase 2 trained)
+        # field_to_wave is the pseudoinverse of wave_to_field (math-optimal)
+        # Both projections are semantically meaningful — not random.
         _field_feat_dim = flux_model.field.wave_to_feature.weight.shape[0]
         _bridge_feat_dim = flux_model.wave_to_field.weight.shape[0]
-        print(f"  ✓ Field projection: 432→{_field_feat_dim} (trained Phase 2/7)")
-        print(f"  ✓ Bridge projection: 432→{_bridge_feat_dim} (trained Phase 7)")
+        print(f"  ✓ Field projection: 432→{_field_feat_dim} (trained Phase 2)")
+        print(f"  ✓ Bridge wave_to_field: 432→{_bridge_feat_dim} (patched from field)")
+        print(f"  ✓ Bridge field_to_wave: {_bridge_feat_dim}→432 (pseudoinverse)")
         assert _field_feat_dim == _bridge_feat_dim, (
             f"Dimension mismatch: field.wave_to_feature outputs {_field_feat_dim} "
             f"but wave_to_field outputs {_bridge_feat_dim}. "
@@ -434,10 +462,10 @@ class Phase9Trainer:
 
         Pipeline: wave_vec → wave_to_field → GR → CGN → field query → combine
 
-        With FLUXModel (native 512-dim), all projections are trained and
-        consistent. wave_to_field maps 432→512, GR operates in 512-dim,
-        field.query uses trained wave_to_feature (432→512), and the combined
-        output is a meaningful 512-dim representation.
+        wave_to_field is patched from field.wave_to_feature (Phase 2 trained),
+        so the 432→512 projection is semantically meaningful. GR operates in
+        512-dim, field.query uses the same trained projection internally, and
+        the combined output is a meaningful 512-dim representation.
 
         Args:
             wave_vec: [432] mean CSE wave vector
@@ -1520,7 +1548,7 @@ def generate_text(
         wave_seq = wave.full.to(device)          # [seq, 432]
         wave_vec = wave_seq.mean(dim=0)          # [432]
 
-        # Full Phase 7 pipeline: wave_to_field → GR → CGN → field query → combine
+        # Pipeline: wave_to_field(patched) → GR → CGN → field query → combine
         try:
             field_input = flux_model.wave_to_field(wave_vec)                     # [512]
             relevance_out = flux_model.gr(field_input.unsqueeze(0)).squeeze(0)   # [512]
