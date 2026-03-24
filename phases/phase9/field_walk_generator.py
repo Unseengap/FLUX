@@ -261,23 +261,20 @@ class FieldWalkGenerator(nn.Module):
         if len(recent_waves) == 0:
             return torch.zeros(candidate_waves.shape[0], device=candidate_waves.device)
 
-        # Stack recent waves
+        # Stack recent waves (only keep last interference_radius)
         recent = torch.stack(recent_waves[-self.interference_radius:])  # [R, 432]
 
-        # For each candidate, compute mean cosine similarity with recent history
-        # This is the interference proxy: high similarity = constructive interference
-        scores = []
-        for i in range(candidate_waves.shape[0]):
-            cos_sims = F.cosine_similarity(
-                candidate_waves[i].unsqueeze(0),
-                recent,
-                dim=-1,
-            )  # [R]
-            # Weighted by recency (more recent = more influence)
-            weights = torch.linspace(0.5, 1.0, len(cos_sims), device=cos_sims.device)
-            scores.append((cos_sims * weights).mean())
+        # Batched cosine similarity: [k, R] in one GPU op
+        # Normalize both sets of vectors, then matmul
+        cand_norm = F.normalize(candidate_waves, dim=-1)   # [k, 432]
+        rec_norm = F.normalize(recent, dim=-1)              # [R, 432]
+        cos_matrix = cand_norm @ rec_norm.T                 # [k, R]
 
-        return torch.stack(scores)
+        # Recency weights: more recent waves have stronger influence
+        weights = torch.linspace(0.5, 1.0, recent.shape[0], device=cos_matrix.device)  # [R]
+        scores = (cos_matrix * weights.unsqueeze(0)).mean(dim=-1)  # [k]
+
+        return scores
 
     def _compute_novelty_scores(
         self,
@@ -300,23 +297,22 @@ class FieldWalkGenerator(nn.Module):
         if len(all_generated) == 0:
             return torch.ones(candidate_waves.shape[0], device=candidate_waves.device)
 
-        # Stack all generated waves
-        generated = torch.stack(all_generated)  # [N, 432]
+        # Only check novelty against recent history (capped window)
+        # Full history is O(N²) and unnecessary — local repetition is the real problem
+        _NOVELTY_WINDOW = 15
+        recent_gen = all_generated[-_NOVELTY_WINDOW:]
+        generated = torch.stack(recent_gen)  # [W, 432] where W <= 15
 
-        # For each candidate, find max similarity to any generated wave
-        # Higher max_sim = more repetitive = lower novelty
-        novelty = []
-        for i in range(candidate_waves.shape[0]):
-            cos_sims = F.cosine_similarity(
-                candidate_waves[i].unsqueeze(0),
-                generated,
-                dim=-1,
-            )
-            max_sim = cos_sims.max().item()
-            # Invert: novelty = 1 - max_similarity
-            novelty.append(1.0 - max_sim)
+        # Batched cosine similarity: [k, W] in one GPU op
+        cand_norm = F.normalize(candidate_waves, dim=-1)  # [k, 432]
+        gen_norm = F.normalize(generated, dim=-1)          # [W, 432]
+        cos_matrix = cand_norm @ gen_norm.T                # [k, W]
 
-        return torch.tensor(novelty, device=candidate_waves.device)
+        # Novelty = 1 - max similarity to any recent generated wave
+        max_sims = cos_matrix.max(dim=-1).values            # [k]
+        novelty = 1.0 - max_sims
+
+        return novelty
 
     # ─────────────────────────────────────────────
     # Confidence Estimation
@@ -506,6 +502,16 @@ class FieldWalkGenerator(nn.Module):
             (predicted_waves [N, 432], confidences [N])
         """
         device = target_waves.device
+
+        # Cap sequence length to avoid O(N²) blowup on long documents.
+        # The scorer has ~50 params — 30 steps is plenty for learning.
+        _MAX_TRAIN_CHUNKS = 30
+        if target_waves.shape[0] > _MAX_TRAIN_CHUNKS:
+            # Random window so all positions get covered across steps
+            import random as _rand
+            start = _rand.randint(0, target_waves.shape[0] - _MAX_TRAIN_CHUNKS)
+            target_waves = target_waves[start:start + _MAX_TRAIN_CHUNKS]
+
         n_waves = target_waves.shape[0]
 
         predicted = []
@@ -515,6 +521,7 @@ class FieldWalkGenerator(nn.Module):
 
         current_wave = self.bos_wave
 
+        import random as _rand
         for i in range(n_waves):
             # Build candidate set: target[i] + k-1 distractors from other targets
             k = min(self.k_neighbors, n_waves)
@@ -522,7 +529,6 @@ class FieldWalkGenerator(nn.Module):
             candidate_indices = [i]
             # Add random other targets as distractors
             other_indices = [j for j in range(n_waves) if j != i]
-            import random as _rand
             _rand.shuffle(other_indices)
             candidate_indices.extend(other_indices[:k - 1])
             # Pad if not enough candidates

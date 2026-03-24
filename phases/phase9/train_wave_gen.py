@@ -739,6 +739,14 @@ class Phase9Trainer:
                     chunk_waves, spans = self.chunker(wave_seq)
                     target_waves = chunk_waves               # [N, 432]
 
+                    # Cap chunk length — the scorer (~50 params) only needs
+                    # ~30 chunks to learn. Storing 1000+ chunks per sample
+                    # wastes memory and causes O(N²) in the forward pass.
+                    _MAX_CHUNKS = 40  # store a bit more than the 30-cap in forward
+                    if target_waves.shape[0] > _MAX_CHUNKS:
+                        _start = 0  # take from the beginning; forward will random-window
+                        target_waves = target_waves[_start:_start + _MAX_CHUNKS]
+
                 if target_waves.shape[0] < 2:
                     skipped += 1
                     continue
@@ -1169,6 +1177,11 @@ class Phase9Trainer:
                 if len(pairs) < 2:
                     _skipped += 1
                     continue
+
+                # Cap pairs to avoid O(N²) in generator forward pass
+                _MAX_PAIRS = 40
+                if len(pairs) > _MAX_PAIRS:
+                    pairs = pairs[:_MAX_PAIRS]
 
                 target_waves_fresh = torch.stack([p[0] for p in pairs]).to(self.device)
                 targets_batch = [p[1] for p in pairs]
