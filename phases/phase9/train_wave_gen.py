@@ -353,7 +353,7 @@ class Phase9Trainer:
     def populate_field(
         self,
         texts: List[str],
-        max_chunks: int = 50000,
+        max_chunks: int = 200000,
     ) -> Dict[str, Any]:
         """
         Densify the resonance field with chunk-level attractors.
@@ -361,6 +361,9 @@ class Phase9Trainer:
         Phase 7 only perturbed the field with ~60 document-level means.
         For field-walk generation, we need word/chunk-level attractors
         so the walker has dense stepping stones.
+
+        Default 200K perturbs covers ~50% of a typical 250K-doc dataset
+        at ~10 chunks/doc — enough for full vocabulary coverage.
 
         For each training document:
             1. CSE encode → wave sequence
