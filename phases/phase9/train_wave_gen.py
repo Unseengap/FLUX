@@ -386,6 +386,7 @@ class Phase9Trainer:
         print(f"    Field attractors before: {attractors_before:,}", flush=True)
 
         _texts_processed = 0
+        _errors = 0
         for i, text in enumerate(texts):
             if total_perturbs >= max_chunks:
                 break
@@ -424,7 +425,12 @@ class Phase9Trainer:
                             flush=True,
                         )
 
-            except Exception:
+            except Exception as e:
+                _errors += 1
+                if _errors <= 5:
+                    print(f"    ✗ Error on text {i}: {type(e).__name__}: {e}", flush=True)
+                elif _errors == 6:
+                    print(f"    ✗ Suppressing further errors (6+ failures)...", flush=True)
                 continue
 
             _texts_processed += 1
@@ -445,6 +451,7 @@ class Phase9Trainer:
 
         print(f"  ✓ Field populated in {elapsed:.1f}s", flush=True)
         print(f"    Perturbs: {total_perturbs:,}", flush=True)
+        print(f"    Texts processed: {_texts_processed:,}  |  Errors: {_errors:,}", flush=True)
         print(f"    Attractors: {attractors_before:,} → {attractors_after:,} (+{stats['new_attractors']:,})", flush=True)
 
         return stats
