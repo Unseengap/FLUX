@@ -142,7 +142,7 @@ class FieldWalkGenerator(nn.Module):
 
     Args:
         wave_dim: Wave dimension (432)
-        field_features: Field feature dimension (768 for FLUXLarge)
+        field_features: Field feature dimension (512 for FLUXModel)
         k_neighbors: How many field attractors to consider per step (8)
         interference_radius: Recent wave history window for coherence (4)
         max_waves: Maximum waves to generate (50)
@@ -151,7 +151,7 @@ class FieldWalkGenerator(nn.Module):
     def __init__(
         self,
         wave_dim: int = 432,
-        field_features: int = 768,
+        field_features: int = 512,
         k_neighbors: int = 8,
         interference_radius: int = 4,
         max_waves: int = 50,
@@ -378,7 +378,7 @@ class FieldWalkGenerator(nn.Module):
             current_wave: [432] current position in wave space
             recent_waves: Last few generated waves (interference window)
             all_generated: All generated waves so far (novelty tracking)
-            flux_model: FLUXLarge instance with all Phase 1-7 components
+            flux_model: FLUXModel instance with all Phase 1-7 components
 
         Returns:
             (next_wave [432], confidence float)
@@ -388,7 +388,7 @@ class FieldWalkGenerator(nn.Module):
         # Step 1: Query field for k nearby attractors
         field_feats, sims, locs = flux_model.field.query(
             current_wave, k=self.k_neighbors
-        )  # field_feats: [k, 768], sims: [k]
+        )  # field_feats: [k, 512], sims: [k]
 
         k_actual = field_feats.shape[0]
         if k_actual == 0:
@@ -465,9 +465,9 @@ class FieldWalkGenerator(nn.Module):
         features. The full field walk happens during inference.
 
         Args:
-            field_context: [768] merged field context
+            field_context: [512] merged field context
             target_waves: [N, 432] ground truth wave sequence
-            flux_model: FLUXLarge for live field queries (None during precomputed training)
+            flux_model: FLUXModel for live field queries (None during precomputed training)
             scheduled_sampling_p: Unused (kept for interface compatibility)
 
         Returns:
@@ -495,7 +495,7 @@ class FieldWalkGenerator(nn.Module):
         - Physics signals computed from wave similarities
 
         Args:
-            field_context: [768] merged context
+            field_context: [512] merged context
             target_waves: [N, 432] ground truth chunks
 
         Returns:
@@ -590,9 +590,9 @@ class FieldWalkGenerator(nn.Module):
         Live field-walk training. Uses actual field queries.
 
         Args:
-            field_context: [768] merged context
+            field_context: [512] merged context
             target_waves: [N, 432] ground truth
-            flux_model: FLUXLarge instance
+            flux_model: FLUXModel instance
 
         Returns:
             (predicted_waves [N, 432], confidences [N])
@@ -646,10 +646,10 @@ class FieldWalkGenerator(nn.Module):
             4. Advance current position → next step
 
         Args:
-            field_context: [768] initial context from FLUX pipeline
+            field_context: [512] initial context from FLUX pipeline
             max_waves: Maximum waves to generate
             min_confidence: Stop if confidence drops below this
-            flux_model: FLUXLarge instance (required for field access)
+            flux_model: FLUXModel instance (required for field access)
             temperature: Controls selection sharpness (higher = more diverse)
             target_waves: If provided, teacher-forced (training mode)
 

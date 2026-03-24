@@ -38,7 +38,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 if str(Path(__file__).parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).parent))
 
-from flux_large import FLUXLarge, FLUX_LARGE_CONFIG
+from flux_model import FLUXModel, FLUX_MODEL_CONFIG
 from flux_utils import (
     get_device, save_checkpoint, load_checkpoint, checkpoint_exists,
     PhaseLogger, PhaseResults,
@@ -51,60 +51,69 @@ from field_walk_generator import FieldWalkGenerator
 
 
 # ─────────────────────────────────────────────
-# Build FLUXLarge with Checkpoint Cascade
+# Build FLUXModel with Phase 7 Checkpoint (Native 512-dim)
 # ─────────────────────────────────────────────
 
-def build_flux_for_phase9(device: str = 'cpu') -> FLUXLarge:
+def build_flux_for_phase9(device: str = 'cpu') -> FLUXModel:
     """
-    Build FLUXLarge by loading the best available checkpoint.
+    Build FLUXModel by loading Phase 7 checkpoint NATIVELY.
 
-    Phase 9 is a PEER to Phase 8, not a continuation. Both build on
-    Phase 7 (which contains all trained components: CSE, field, GR,
-    TL, CGN, memory, bridges from Phases 1-7).
+    Phase 9 loads FLUXModel (512-dim field_features) directly from Phase 7,
+    NOT FLUXLarge (768-dim). This ensures ALL bridge projections and the
+    field state are the TRAINED Phase 7 weights — no dimension mismatches,
+    no random re-initialization.
 
-    Phase 8 added a WaveDecoder (byte-level generation).
-    Phase 9 adds WaveGenerator + WaveToText (wave-level generation).
-    They are independent approaches to generation.
+    Phase 8 FLUXLarge scaled field_features from 512→768, which caused
+    from_phase7_checkpoint() to SKIP loading wave_to_field, field_to_wave,
+    field state, and GR — leaving them all randomly initialized. This broke
+    the entire field round-trip pipeline.
 
-    Cascade order:
-        1. Phase 7 checkpoint → primary dependency (has all Phases 1-7)
-        2. Phase 8 checkpoint → legacy fallback (has Phase 7 weights inside)
-        3. Fresh init → untrained (last resort)
+    By using FLUXModel natively:
+      - wave_to_field (432→512): TRAINED from Phase 7
+      - field_to_wave (512→432): TRAINED from Phase 7
+      - field.wave_to_feature (432→512): TRAINED from Phase 2/7
+      - field state (64³×512): TRAINED attractors from Phase 7
+      - GR (512-dim): TRAINED from Phase 3/7
 
     Args:
         device: Target device
 
     Returns:
-        FLUXLarge with the best available pre-trained weights, frozen
+        FLUXModel with ALL trained Phase 7 weights, frozen
     """
     model = None
 
-    # Try Phase 7 first — this is Phase 9's TRUE dependency.
-    # Phase 7 has all trained components: CSE, field, GR, TL, CGN, memory, bridges.
-    # Phase 9 builds its own generation on top of these, parallel to Phase 8.
-    if model is None:
-        try:
-            model = FLUXLarge.from_phase7_checkpoint(device=device)
-            print("  ✓ Loaded Phase 7 checkpoint (CSE, field, GR, TL, CGN, memory, bridges)")
-            print("  ℹ Phase 9 builds wave-level generation on Phase 7 foundation")
-        except Exception as e:
-            print(f"  ℹ No Phase 7 checkpoint: {e}")
-
-    # Legacy fallback: Phase 8 contains Phase 7's weights + a WaveDecoder we don't use.
-    # If Phase 7 isn't available, Phase 8 can provide the same base weights.
-    if model is None:
-        try:
-            model = FLUXLarge.from_phase8_checkpoint(device=device)
-            print("  ✓ Loaded Phase 8 checkpoint as fallback (contains Phase 7 weights)")
-            print("  ✗ WaveDecoder ignored — Phase 9 replaces it")
-        except Exception as e:
-            print(f"  ℹ No Phase 8 checkpoint: {e}")
+    # Load Phase 7 FLUXModel natively — ALL weights transfer (512-dim)
+    try:
+        model = FLUXModel.from_checkpoints(device=device)
+        print("  ✓ Loaded FLUXModel with Phase 1-7 trained weights (native 512-dim)")
+        print("  ✓ All bridges trained: wave_to_field(432→512), field_to_wave(512→432)")
+        print("  ✓ Field state loaded: 64³×512 with trained attractors")
+    except Exception as e:
+        print(f"  ✗ Could not load Phase 7 components: {e}")
 
     # Last resort: fresh init (untrained — will produce poor results)
     if model is None:
-        print("  ⚠ No checkpoints available — using fresh FLUXLarge (untrained)")
+        print("  ⚠ No checkpoints available — using fresh FLUXModel (untrained)")
         print("    Wave generation quality will be limited without trained CSE/field")
-        model = FLUXLarge(device=device)
+        model = FLUXModel(device=device)
+
+    # ── Validate bridge round-trip (catch untrained bridges early) ──
+    try:
+        import torch.nn.functional as _F
+        with torch.no_grad():
+            _test_wave = torch.randn(432, device=device)
+            _projected = model.wave_to_field(_test_wave)
+            _roundtrip = model.field_to_wave(_projected)
+            _cos = _F.cosine_similarity(
+                _test_wave.unsqueeze(0), _roundtrip.unsqueeze(0)
+            ).item()
+            if _cos > 0.2:
+                print(f"  ✓ Bridge round-trip sanity check: cosine={_cos:.3f} (trained)")
+            else:
+                print(f"  ⚠ Bridge round-trip cosine={_cos:.3f} — bridges may be untrained")
+    except Exception:
+        pass
 
     # Freeze all base model params — Phase 9 only trains new generation modules
     for param in model.parameters():
@@ -118,7 +127,7 @@ def build_flux_for_phase9(device: str = 'cpu') -> FLUXLarge:
 # ─────────────────────────────────────────────
 PHASE9_CONFIG = {
     'wave_dim': 432,
-    'field_features': 768,
+    'field_features': 512,  # Native Phase 7 FLUXModel dimension (NOT 768)
     'max_waves': 50,
     'k_neighbors': 16,
     'interference_radius': 4,
@@ -265,7 +274,7 @@ class Phase9Trainer:
     Stage 2: Train WaveGenerator to predict next chunk waves.
 
     Args:
-        flux_model: FLUXLarge with Phase 8 weights (frozen)
+        flux_model: FLUXModel with Phase 7 weights (frozen, native 512-dim)
         wave_chunker: WaveChunker instance
         wave_generator: WaveGenerator instance
         wave_to_text: WaveToText instance
@@ -276,7 +285,7 @@ class Phase9Trainer:
 
     def __init__(
         self,
-        flux_model: FLUXLarge,
+        flux_model: FLUXModel,
         wave_chunker: WaveChunker,
         wave_generator: WaveGenerator,
         wave_to_text: WaveToText,
@@ -293,19 +302,20 @@ class Phase9Trainer:
         self.log = log
         self.device = flux_model._device_str
 
-        # ── Align field's projection with the trained bridge ──
-        # field.wave_to_feature is a random nn.Linear(432, 768) that was
-        # never gradient-trained. model.wave_to_field is the TRAINED bridge
-        # from Phase 7. If they differ, field.query returns features in a
-        # different space than model.field_to_wave expects → broken round-trip.
-        # Fix: copy trained weights into field so all projections are aligned.
-        try:
-            with torch.no_grad():
-                flux_model.field.wave_to_feature.weight.copy_(flux_model.wave_to_field.weight)
-                flux_model.field.wave_to_feature.bias.copy_(flux_model.wave_to_field.bias)
-            print(f"  ✓ Aligned field.wave_to_feature ← model.wave_to_field (trained bridge)")
-        except Exception as e:
-            print(f"  ⚠ Could not align bridges: {e}")
+        # With FLUXModel (native 512-dim), all bridges and field projections
+        # are already trained and consistent from Phase 7. No alignment needed.
+        # The old FLUXLarge path required copying model.wave_to_field into
+        # field.wave_to_feature because both were randomly initialized (768-dim).
+        # That hack is no longer necessary.
+        _field_feat_dim = flux_model.field.wave_to_feature.weight.shape[0]
+        _bridge_feat_dim = flux_model.wave_to_field.weight.shape[0]
+        print(f"  ✓ Field projection: 432→{_field_feat_dim} (trained Phase 2/7)")
+        print(f"  ✓ Bridge projection: 432→{_bridge_feat_dim} (trained Phase 7)")
+        assert _field_feat_dim == _bridge_feat_dim, (
+            f"Dimension mismatch: field.wave_to_feature outputs {_field_feat_dim} "
+            f"but wave_to_field outputs {_bridge_feat_dim}. "
+            f"Are you loading FLUXLarge instead of FLUXModel?"
+        )
 
     # ─────────────────────────────────────────────
     # Pipeline Helper
@@ -318,36 +328,37 @@ class Phase9Trainer:
 
         Pipeline: wave_vec → wave_to_field → GR → CGN → field query → combine
 
-        This is the CORRECT pipeline from Phase 7. The old code skipped
-        wave_to_field bridge and GR, using field.query(mean).mean(dim=0)
-        instead — losing gravitational relevance weighting.
+        With FLUXModel (native 512-dim), all projections are trained and
+        consistent. wave_to_field maps 432→512, GR operates in 512-dim,
+        field.query uses trained wave_to_feature (432→512), and the combined
+        output is a meaningful 512-dim representation.
 
         Args:
             wave_vec: [432] mean CSE wave vector
 
         Returns:
-            [768] merged field context
+            [512] merged field context
         """
         try:
             # Step 1: Project wave → field feature space via bridge
-            field_input = self.model.wave_to_field(wave_vec)          # [768]
+            field_input = self.model.wave_to_field(wave_vec)          # [512]
 
             # Step 2: Gravitational Relevance — mass-weighted attention
             relevance_out = self.model.gr(
                 field_input.unsqueeze(0)
-            ).squeeze(0)                                               # [768]
+            ).squeeze(0)                                               # [512]
 
             # Step 3: Causal Geometry — multi-timescale processing
-            cgn_out = self.model.cgn(relevance_out)                    # [768]
+            cgn_out = self.model.cgn(relevance_out)                    # [512]
 
             # Step 4: Field query → top-1 attractor (not mean!)
             field_features, sims, locs = self.model.field.query(
                 wave_vec, k=4
             )
-            best_features = field_features[0]                          # [768]
+            best_features = field_features[0]                          # [512]
 
             # Step 5: Combine (Phase 7 pattern)
-            merged = best_features + cgn_out                           # [768]
+            merged = best_features + cgn_out                           # [512]
         except Exception:
             # Fallback: simplified pipeline (for untrained models)
             field_features, sims, locs = self.model.field.query(
@@ -355,7 +366,7 @@ class Phase9Trainer:
             )
             combined = field_features.mean(dim=0)
             cgn_out = self.model.cgn(combined)
-            merged = combined + cgn_out                                # [768]
+            merged = combined + cgn_out                                # [512]
 
         return merged
 
@@ -399,10 +410,8 @@ class Phase9Trainer:
         total_perturbs = 0
         attractors_before = self.model.field.num_attractors()
 
-        # Re-align bridge in case field was reset between __init__ and populate
-        with torch.no_grad():
-            self.model.field.wave_to_feature.weight.copy_(self.model.wave_to_field.weight)
-            self.model.field.wave_to_feature.bias.copy_(self.model.wave_to_field.bias)
+        # With FLUXModel (native 512-dim), field.wave_to_feature is already
+        # the trained Phase 2/7 projection. No alignment needed.
 
         print(f"  ℹ Populating field with chunk-level attractors (max {max_chunks:,})...", flush=True)
         print(f"    Field attractors before: {attractors_before:,}", flush=True)
@@ -713,8 +722,8 @@ class Phase9Trainer:
         Pre-compute all frozen pipeline outputs for WG training.
 
         Uses the full Phase 7 pipeline: wave_to_field → GR → CGN → field
-        query → combine. This replaces the old simplified pipeline that
-        skipped GR and the wave_to_field bridge.
+        query → combine. All projections are trained (native 512-dim), so
+        the merged context carries meaningful semantic information.
 
         Since CSE, field, GR, CGN, and WaveChunker are all frozen during
         Stage 2, their outputs never change. Computing them once upfront
@@ -725,7 +734,7 @@ class Phase9Trainer:
             max_samples: Maximum samples to pre-compute
 
         Returns:
-            List of (merged_context [768], target_waves [N, 432], wave_vec [432])
+            List of (merged_context [512], target_waves [N, 432], wave_vec [432])
             tuples, stored on CPU
         """
         precomputed = []
@@ -752,7 +761,7 @@ class Phase9Trainer:
 
                     # Full FLUX pipeline → merged context
                     # (uses wave_to_field → GR → CGN → field top-1)
-                    merged = self._compute_merged_context(wave_vec)  # [768]
+                    merged = self._compute_merged_context(wave_vec)  # [512]
 
                     # WaveChunker → target waves
                     chunk_waves, spans = self.chunker(wave_seq)
@@ -820,7 +829,7 @@ class Phase9Trainer:
         train_wave_generator(precomputed=...) to skip re-computation.
 
         Returns:
-            List of (merged [768], target_waves [N, 432], wave_vec [432]) tuples
+            List of (merged [512], target_waves [N, 432], wave_vec [432]) tuples
         """
         # Freeze chunker for consistency
         for param in self.chunker.parameters():
@@ -1369,7 +1378,7 @@ class Phase9Trainer:
 
 def generate_text(
     prompt: str,
-    flux_model: FLUXLarge,
+    flux_model: FLUXModel,
     wave_chunker: WaveChunker,
     wave_generator: WaveGenerator,
     wave_to_text: WaveToText,
@@ -1382,7 +1391,7 @@ def generate_text(
 
     Args:
         prompt: Input text prompt
-        flux_model: FLUXLarge with frozen Phase 8 components
+        flux_model: FLUXModel with frozen Phase 7 components (native 512-dim)
         wave_chunker: Trained WaveChunker
         wave_generator: Trained WaveGenerator
         wave_to_text: Trained WaveToText
@@ -1400,8 +1409,24 @@ def generate_text(
     wave_chunker.eval()
 
     with torch.no_grad():
-        # 1. Encode prompt through FLUX pipeline
-        wave_seq, wave_vec, merged = flux_model._get_context(prompt)
+        # 1. Encode prompt through FLUX pipeline (same as _compute_merged_context)
+        wave = flux_model.cse.encode(prompt)
+        wave_seq = wave.full.to(device)          # [seq, 432]
+        wave_vec = wave_seq.mean(dim=0)          # [432]
+
+        # Full Phase 7 pipeline: wave_to_field → GR → CGN → field query → combine
+        try:
+            field_input = flux_model.wave_to_field(wave_vec)                     # [512]
+            relevance_out = flux_model.gr(field_input.unsqueeze(0)).squeeze(0)   # [512]
+            cgn_out = flux_model.cgn(relevance_out)                              # [512]
+            field_features, sims, locs = flux_model.field.query(wave_vec, k=4)
+            best_features = field_features[0]                                     # [512]
+            merged = best_features + cgn_out                                      # [512]
+        except Exception:
+            field_features, sims, locs = flux_model.field.query(wave_vec, k=4)
+            combined = field_features.mean(dim=0)
+            cgn_out = flux_model.cgn(combined)
+            merged = combined + cgn_out                                           # [512]
 
         # 2. Generate new waves (the THINKING — universal, modality-agnostic)
         generated_waves, confidences = wave_generator.generate(
@@ -1544,7 +1569,7 @@ def build_phase9_modules_fieldwalk(
 
 def load_phase9_modules(
     device: str = 'cpu',
-) -> Tuple[FLUXLarge, WaveChunker, WaveGenerator, WaveToText]:
+) -> Tuple[FLUXModel, WaveChunker, WaveGenerator, WaveToText]:
     """
     Load Phase 9 from checkpoint.
 
@@ -1554,12 +1579,12 @@ def load_phase9_modules(
     ckpt = load_checkpoint(9)
     p9cfg = ckpt.get('phase9_config', PHASE9_CONFIG)
 
-    # Build FLUXLarge and load component states from the Phase 9
+    # Build FLUXModel and load component states from the Phase 9
     # checkpoint itself (which contains all frozen component states).
-    model_config = ckpt.get('config', FLUX_LARGE_CONFIG)
-    model = FLUXLarge(config=model_config, device=device)
+    model_config = ckpt.get('config', FLUX_MODEL_CONFIG)
+    model = FLUXModel(config=model_config, device=device)
 
-    # Load Phase 8 frozen states
+    # Load Phase 7 frozen states
     if 'cse_state_dict' in ckpt:
         try:
             model.cse.load_state_dict(ckpt['cse_state_dict'])

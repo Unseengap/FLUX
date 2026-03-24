@@ -11,7 +11,7 @@ Key changes from v1 (MLP):
     - Confidence derived from GRU features (richer than wave features alone)
 
 Generation mechanism:
-    1. Project field context (768) → wave space (432)
+    1. Project field context (512) → wave space (432)
     2. GRU processes [prev_wave + context_wave] → hidden state → next_wave
     3. Hidden state carries temporal coherence between steps
     4. At inference: RE-QUERY field at each step → dynamic context
@@ -63,7 +63,7 @@ class WaveGenerator(nn.Module):
 
     Args:
         wave_dim: Wave dimension (432)
-        field_features: Field feature dimension (768 for FLUXLarge)
+        field_features: Field feature dimension (512 for FLUXModel)
         max_waves: Maximum waves to generate (50)
         k_neighbors: Gravitational readout neighbors (16)
         interference_radius: How many previous waves influence the next (4)
@@ -74,7 +74,7 @@ class WaveGenerator(nn.Module):
     def __init__(
         self,
         wave_dim: int = 432,
-        field_features: int = 768,
+        field_features: int = 512,
         max_waves: int = 50,
         k_neighbors: int = 16,
         interference_radius: int = 4,
@@ -257,7 +257,7 @@ class WaveGenerator(nn.Module):
 
         Args:
             query_wave: [432] the most recent wave (used as field query)
-            flux_model: FLUXLarge instance (for field + GR access)
+            flux_model: FLUXModel instance (for field + GR access)
             temperature: Sampling temperature (higher = more diverse)
 
         Returns:
@@ -284,7 +284,7 @@ class WaveGenerator(nn.Module):
         logits = []
 
         for j in range(field_feats.shape[0]):
-            feat = field_feats[j]  # [768]
+            feat = field_feats[j]  # [512]
             nw = self.context_to_wave(feat)  # [432]
             attractor_waves.append(nw)
 
@@ -333,11 +333,11 @@ class WaveGenerator(nn.Module):
         back to static context (faster, used during training).
 
         Args:
-            field_context: [768] merged field + CGN context (initial)
+            field_context: [512] merged field + CGN context (initial)
             max_waves: Maximum waves to generate (default: self.max_waves)
             min_confidence: Stop if confidence drops below this
             target_waves: [N, 432] teacher-forcing targets (training only)
-            flux_model: FLUXLarge instance for dynamic field re-query
+            flux_model: FLUXModel instance for dynamic field re-query
             temperature: Sampling temperature for field re-query
             scheduled_sampling_p: Probability [0,1] of using the model's
                 own prediction as prev_wave instead of ground truth.
@@ -425,7 +425,7 @@ class WaveGenerator(nn.Module):
         During inference, pass flux_model to generate() for dynamic re-query.
 
         Args:
-            field_context: [768] merged context
+            field_context: [512] merged context
             target_waves: [N, 432] ground truth wave sequence
             scheduled_sampling_p: Probability of using own prediction
                 as prev_wave instead of ground truth (exposure bias fix)
