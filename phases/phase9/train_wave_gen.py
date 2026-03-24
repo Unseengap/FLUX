@@ -401,27 +401,29 @@ class Phase9Trainer:
                 for chunk_wave in chunk_waves:
                     if total_perturbs >= max_chunks:
                         break
-                    # Perturb field at this chunk's location
+                    # Perturb field at this chunk's location (fast — tensor write)
+                    # NOTE: We skip tl.settle_once() per chunk because it does
+                    # a full field.settle(N iterations) internally per perturb,
+                    # which is ~100x slower. Instead we batch-settle at the end.
                     self.model.field.perturb(chunk_wave, strength=0.5)
-                    # TL settle: energy minimization around the perturbation
-                    self.model.tl.settle_once(chunk_wave)
                     total_perturbs += 1
 
-                    # Log every 10 perturbs so output is never silent
+                    # Log every 100 perturbs (fast now, so less frequent)
                     if total_perturbs == 1:
                         elapsed = time.time() - t0
                         print(
                             f"    ... 1st perturb done in {elapsed:.2f}s",
                             flush=True,
                         )
-                    elif total_perturbs % 10 == 0:
+                    elif total_perturbs % 100 == 0:
                         elapsed = time.time() - t0
                         rate = total_perturbs / max(elapsed, 0.01)
                         pct = total_perturbs / max_chunks * 100
                         eta = (max_chunks - total_perturbs) / max(rate, 0.01)
+                        _eta_min = eta / 60
                         print(
-                            f"    ... {total_perturbs:,}/{max_chunks:,} perturbs ({pct:.0f}%)  "
-                            f"[{rate:.1f} perturb/s, ETA {eta:.0f}s]",
+                            f"    ... {total_perturbs:,}/{max_chunks:,} perturbs ({pct:.1f}%)  "
+                            f"[{rate:.0f}/s, ETA {_eta_min:.1f} min]",
                             flush=True,
                         )
 
@@ -435,8 +437,13 @@ class Phase9Trainer:
 
             _texts_processed += 1
 
-        # Settle the full field to let it stabilize
-        self.model.field.settle(steps=20, dt=0.1)
+        # Bulk settle the full field — this replaces per-chunk settle_once.
+        # More steps since we're settling all perturbs at once.
+        print(f"    ℹ Bulk settling field (50 steps)...", flush=True)
+        _settle_t0 = time.time()
+        self.model.field.settle(steps=50, dt=0.1)
+        _settle_elapsed = time.time() - _settle_t0
+        print(f"    ✓ Field settled in {_settle_elapsed:.1f}s", flush=True)
 
         attractors_after = self.model.field.num_attractors()
         elapsed = time.time() - t0
