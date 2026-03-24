@@ -967,6 +967,10 @@ class Phase9Trainer:
                 scheduled_sampling_p=ss_p,
             )
 
+            # Align target to predicted length (generator may cap sequence)
+            pred_len = predicted_waves.shape[0]
+            target_waves = target_waves[:pred_len]
+
             # Loss: MSE + cosine distance
             mse_loss = F.mse_loss(predicted_waves, target_waves)
             cos_loss = 1.0 - F.cosine_similarity(
