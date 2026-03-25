@@ -1078,12 +1078,13 @@ class Phase9Trainer:
         del _pred_test, _m0, _t0_test
 
         # ── Scheduled sampling schedule ──
-        # Start with pure teacher forcing, linearly ramp to 50% own-prediction
-        # by the end of training. This cures exposure bias: the model learns
-        # to handle its own imperfect predictions, not just perfect inputs.
-        ss_start = 0.0    # Start: 100% teacher forced
+        # Start with some scheduled sampling from step 1 to prevent
+        # the model from over-relying on teacher forcing and ignoring context.
+        # Previous: started at 0% until 20%, then ramped. Problem: by then
+        # the model already learned to ignore context (loss plateaus at step 400).
+        ss_start = 0.1    # Start: 10% own predictions (mild exposure from step 1)
         ss_end = 0.5      # End: 50% use own prediction
-        ss_warmup = total_steps // 5  # Don't start SS until 20% through
+        ss_warmup = total_steps // 10  # Ramp from 10% in first 10%
 
         # ── Context loss weight ──
         # Wave 0 must depend on context. Without this, the model learns
@@ -1093,8 +1094,10 @@ class Phase9Trainer:
         # ── Contrastive loss ──
         # Push Wave 0 from different inputs apart — prevents all inputs
         # from collapsing to the same first wave.
+        # Increased from 0.3 to 1.0 — the original weight was too weak
+        # to prevent context collapse (cross-context cosine = 1.000).
         wave0_buffer = []
-        contrastive_weight = 0.3
+        contrastive_weight = 1.0
 
         print(f"\n  ℹ Starting WG training loop: {total_steps:,} steps over {len(precomputed):,} samples", flush=True)
         print(f"    Scheduled sampling: {ss_start:.0%}→{ss_end:.0%} (warmup={ss_warmup})", flush=True)
@@ -1164,7 +1167,8 @@ class Phase9Trainer:
                 neg_sim = F.cosine_similarity(
                     predicted_waves[0].unsqueeze(0), negatives, dim=-1
                 )
-                contrastive_loss = neg_sim.clamp(min=0).mean() * contrastive_weight
+                # Margin-based: penalize negatives closer than 0.5 cosine
+                contrastive_loss = F.relu(neg_sim - 0.3).mean() * contrastive_weight
 
             loss = mse_loss + cos_loss + ctx_loss + contrastive_loss
 

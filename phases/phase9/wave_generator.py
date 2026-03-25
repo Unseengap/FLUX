@@ -133,6 +133,15 @@ class WaveGenerator(nn.Module):
             nn.Sigmoid(),
         )
 
+        # ── Context → GRU hidden state (CRITICAL for context sensitivity) ──
+        # Without this, hidden starts as zeros and the GRU learns to
+        # ignore context_wave (teacher forcing dominates). By initializing
+        # hidden FROM context, Wave 0 immediately depends on the input.
+        self.context_to_hidden = nn.Sequential(
+            nn.Linear(field_features, gru_hidden),
+            nn.Tanh(),  # Bounded like GRU hidden state
+        )
+
         # ── Learned start-of-sequence wave ──
         self.bos_wave = nn.Parameter(torch.randn(wave_dim) * 0.01)
 
@@ -140,18 +149,35 @@ class WaveGenerator(nn.Module):
     # Hidden State Management
     # ─────────────────────────────────────────────
 
-    def init_hidden(self, device: Optional[str] = None) -> torch.Tensor:
+    def init_hidden(
+        self,
+        device: Optional[str] = None,
+        field_context: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
-        Initialize GRU hidden state to zeros.
+        Initialize GRU hidden state from field context.
+
+        If field_context is provided, projects it to GRU hidden space
+        via context_to_hidden. This is CRITICAL: without it, the GRU
+        starts from zeros and learns to ignore context (teacher forcing
+        dominates, causing Wave 0 cross-context cosine = 1.000).
 
         Args:
             device: Target device (defaults to bos_wave's device)
+            field_context: [field_features] optional context vector
 
         Returns:
-            [gru_layers, 1, gru_hidden] zero tensor
+            [gru_layers, 1, gru_hidden] hidden state tensor
         """
         if device is None:
             device = self.bos_wave.device
+        if field_context is not None:
+            # Project context → hidden state for each GRU layer
+            h = self.context_to_hidden(field_context)  # [gru_hidden]
+            # Expand to [gru_layers, 1, gru_hidden]
+            return h.unsqueeze(0).unsqueeze(0).expand(
+                self.gru_layers, 1, self.gru_hidden
+            ).contiguous()
         return torch.zeros(
             self.gru_layers, 1, self.gru_hidden, device=device
         )
@@ -351,8 +377,11 @@ class WaveGenerator(nn.Module):
         device = self.bos_wave.device
         context_wave = self.context_to_wave(field_context)  # Initial context [432]
 
-        # Initialize GRU hidden state — this IS the temporal memory
-        hidden = self.init_hidden(device)
+        # Initialize GRU hidden state FROM context — this IS the temporal memory
+        # Critical: without context-dependent init, Wave 0 is identical for all
+        # inputs (cross-context cosine = 1.000) because zeros + bos_wave + teacher
+        # forcing makes the model ignore context_wave entirely.
+        hidden = self.init_hidden(device, field_context=field_context)
 
         generated = []
         confidences = []
