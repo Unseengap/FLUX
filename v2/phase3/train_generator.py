@@ -99,6 +99,12 @@ PHASE3_CONFIG: Dict[str, Any] = {
     # Manifold anchoring: teaches GRU to produce waves where f2w(w2f(x))≈x,
     # i.e., waves that already lie on the Phase 2-decodable manifold.
     'manifold_loss_weight': 2.0,
+    # Anchor loss: forces first generated wave toward f2w(ctx) — the field
+    # context decoded back to wave space.  Phase 2 guarantees f2w(ctx) is
+    # on the CSE manifold (97.79% accuracy), so this gives the GRU a concrete
+    # reachable on-manifold target from step 1, replacing the abstract manifold
+    # projection that starts flat at 0.07 and never descends.
+    'anchor_loss_weight': 5.0,
     # Decode gate
     'gate_avg_threshold':  0.90,
     'gate_min_threshold':  0.70,
@@ -208,6 +214,7 @@ def precompute_corpus(
     cse:        'ContinuousSemanticEncoder',
     chunker:    'WaveChunker',
     w2f:        'WaveToField',
+    f2w:        'FieldToWave',
     device:     str,
     cache_path: Path,
     max_seq:    int = 30,
@@ -220,10 +227,13 @@ def precompute_corpus(
     WaveToField calls during training.
 
     Record schema:
-        ctx    : Tensor [512]          — WaveToField context (CPU)
-        waves  : Tensor [max_seq, 432] — padded target waves (CPU)
-        length : int                   — valid (non-padded) wave count
-        bytes  : List[bytes]           — UTF-8 bytes per chunk
+        ctx       : Tensor [512]          — WaveToField context (CPU)
+        f2w_wave  : Tensor [432]          — f2w(ctx): context decoded to wave space
+                                            Always on the Phase 2 CSE manifold.
+                                            Used as anchor target for first generated wave.
+        waves     : Tensor [max_seq, 432] — padded target waves (CPU)
+        length    : int                   — valid (non-padded) wave count
+        bytes     : List[bytes]           — UTF-8 bytes per chunk
 
     Args:
         corpus:     Training strings
@@ -259,6 +269,10 @@ def precompute_corpus(
                 n         = min(len(pairs), max_seq)
                 mean_wave = wave.full.mean(dim=0)
                 ctx       = w2f(mean_wave.to(device)).cpu()          # [512]
+                # f2w(ctx) is the context decoded to wave space — always on-manifold
+                # because Phase 2 was trained with exactly this round-trip path.
+                # Used as the anchor target: first generated wave → f2w_wave.
+                f2w_wave  = f2w(ctx.to(device)).cpu()                 # [432]
 
                 chunk_waves = torch.stack([p[0] for p in pairs[:n]])  # [n, 432]
                 chunk_bytes = [p[1] for p in pairs[:n]]               # List[bytes]
@@ -268,10 +282,11 @@ def precompute_corpus(
                 pad[:n]  = chunk_waves
 
                 records.append({
-                    'ctx':    ctx,
-                    'waves':  pad,
-                    'length': n,
-                    'bytes':  chunk_bytes,
+                    'ctx':      ctx,
+                    'f2w_wave': f2w_wave,
+                    'waves':    pad,
+                    'length':   n,
+                    'bytes':    chunk_bytes,
                 })
             except Exception:
                 continue
@@ -302,16 +317,18 @@ def sample_batch(
 
     Returns:
         (field_contexts [B, 512],
+         f2w_waves      [B, 432],
          target_waves   [B, max_seq, 432],
          lengths        [B],
          bytes_list     [B][n_chunks bytes each])
     """
     batch          = random.choices(records, k=batch_size)
-    field_contexts = torch.stack([r['ctx']    for r in batch]).to(device)
-    target_waves   = torch.stack([r['waves']  for r in batch]).to(device)
-    lengths        = torch.tensor([r['length'] for r in batch], device=device)
+    field_contexts = torch.stack([r['ctx']      for r in batch]).to(device)
+    f2w_waves      = torch.stack([r['f2w_wave'] for r in batch]).to(device)
+    target_waves   = torch.stack([r['waves']    for r in batch]).to(device)
+    lengths        = torch.tensor([r['length']  for r in batch], device=device)
     bytes_list     = [r['bytes'] for r in batch]
-    return field_contexts, target_waves, lengths, bytes_list
+    return field_contexts, f2w_waves, target_waves, lengths, bytes_list
 
 
 # ─────────────────────────────────────────────
@@ -576,13 +593,16 @@ def train(
     corpus = build_training_corpus(target_size=10_000)
     log.info(f"Training corpus: {len(corpus):,} texts")
 
-    corpus_cache_path = checkpoint_dir / 'phase3_v2_corpus_cache.pt'
+    # Cache v2 — includes f2w_wave field (anchor target per record).
+    # The old phase3_v2_corpus_cache.pt lacks this field and will crash.
+    corpus_cache_path = checkpoint_dir / 'phase3_v2_corpus_cache_v2.pt'
     log.info("Pre-encoding corpus (uses cache if already done)...")
     corpus_records = precompute_corpus(
         corpus=corpus,
         cse=cse,
         chunker=chunker,
         w2f=w2f,
+        f2w=f2w,
         device=device,
         cache_path=corpus_cache_path,
     )
@@ -610,7 +630,7 @@ def train(
         ss_p = ss_start + (ss_end - ss_start) * (step / steps)
 
         # Sample pre-encoded batch — zero CSE / chunker / field calls
-        field_contexts, target_waves, lengths, bytes_list = sample_batch(
+        field_contexts, f2w_waves, target_waves, lengths, bytes_list = sample_batch(
             records=corpus_records,
             batch_size=batch_size,
             device=device,
@@ -663,11 +683,20 @@ def train(
         else:
             contrastive_loss = torch.tensor(0.0, device=device)
 
+        # ── Anchor loss: first generated wave → f2w(ctx) ────────────────
+        # f2w_waves[b] = f2w(ctx[b]) = the field context decoded to wave space.
+        # Phase 2 guarantees this is on the CSE manifold at 97.79% accuracy.
+        # Forcing predicted[:, 0, :] toward f2w_waves gives the GRU a concrete
+        # on-manifold target from step 1.  Without this, manifold_loss starts
+        # at ~0.07 and never moves, because f2w(w2f(random)) maps to a constant
+        # region of the manifold — gradient is pure noise.
+        anchor_loss = F.mse_loss(predicted[:, 0, :], f2w_waves.detach())
+
         # ── Manifold anchoring loss ──────────────────────────────────────
-        # Force GRU outputs onto the Phase 2 CSE-decodable manifold.
-        # f2w(w2f(x)) projects x into the subspace that WTT can decode.
-        # Loss = MSE(projected, x) teaches the GRU that its raw output
-        # should already lie on that manifold (no projection needed at test).
+        # Kept as a secondary regulariser: MSE(f2w(w2f(pred)), pred) still
+        # discourages outputs that project far from the manifold, but it is
+        # now secondary to anchor_loss which provides the direct on-manifold
+        # gradient signal.
         flat_pred   = predicted.reshape(-1, predicted.shape[-1])  # [B*S, 432]
         flat_mask   = mask.reshape(-1)                             # [B*S, 1]
         valid_preds = flat_pred[flat_mask.squeeze(-1).bool()]      # [V, 432]
@@ -712,6 +741,7 @@ def train(
           + PHASE3_CONFIG['contrastive_weight']   * contrastive_loss
           + decode_loss_weight                    * decode_loss
           + PHASE3_CONFIG['manifold_loss_weight'] * manifold_loss
+          + PHASE3_CONFIG['anchor_loss_weight']   * anchor_loss
         )
 
         optimizer.zero_grad()
@@ -733,6 +763,7 @@ def train(
                 f"  step {step:6d}/{steps}: "
                 f"wave_norm={wave_loss.item():.4f}  "
                 f"cosine={cosine_loss.item():.4f}  "
+                f"anchor={anchor_loss.item():.4f}  "
                 f"manifold={manifold_loss.item():.4f}  "
                 f"decode={decode_loss.item():.4f}  "
                 f"total={avg_loss:.4f}  "
