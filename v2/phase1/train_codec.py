@@ -788,32 +788,51 @@ def load_phase1_checkpoint(device: str = 'cpu', hf_token: str = '') -> WaveCodec
 
     Args:
         device:    Target device
-        hf_token:  HuggingFace token (reads HF_TOKEN env var if not supplied)
+        hf_token:  HuggingFace token (reads HF_TOKEN env var / HF cache if not supplied)
     Returns:
         WaveCodec with loaded weights
     """
-    import os
+    import os, shutil
     checkpoint_dir = Path(__file__).parent.parent.parent / 'checkpoints'
     path = checkpoint_dir / 'phase1_v2.phase.pt'
 
+    # hf_hub_download mirrors subfolder structure, so also check the mirrored path
+    _mirrored_path = checkpoint_dir / 'v2' / 'phase1_v2.phase.pt'
+    if not path.exists() and _mirrored_path.exists():
+        # Copy to canonical location so future loads are instant
+        shutil.copy2(str(_mirrored_path), str(path))
+        print(f"  ✓ Phase 1 v2 checkpoint found at mirrored path, copied to {path}")
+
     if not path.exists():
-        # ── Try HuggingFace download ──────────────────────────────────
+        # ── Token resolution: explicit → env var → HF cached login ───
         _token = hf_token or os.environ.get('HF_TOKEN', '')
         if not _token:
+            try:
+                import huggingface_hub as _hfh
+                _token = _hfh.get_token() or ''
+            except Exception:
+                pass
+        if not _token:
             raise FileNotFoundError(
-                f"Phase 1 v2 checkpoint not found at {path} and HF_TOKEN is not set.\n"
-                f"Either run Phase 1 first (python train_codec.py) or provide HF_TOKEN."
+                f"Phase 1 v2 checkpoint not found at {path} and no HuggingFace token available.\n"
+                f"Either run Phase 1 first (python train_codec.py) or set HF_TOKEN."
             )
+        # ── Download from HuggingFace ─────────────────────────────────
         try:
             from huggingface_hub import hf_hub_download
             print("  Downloading Phase 1 v2 checkpoint from HuggingFace...")
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
-            hf_hub_download(
+            # hf_hub_download mirrors 'v2/phase1_v2.phase.pt' → local_dir/v2/phase1_v2.phase.pt
+            _dl_path = hf_hub_download(
                 repo_id   = 'UnseenGAP/FLUX',
                 filename  = 'v2/phase1_v2.phase.pt',
                 token     = _token,
                 local_dir = str(checkpoint_dir),
             )
+            # Normalise to canonical path regardless of where hf_hub_download placed it
+            _dl_path = Path(_dl_path)
+            if _dl_path != path:
+                shutil.copy2(str(_dl_path), str(path))
             print(f"  ✓ Phase 1 v2 checkpoint downloaded → {path}")
         except Exception as _e:
             raise FileNotFoundError(
