@@ -293,26 +293,43 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
     except Exception as e:
         print(f"  ⚠ OPUS-100 failed: {e}", flush=True)
 
-    # ── 5. MATH dataset — competition problems ─────────────────────
+    # ── 5a. GSM8K — grade school math word problems ────────────────
+    # Reliable, widely mirrored, contains numeric + symbolic text
     try:
-        print("  → Loading MATH dataset...", flush=True)
-        math_ds = load_dataset(
-            "hendrycks/competition_math",
+        print("  → Loading GSM8K...", flush=True)
+        gsm = load_dataset(
+            "openai/gsm8k", "main",
             split="train", streaming=True,
         )
         collected = 0
-        for row in math_ds:
-            # First sentence of problem (contains formulas / Unicode math)
+        for row in gsm:
+            q = (row.get("question") or "").strip()
+            if 15 <= len(q) <= 220:
+                corpus.append(q)
+                collected += 1
+            if collected >= per_source // 2:
+                break
+        print(f"  ✓ GSM8K: {collected} problems", flush=True)
+    except Exception as e:
+        print(f"  ⚠ GSM8K failed: {e}", flush=True)
+
+    # ── 5b. MATH-500 — competition math with Unicode formulas ──────
+    try:
+        print("  → Loading MATH-500...", flush=True)
+        math500 = load_dataset(
+            "HuggingFaceH4/MATH-500",
+            split="test", streaming=True,
+        )
+        collected = 0
+        for row in math500:
             problem = (row.get("problem") or "").strip()
             first = problem.split("\n")[0].strip()
             if 15 <= len(first) <= 220:
                 corpus.append(first)
                 collected += 1
-            if collected >= per_source:
-                break
-        print(f"  ✓ MATH: {collected} problems", flush=True)
+        print(f"  ✓ MATH-500: {collected} problems", flush=True)
     except Exception as e:
-        print(f"  ⚠ MATH dataset failed: {e}", flush=True)
+        print(f"  ⚠ MATH-500 failed: {e}", flush=True)
 
     # ── Fallback if all datasets failed ───────────────────────────
     if len(corpus) < 200:
