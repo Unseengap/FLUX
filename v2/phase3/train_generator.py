@@ -79,32 +79,37 @@ PHASE3_CONFIG: Dict[str, Any] = {
     'steps':               20_000,
     'batch_size':          64,
     'lr':                  3e-4,
-    # Scheduled sampling: ramp from 30% to 85% over training so the GRU trains
-    # on its OWN outputs most of the time — closing the train/inference gap.
-    # Original 0 → 40% meant 60% teacher-forced throughout → inference was
-    # completely out-of-distribution.
-    'ss_start':            0.3,
-    'ss_end':              0.85,
-    # Loss weights
-    # wave_loss is NORMALISED by target magnitude → ~0-1 range, same as decode
-    'wave_loss_weight':    1.0,
-    'cosine_loss_weight':  0.5,
-    # Contrastive weight reduced 0.5 → 0.1: early training showed it dominated
-    # total loss (~5-6 pts), preventing wave_loss from converging.
+    # Scheduled sampling: ramp 0 → 60% so GRU gradually learns to track its own
+    # outputs.  We no longer need the 0.3 floor now that REINFORCE provides the
+    # direct autoregressive-quality signal — the regular teacher-forced loss is a
+    # light regulariser, not the primary supervisor.
+    'ss_start':            0.0,
+    'ss_end':              0.6,
+    # Loss weights (regular per-step supervised losses)
+    # wave_loss is the normalised MSE — kept at low weight as a regulariser only.
+    # Three runs proved that making it the dominant signal prevents gate learning.
+    'wave_loss_weight':    0.3,
+    'cosine_loss_weight':  0.2,
+    # Contrastive: keeps different contexts distinguishable.
     'contrastive_weight':  0.1,
-    # Decode loss routed through Phase 2 bridge (f2w(w2f(wave))) so WTT sees
-    # waves on the CSE manifold it was trained on. Weight reduced 10→3 because
-    # the bridge fix makes each gradient step ~10× more effective.
-    'decode_loss_weight':  3.0,
-    # Manifold anchoring: teaches GRU to produce waves where f2w(w2f(x))≈x,
-    # i.e., waves that already lie on the Phase 2-decodable manifold.
-    'manifold_loss_weight': 2.0,
-    # Anchor loss: forces first generated wave toward f2w(ctx) — the field
-    # context decoded back to wave space.  Phase 2 guarantees f2w(ctx) is
-    # on the CSE manifold (97.79% accuracy), so this gives the GRU a concrete
-    # reachable on-manifold target from step 1, replacing the abstract manifold
-    # projection that starts flat at 0.07 and never descends.
-    'anchor_loss_weight': 5.0,
+    # Decode loss routed through Phase 2 bridge (f2w(w2f(wave))) — provides a
+    # differentiable word-level signal every step while REINFORCE handles the
+    # sequence-level autoregressive quality signal.
+    'decode_loss_weight':  1.0,
+    # ── REINFORCE (policy gradient) ──────────────────────────────────────
+    # Every `reinforce_interval` steps we roll out the generator autoregressively
+    # (exactly as the decode gate does), compute byte-accuracy as the reward,
+    # and do a REINFORCE update: reward-weighted imitation of good rollouts,
+    # reward-weighted avoidance of bad ones.
+    #
+    # reinforce_weight scales the advantage-weighted MSE loss.
+    # reinforce_batch is the number of corpus records rolled out each interval.
+    # reinforce_sigma is the stddev of Gaussian exploration noise added to the
+    #   field context before each rollout (breaks symmetry, explores nearby states).
+    'reinforce_weight':    3.0,
+    'reinforce_interval':  50,
+    'reinforce_batch':     16,
+    'reinforce_sigma':     0.05,
     # Decode gate
     'gate_avg_threshold':  0.90,
     'gate_min_threshold':  0.70,
@@ -513,6 +518,94 @@ def run_decode_gate(
 
 
 # ─────────────────────────────────────────────
+# REINFORCE Rollout
+# ─────────────────────────────────────────────
+
+@torch.no_grad()
+def compute_reinforce_rewards(
+    records:    List[Dict[str, Any]],
+    generator:  'WaveGenerator',
+    w2f:        'WaveToField',
+    f2w:        'FieldToWave',
+    wtt:        'WaveToText',
+    device:     str,
+    batch_size: int = 16,
+    sigma:      float = 0.05,
+) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float]]:
+    """
+    Roll out WaveGenerator autoregressively for a sample of corpus records.
+
+    This is exactly the path the decode gate tests — so reward directly
+    reflects what we want to optimize.
+
+    For each sampled record:
+      1. Add small Gaussian noise to the field context (exploration).
+      2. Call generator.generate() — fully autoregressive, no teacher forcing.
+      3. Bridge each generated wave through f2w(w2f(wave)).
+      4. Decode with WTT and compare to the record's ground-truth bytes.
+      5. byte_accuracy ∈ [0, 1] is the reward.
+
+    Args:
+        records:    Pre-encoded corpus records (output of precompute_corpus)
+        generator:  WaveGenerator in eval mode
+        w2f, f2w:   Frozen Phase 2 bridge
+        wtt:        Frozen WaveToText
+        device:     Target device
+        batch_size: Number of records to roll out
+        sigma:      Std-dev of context exploration noise
+
+    Returns:
+        (ctxs        List[Tensor [512]]   — field contexts (no noise) on device,
+         wave_rolls  List[Tensor [N,432]] — generated waves on device,
+         rewards     List[float]          — byte accuracy for each rollout)
+    """
+    selected   = random.sample(records, min(batch_size, len(records)))
+    ctxs:       List[torch.Tensor] = []
+    wave_rolls: List[torch.Tensor] = []
+    rewards:    List[float]        = []
+
+    for rec in selected:
+        try:
+            ctx = rec['ctx'].to(device)                # [512]
+            # Reconstruct ground-truth bytes from record chunks
+            target_bytes = b''.join(
+                b if isinstance(b, bytes) else bytes(b)
+                for b in rec['bytes'][:rec['length']]
+            )
+            if not target_bytes:
+                continue
+
+            # Add small exploration noise to break symmetry
+            ctx_noisy = ctx + torch.randn_like(ctx) * sigma
+
+            gen_waves, _ = generator.generate(
+                field_context=ctx_noisy,
+                max_waves=rec['length'] + 5,
+            )   # [N, 432]
+
+            # Decode through bridge (same path as gate)
+            bridged   = f2w(w2f(gen_waves))            # [N, 432]
+            decoded   = b''
+            for i in range(bridged.shape[0]):
+                d = wtt.decode(bridged[i])
+                if d:
+                    decoded += bytes(d)
+
+            # Byte accuracy as reward
+            n       = max(len(target_bytes), len(decoded))
+            correct = sum(a == b for a, b in zip(target_bytes, decoded))
+            reward  = float(correct) / max(n, 1)
+
+            ctxs.append(ctx)
+            wave_rolls.append(gen_waves)
+            rewards.append(reward)
+        except Exception:
+            continue
+
+    return ctxs, wave_rolls, rewards
+
+
+# ─────────────────────────────────────────────
 # Training Step Helpers
 # ─────────────────────────────────────────────
 
@@ -612,6 +705,14 @@ def train(
     ss_start    = PHASE3_CONFIG['ss_start']
     ss_end      = PHASE3_CONFIG['ss_end']
 
+    reinforce_interval = PHASE3_CONFIG['reinforce_interval']
+    reinforce_batch    = PHASE3_CONFIG['reinforce_batch']
+    reinforce_sigma    = PHASE3_CONFIG['reinforce_sigma']
+    reinforce_weight   = PHASE3_CONFIG['reinforce_weight']
+
+    # Running reward baseline for REINFORCE variance reduction
+    running_reward = 0.05   # conservative initial estimate — avoids large advantages early
+
     # ── Training loop ──
     print(f"\n{'─' * 60}")
     print(f"Phase 3 v2 — Wave Generator Training")
@@ -683,29 +784,6 @@ def train(
         else:
             contrastive_loss = torch.tensor(0.0, device=device)
 
-        # ── Anchor loss: first generated wave → f2w(ctx) ────────────────
-        # f2w_waves[b] = f2w(ctx[b]) = the field context decoded to wave space.
-        # Phase 2 guarantees this is on the CSE manifold at 97.79% accuracy.
-        # Forcing predicted[:, 0, :] toward f2w_waves gives the GRU a concrete
-        # on-manifold target from step 1.  Without this, manifold_loss starts
-        # at ~0.07 and never moves, because f2w(w2f(random)) maps to a constant
-        # region of the manifold — gradient is pure noise.
-        anchor_loss = F.mse_loss(predicted[:, 0, :], f2w_waves.detach())
-
-        # ── Manifold anchoring loss ──────────────────────────────────────
-        # Kept as a secondary regulariser: MSE(f2w(w2f(pred)), pred) still
-        # discourages outputs that project far from the manifold, but it is
-        # now secondary to anchor_loss which provides the direct on-manifold
-        # gradient signal.
-        flat_pred   = predicted.reshape(-1, predicted.shape[-1])  # [B*S, 432]
-        flat_mask   = mask.reshape(-1)                             # [B*S, 1]
-        valid_preds = flat_pred[flat_mask.squeeze(-1).bool()]      # [V, 432]
-        if valid_preds.shape[0] > 0:
-            bridged_valid = f2w(w2f(valid_preds))                  # [V, 432]
-            manifold_loss = F.mse_loss(bridged_valid, valid_preds)
-        else:
-            manifold_loss = torch.tensor(0.0, device=device)
-
         # ── Decode loss: WTT on bridge-projected waves ───────────────────
         # Snap predicted waves through f2w(w2f(...)) before feeding WTT.
         # Phase 2 guarantees f2w(w2f(cse_wave)) decodes at 97.79% accuracy.
@@ -740,8 +818,6 @@ def train(
           + PHASE3_CONFIG['cosine_loss_weight']   * cosine_loss
           + PHASE3_CONFIG['contrastive_weight']   * contrastive_loss
           + decode_loss_weight                    * decode_loss
-          + PHASE3_CONFIG['manifold_loss_weight'] * manifold_loss
-          + PHASE3_CONFIG['anchor_loss_weight']   * anchor_loss
         )
 
         optimizer.zero_grad()
@@ -753,6 +829,77 @@ def train(
         running_loss += total_loss.item()
         step         += 1
 
+        # ── REINFORCE update (every reinforce_interval steps) ────────────
+        # Roll out autoregressively — exactly the decode-gate path — compute
+        # byte-accuracy reward, then do a reward-weighted imitation update:
+        #   advantage > 0  →  push toward this rollout (it decoded well)
+        #   advantage < 0  →  push away from this rollout (it decoded poorly)
+        #
+        # running_reward is an exponential baseline to reduce variance:
+        #   advantage = reward - running_reward
+        #
+        # This is the ONLY loss that directly optimises what the gate measures.
+        if step % reinforce_interval == 0:
+            generator.eval()
+            roll_ctxs, roll_waves, roll_rewards = compute_reinforce_rewards(
+                records=corpus_records,
+                generator=generator,
+                w2f=w2f,
+                f2w=f2w,
+                wtt=wtt,
+                device=device,
+                batch_size=reinforce_batch,
+                sigma=reinforce_sigma,
+            )
+            generator.train()
+
+            if roll_rewards:
+                mean_reward = sum(roll_rewards) / len(roll_rewards)
+                # Update exponential baseline (decay=0.95 keeps it stable)
+                running_reward = 0.95 * running_reward + 0.05 * mean_reward
+
+                reinforce_loss_val = torch.tensor(0.0, device=device)
+                for ctx_r, waves_r, R_r in zip(roll_ctxs, roll_waves, roll_rewards):
+                    advantage = R_r - running_reward
+                    T = waves_r.shape[0]
+                    # Pad to at least 1 wave so forward_batch doesn't fail
+                    max_T     = max(T, 1)
+                    # Pad waves_r to [1, max_T, 432]
+                    waves_pad = torch.zeros(1, max_T, 432, device=device)
+                    waves_pad[0, :T] = waves_r[:T]
+                    ctx_b   = ctx_r.unsqueeze(0)               # [1, 512]
+                    len_b   = torch.tensor([T], device=device)  # [1]
+                    # Teacher-force with the generated rollout (ss_p=0.0 → pure TF)
+                    pred_r, _ = generator.forward_batch(
+                        field_contexts=ctx_b,
+                        target_waves=waves_pad,
+                        lengths=len_b,
+                        scheduled_sampling_p=0.0,
+                    )  # [1, max_T, 432]
+                    mse_r = F.mse_loss(pred_r[:, :T], waves_pad[:, :T].detach())
+                    # Minimising  -(advantage) * mse = advantage * (-mse)
+                    # advantage > 0: loss is -|advantage|*mse → minimising pushes
+                    #   predicted toward rollout (reinforces good behaviour)
+                    # advantage < 0: loss is +|advantage|*mse → minimising pushes
+                    #   predicted away from rollout (suppresses bad behaviour)
+                    reinforce_loss_val = reinforce_loss_val - advantage * mse_r
+
+                reinforce_loss_val = reinforce_loss_val / max(len(roll_rewards), 1)
+                reinforce_loss_val = reinforce_weight * reinforce_loss_val
+
+                optimizer.zero_grad()
+                reinforce_loss_val.backward()
+                torch.nn.utils.clip_grad_norm_(generator.parameters(), 1.0)
+                optimizer.step()
+                # Note: do NOT call scheduler.step() here — only the main pass drives LR
+
+                if step % 500 == 0:
+                    print(
+                        f"    REINFORCE: mean_reward={mean_reward:.3f}  "
+                        f"baseline={running_reward:.3f}  "
+                        f"loss_rl={reinforce_loss_val.item():.4f}"
+                    )
+
         # ── Logging ──
         if step % log_interval == 0:
             avg_loss = running_loss / log_interval
@@ -761,12 +908,11 @@ def train(
             lr_now  = scheduler.get_last_lr()[0]
             print(
                 f"  step {step:6d}/{steps}: "
-                f"wave_norm={wave_loss.item():.4f}  "
+                f"wave={wave_loss.item():.4f}  "
                 f"cosine={cosine_loss.item():.4f}  "
-                f"anchor={anchor_loss.item():.4f}  "
-                f"manifold={manifold_loss.item():.4f}  "
                 f"decode={decode_loss.item():.4f}  "
                 f"total={avg_loss:.4f}  "
+                f"reward_baseline={running_reward:.3f}  "
                 f"lr={lr_now:.6f}"
             )
             log.metric("step", str(step))
