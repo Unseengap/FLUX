@@ -147,8 +147,7 @@ def run_phase2_decode_gate(
     cse.eval()
     chunker.eval()
     bridge.eval()
-    # Do NOT call wtt.eval() — cuDNN RNN backward requires train mode.
-    # wtt parameters are frozen so this is safe for inference too.
+    wtt.eval()
 
     results = []
 
@@ -247,11 +246,7 @@ def train_field(
         codec = load_phase1_checkpoint(device=device, hf_token=hf_token or '')
         cse     = codec.cse.eval()
         chunker = codec.chunker.eval()
-        # wtt must stay in TRAIN mode: cuDNN RNN backward() is disabled in eval mode.
-        # Gradients flow *through* wtt from the trainable bridge, so eval mode would
-        # raise "cudnn RNN backward can only be called in training mode".
-        # Parameters are frozen (requires_grad=False) so wtt weights won't update.
-        wtt = codec.wtt.train()
+        wtt     = codec.wtt.eval()
 
         # Freeze Phase 1 parameters
         for p in cse.parameters():
@@ -261,7 +256,7 @@ def train_field(
         for p in wtt.parameters():
             p.requires_grad_(False)
 
-        log.success("Phase 1 v2 loaded and frozen (wtt kept in train mode for cuDNN RNN)")
+        log.success("Phase 1 v2 loaded and frozen")
     except FileNotFoundError as _e:
         log.error(f"Phase 1 v2 checkpoint not found!\n  {_e}")
         raise
@@ -339,12 +334,8 @@ def train_field(
         total_recon = recon_loss + 0.5 * cos_loss
 
         # 2. Decode: WTT(reconstructed_wave) ≈ original bytes
-        # Reconstructed waves go through the FROZEN WTT (GRU inside).
-        # cuDNN GRU backward requires train mode — we set wtt.train() at load
-        # time, but also disable cuDNN here as a belt-and-suspenders guard:
-        # the non-cuDNN GRU path supports backward regardless of train/eval state.
-        with torch.backends.cudnn.flags(enabled=False):
-            decode_loss = wtt.forward_batch(reconstructed, tgt_list)
+        # Reconstructed waves go through the FROZEN WTT
+        decode_loss = wtt.forward_batch(reconstructed, tgt_list)
 
         total_loss = recon_loss_weight * total_recon + decode_loss_weight * decode_loss
 
@@ -407,7 +398,6 @@ def train_field(
             bridge.train()
             field.wave_to_location.train()
             field.wave_to_feature.train()
-            wtt.train()  # restore: gate check must not leave wtt in eval mode
 
         # ── Periodic checkpoint ───────────────────────────────────────
         if step % save_every == 0:

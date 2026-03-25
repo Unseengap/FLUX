@@ -1,0 +1,20 @@
+{
+  "phase": 2,
+  "version": "v2",
+  "checks": {
+    "Checkpoint exists on disk": "PASS",
+    "Checkpoint loads without error": "PASS",
+    "All state_dict keys present": "PASS",
+    "Loss values are finite (no NaN/Inf)": "PASS",
+    "Recon loss below threshold (< 0.5)": "PASS",
+    "Decode loss below threshold (< 1.5)": "PASS",
+    "Model forward pass (round_trip) OK": "PASS",
+    "Wave shape preserved [N, 432]": "PASS",
+    "Mini round-trip cosine > 0.50": "PASS",
+    "Attractor catalog not empty (> 0)": "PASS"
+  },
+  "recon_loss": 0.025854460218921304,
+  "decode_loss": 0.03067628666759265,
+  "mini_cosine": 0.9960170388221741,
+  "num_attractors": 10
+}

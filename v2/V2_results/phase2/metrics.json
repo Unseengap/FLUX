@@ -1,0 +1,19 @@
+{
+  "test1_catalog_count": 10,
+  "test1_field_attractors": 5648,
+  "test1_location_spread": 0.0256,
+  "test2_avg_cosine": 0.9976,
+  "test2_min_cosine": 0.9915,
+  "test3_gate_avg": 0.9779,
+  "test3_gate_min": 0.8235,
+  "test3_per_text": {
+    "The future of artificial intelligence": 1.0,
+    "Energy equals mass times the speed of li": 1.0,
+    "Photosynthesis converts sunlight into ch": 1.0,
+    "Water freezes at zero degrees Celsius": 1.0,
+    "The cat sat on the mat": 1.0,
+    "caf\u00e9 na\u00efve r\u00e9sum\u00e9": 1.0,
+    "def hello(): return 'world'": 1.0,
+    "\u222b\u2080^\u221e e^(-x\u00b2) dx = \u221a\u03c0/2": 0.8235
+  }
+}

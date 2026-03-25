@@ -1,0 +1,287 @@
+[15:03:18] ============================================================
+[15:03:18] FLUX Phase 2 Log
+[15:03:18] Started: 2026-03-25 15:03:18
+[15:03:18] ============================================================
+
+[15:03:18] 
+▶ CELL: Cell 3 — Hardware & Credentials
+[15:03:18]   Started: 2026-03-25 15:03:18
+[15:03:18]   ℹ Runtime   : colab
+[15:03:18]   ℹ WORK_DIR  : /content
+[15:03:18]   ℹ REPO_PATH : /content/FLUX
+[15:03:18]   ℹ Device    : cuda
+[15:03:18]   ✓ GPU: NVIDIA L4
+[15:03:18]   📊 Total VRAM: 23.7 GB
+[15:03:18]   📊 Free VRAM: 23.7 GB
+[15:03:28]   ⚠ HF_TOKEN not found — HF upload/download will fail
+[15:03:38]   ⚠ GITHUB_TOKEN not found — Cell 13 git push will be skipped
+[15:03:38]   ⚠ Skipping HuggingFace login — no token available
+[15:03:38]   ⚠ HF_TOKEN missing — cannot download Phase 1 checkpoint
+[15:03:38]   ◼ CELL Cell 3 — Hardware & Credentials — PASS
+[15:03:38] 
+▶ CELL: Cell 4 — Smoke Test
+[15:03:38]   Started: 2026-03-25 15:03:38
+[15:03:39]   ✓ SMOKE TEST PASSED — all imports and shapes OK
+[15:03:39]   ◼ CELL Cell 4 — Smoke Test — PASS
+[15:03:39] 
+▶ CELL: Cell 5 — Training
+[15:03:39]   Started: 2026-03-25 15:03:39
+[15:03:39]   ℹ Steps              : 20,000
+[15:03:39]   ℹ Learning rate      : 0.001
+[15:03:39]   ℹ Device             : cuda
+[15:03:39]   ℹ Checkpoint out     : /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:03:39]   ℹ recon_loss_weight  : 1.0
+[15:03:39]   ℹ decode_loss_weight : 0.5
+[15:03:39] 
+──────────────────── Starting Phase 2 field bridge training... ────────────────────
+[15:03:39] 
+──────────────────── Phase 2 v2 — Resonance Field with Decode Loss ────────────────────
+[15:03:39]   ℹ Device: cuda
+[15:03:39]   ℹ Steps: 20,000
+[15:03:39]   ℹ recon_loss_weight=1.0  decode_loss_weight=0.5
+[15:03:39]   ℹ Loading Phase 1 v2 checkpoint (will be FROZEN)...
+[15:03:45]   ✓ Phase 1 v2 loaded and frozen
+[15:03:46]   ℹ Trainable parameters: 1,277,587
+[15:06:26] 
+▶ CELL: Cell 5 — Training
+[15:06:26]   Started: 2026-03-25 15:06:26
+[15:06:26]   ℹ Steps              : 20,000
+[15:06:26]   ℹ Learning rate      : 0.001
+[15:06:26]   ℹ Device             : cuda
+[15:06:26]   ℹ Checkpoint out     : /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:06:26]   ℹ recon_loss_weight  : 1.0
+[15:06:26]   ℹ decode_loss_weight : 0.5
+[15:06:26] 
+──────────────────── Starting Phase 2 field bridge training... ────────────────────
+[15:06:26] 
+──────────────────── Phase 2 v2 — Resonance Field with Decode Loss ────────────────────
+[15:06:26]   ℹ Device: cuda
+[15:06:26]   ℹ Steps: 20,000
+[15:06:26]   ℹ recon_loss_weight=1.0  decode_loss_weight=0.5
+[15:06:26]   ℹ Loading Phase 1 v2 checkpoint (will be FROZEN)...
+[15:06:26]   ✓ Phase 1 v2 loaded and frozen
+[15:06:27]   ℹ Trainable parameters: 1,277,587
+[15:07:27] 
+▶ CELL: Cell 5 — Training
+[15:07:27]   Started: 2026-03-25 15:07:27
+[15:07:27]   ℹ Steps              : 20,000
+[15:07:27]   ℹ Learning rate      : 0.001
+[15:07:27]   ℹ Device             : cuda
+[15:07:27]   ℹ Checkpoint out     : /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:07:27]   ℹ recon_loss_weight  : 1.0
+[15:07:27]   ℹ decode_loss_weight : 0.5
+[15:07:27] 
+──────────────────── Starting Phase 2 field bridge training... ────────────────────
+[15:07:27] 
+──────────────────── Phase 2 v2 — Resonance Field with Decode Loss ────────────────────
+[15:07:27]   ℹ Device: cuda
+[15:07:27]   ℹ Steps: 20,000
+[15:07:27]   ℹ recon_loss_weight=1.0  decode_loss_weight=0.5
+[15:07:27]   ℹ Loading Phase 1 v2 checkpoint (will be FROZEN)...
+[15:07:27]   ✓ Phase 1 v2 loaded and frozen
+[15:07:29]   ℹ Trainable parameters: 1,277,587
+[15:11:35] 
+▶ CELL: Cell 5 — Training
+[15:11:35]   Started: 2026-03-25 15:11:35
+[15:11:35]   ℹ Steps              : 20,000
+[15:11:35]   ℹ Learning rate      : 0.001
+[15:11:35]   ℹ Device             : cuda
+[15:11:35]   ℹ Checkpoint out     : /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:11:35]   ℹ recon_loss_weight  : 1.0
+[15:11:35]   ℹ decode_loss_weight : 0.5
+[15:11:35] 
+──────────────────── Starting Phase 2 field bridge training... ────────────────────
+[15:11:35] 
+──────────────────── Phase 2 v2 — Resonance Field with Decode Loss ────────────────────
+[15:11:35]   ℹ Device: cuda
+[15:11:35]   ℹ Steps: 20,000
+[15:11:35]   ℹ recon_loss_weight=1.0  decode_loss_weight=0.5
+[15:11:35]   ℹ Loading Phase 1 v2 checkpoint (will be FROZEN)...
+[15:11:35]   ✓ Phase 1 v2 loaded and frozen (wtt kept in train mode for cuDNN RNN)
+[15:11:36]   ℹ Trainable parameters: 1,277,587
+[15:11:46]   📊 step    500: recon=0.5210  decode=0.1081  total=0.5750  lr=0.000998  attractors=2032
+[15:11:55]   📊 step   1000: recon=0.0930  decode=0.0289  total=0.1075  lr=0.000994  attractors=2792
+[15:11:56]   ℹ Field settled. 12 new attractors. Total: 12
+[15:12:05]   📊 step   1500: recon=0.0695  decode=0.0203  total=0.0797  lr=0.000986  attractors=2831
+[15:12:14]   📊 step   2000: recon=0.0644  decode=0.0184  total=0.0736  lr=0.000976  attractors=2831
+[15:12:14]   ℹ Field settled. 0 new attractors. Total: 12
+[15:12:24]   📊 step   2500: recon=0.0495  decode=0.0152  total=0.0571  lr=0.000962  attractors=2831
+[15:12:33]   📊 step   3000: recon=0.0470  decode=0.0159  total=0.0549  lr=0.000946  attractors=2831
+[15:12:33]   ℹ Field settled. 0 new attractors. Total: 12
+[15:12:42]   📊 step   3500: recon=0.0384  decode=0.0133  total=0.0451  lr=0.000927  attractors=2831
+[15:12:52]   📊 step   4000: recon=0.0379  decode=0.0124  total=0.0441  lr=0.000905  attractors=2831
+[15:12:52]   ℹ Field settled. 0 new attractors. Total: 12
+[15:13:01]   📊 step   4500: recon=0.0405  decode=0.0134  total=0.0472  lr=0.000881  attractors=2831
+[15:13:10]   📊 step   5000: recon=0.0363  decode=0.0150  total=0.0438  lr=0.000855  attractors=2831
+[15:13:11]   ℹ Field settled. 0 new attractors. Total: 12
+[15:13:11]   📊 step   5000 P2 gate: ✓ avg=100.0% min=100.0%
+[15:13:12]   ✓ Checkpoint saved at step 5000
+[15:13:21]   📊 step   5500: recon=0.0351  decode=0.0119  total=0.0411  lr=0.000826  attractors=2831
+[15:13:31]   📊 step   6000: recon=0.0328  decode=0.0124  total=0.0390  lr=0.000796  attractors=2831
+[15:13:31]   ℹ Field settled. 0 new attractors. Total: 12
+[15:13:40]   📊 step   6500: recon=0.0260  decode=0.0120  total=0.0320  lr=0.000764  attractors=2831
+[15:13:50]   📊 step   7000: recon=0.0248  decode=0.0115  total=0.0306  lr=0.000730  attractors=2831
+[15:13:50]   ℹ Field settled. 0 new attractors. Total: 12
+[15:13:59]   📊 step   7500: recon=0.0230  decode=0.0115  total=0.0287  lr=0.000694  attractors=2831
+[15:14:08]   📊 step   8000: recon=0.0292  decode=0.0137  total=0.0361  lr=0.000658  attractors=2831
+[15:14:09]   ℹ Field settled. 0 new attractors. Total: 12
+[15:14:18]   📊 step   8500: recon=0.0216  decode=0.0113  total=0.0272  lr=0.000621  attractors=2831
+[15:16:19] 
+▶ CELL: Cell 5 — Training
+[15:16:19]   Started: 2026-03-25 15:16:19
+[15:16:19]   ℹ Steps              : 20,000
+[15:16:19]   ℹ Learning rate      : 0.001
+[15:16:19]   ℹ Device             : cuda
+[15:16:19]   ℹ Checkpoint out     : /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:16:19]   ℹ recon_loss_weight  : 1.0
+[15:16:19]   ℹ decode_loss_weight : 0.5
+[15:16:19] 
+──────────────────── Starting Phase 2 field bridge training... ────────────────────
+[15:16:19] 
+──────────────────── Phase 2 v2 — Resonance Field with Decode Loss ────────────────────
+[15:16:19]   ℹ Device: cuda
+[15:16:19]   ℹ Steps: 20,000
+[15:16:19]   ℹ recon_loss_weight=1.0  decode_loss_weight=0.5
+[15:16:19]   ℹ Loading Phase 1 v2 checkpoint (will be FROZEN)...
+[15:16:19]   ✓ Phase 1 v2 loaded and frozen (wtt kept in train mode for cuDNN RNN)
+[15:16:19]   ℹ Building training corpus (WikiText-103 + TinyStories + CodeSearchNet + OPUS-100 + MATH-500)...
+[15:17:04]   ℹ Corpus size: 16,562 strings
+[15:17:05]   ℹ Trainable parameters: 1,277,587
+[15:17:16]   📊 step    500: recon=0.5967  decode=0.1749  total=0.6841  lr=0.000998  attractors=2259
+[15:17:27]   📊 step   1000: recon=0.1645  decode=0.0663  total=0.1976  lr=0.000994  attractors=2857
+[15:17:27]   ℹ Field settled. 10 new attractors. Total: 10
+[15:17:38]   📊 step   1500: recon=0.1226  decode=0.0590  total=0.1521  lr=0.000986  attractors=3203
+[15:17:49]   📊 step   2000: recon=0.1174  decode=0.0620  total=0.1484  lr=0.000976  attractors=3485
+[15:17:49]   ℹ Field settled. 0 new attractors. Total: 10
+[15:18:00]   📊 step   2500: recon=0.1099  decode=0.0627  total=0.1413  lr=0.000962  attractors=3695
+[15:18:11]   📊 step   3000: recon=0.0847  decode=0.0481  total=0.1088  lr=0.000946  attractors=3847
+[15:18:11]   ℹ Field settled. 0 new attractors. Total: 10
+[15:18:22]   📊 step   3500: recon=0.0843  decode=0.0363  total=0.1024  lr=0.000927  attractors=3955
+[15:18:32]   📊 step   4000: recon=0.0877  decode=0.0456  total=0.1105  lr=0.000905  attractors=4072
+[15:18:32]   ℹ Field settled. 0 new attractors. Total: 10
+[15:18:43]   📊 step   4500: recon=0.0776  decode=0.0515  total=0.1034  lr=0.000881  attractors=4142
+[15:18:53]   📊 step   5000: recon=0.0709  decode=0.0452  total=0.0935  lr=0.000855  attractors=4201
+[15:18:53]   ℹ Field settled. 0 new attractors. Total: 10
+[15:18:54]   📊 step   5000 P2 gate: ⚠ avg=93.9% min=51.5%
+[15:18:55]   ✓ Checkpoint saved at step 5000
+[15:19:06]   📊 step   5500: recon=0.0734  decode=0.0557  total=0.1013  lr=0.000826  attractors=4269
+[15:19:16]   📊 step   6000: recon=0.0670  decode=0.0534  total=0.0936  lr=0.000796  attractors=4310
+[15:19:16]   ℹ Field settled. 0 new attractors. Total: 10
+[15:19:27]   📊 step   6500: recon=0.0645  decode=0.0420  total=0.0855  lr=0.000764  attractors=4396
+[15:19:38]   📊 step   7000: recon=0.0582  decode=0.0411  total=0.0787  lr=0.000730  attractors=4462
+[15:19:38]   ℹ Field settled. 0 new attractors. Total: 10
+[15:19:48]   📊 step   7500: recon=0.0629  decode=0.0630  total=0.0943  lr=0.000694  attractors=4514
+[15:19:59]   📊 step   8000: recon=0.0560  decode=0.0400  total=0.0760  lr=0.000658  attractors=4548
+[15:19:59]   ℹ Field settled. 0 new attractors. Total: 10
+[15:20:10]   📊 step   8500: recon=0.0527  decode=0.0465  total=0.0760  lr=0.000621  attractors=4600
+[15:20:20]   📊 step   9000: recon=0.0520  decode=0.0472  total=0.0756  lr=0.000582  attractors=4636
+[15:20:21]   ℹ Field settled. 0 new attractors. Total: 10
+[15:20:31]   📊 step   9500: recon=0.0466  decode=0.0400  total=0.0666  lr=0.000544  attractors=4666
+[15:20:42]   📊 step  10000: recon=0.0468  decode=0.0481  total=0.0708  lr=0.000505  attractors=4703
+[15:20:43]   ℹ Field settled. 0 new attractors. Total: 10
+[15:20:43]   📊 step  10000 P2 gate: ⚠ avg=88.7% min=55.9%
+[15:20:44]   ✓ Checkpoint saved at step 10000
+[15:20:55]   📊 step  10500: recon=0.0440  decode=0.0510  total=0.0695  lr=0.000466  attractors=4740
+[15:21:06]   📊 step  11000: recon=0.0412  decode=0.0429  total=0.0626  lr=0.000428  attractors=4770
+[15:21:06]   ℹ Field settled. 0 new attractors. Total: 10
+[15:21:17]   📊 step  11500: recon=0.0390  decode=0.0313  total=0.0547  lr=0.000389  attractors=4811
+[15:21:28]   📊 step  12000: recon=0.0390  decode=0.0551  total=0.0666  lr=0.000352  attractors=4832
+[15:21:28]   ℹ Field settled. 0 new attractors. Total: 10
+[15:21:39]   📊 step  12500: recon=0.0390  decode=0.0504  total=0.0642  lr=0.000316  attractors=4864
+[15:21:49]   📊 step  13000: recon=0.0377  decode=0.0513  total=0.0633  lr=0.000280  attractors=4894
+[15:21:49]   ℹ Field settled. 0 new attractors. Total: 10
+[15:22:00]   📊 step  13500: recon=0.0350  decode=0.0376  total=0.0538  lr=0.000246  attractors=4910
+[15:22:11]   📊 step  14000: recon=0.0325  decode=0.0415  total=0.0533  lr=0.000214  attractors=4937
+[15:22:11]   ℹ Field settled. 0 new attractors. Total: 10
+[15:22:22]   📊 step  14500: recon=0.0341  decode=0.0560  total=0.0621  lr=0.000184  attractors=4969
+[15:22:33]   📊 step  15000: recon=0.0307  decode=0.0307  total=0.0461  lr=0.000155  attractors=4994
+[15:22:33]   ℹ Field settled. 0 new attractors. Total: 10
+[15:22:33]   📊 step  15000 P2 gate: ⚠ avg=94.1% min=52.9%
+[15:22:34]   ✓ Checkpoint saved at step 15000
+[15:22:45]   📊 step  15500: recon=0.0303  decode=0.0411  total=0.0508  lr=0.000129  attractors=5014
+[15:22:55]   📊 step  16000: recon=0.0294  decode=0.0437  total=0.0512  lr=0.000105  attractors=5044
+[15:22:55]   ℹ Field settled. 0 new attractors. Total: 10
+[15:23:06]   📊 step  16500: recon=0.0293  decode=0.0575  total=0.0581  lr=0.000083  attractors=5065
+[15:23:16]   📊 step  17000: recon=0.0294  decode=0.0458  total=0.0523  lr=0.000064  attractors=5080
+[15:23:17]   ℹ Field settled. 0 new attractors. Total: 10
+[15:23:27]   📊 step  17500: recon=0.0277  decode=0.0441  total=0.0498  lr=0.000048  attractors=5105
+[15:23:38]   📊 step  18000: recon=0.0278  decode=0.0487  total=0.0522  lr=0.000034  attractors=5124
+[15:23:38]   ℹ Field settled. 0 new attractors. Total: 10
+[15:23:49]   📊 step  18500: recon=0.0272  decode=0.0482  total=0.0513  lr=0.000024  attractors=5139
+[15:24:00]   📊 step  19000: recon=0.0277  decode=0.0497  total=0.0525  lr=0.000016  attractors=5168
+[15:24:00]   ℹ Field settled. 0 new attractors. Total: 10
+[15:24:11]   📊 step  19500: recon=0.0262  decode=0.0396  total=0.0459  lr=0.000012  attractors=5202
+[15:24:21]   📊 step  20000: recon=0.0259  decode=0.0310  total=0.0414  lr=0.000010  attractors=5221
+[15:24:21]   ℹ Field settled. 0 new attractors. Total: 10
+[15:24:22]   📊 step  20000 P2 gate: ✓ avg=97.7% min=81.8%
+[15:24:23]   ✓ Checkpoint saved at step 20000
+[15:24:23] 
+──────────────────── Final Phase 2 v2 Decode Gate ────────────────────
+[15:24:24]   ✓ Final checkpoint saved: /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:24:24] 
+──────────────────── Phase 2 v2 Training Complete ────────────────────
+[15:24:24]   ℹ Best recon loss  : 0.0259
+[15:24:24]   ℹ Best decode loss : 0.0307
+[15:24:24]   ℹ Gate avg         : 93.6%
+[15:24:24]   ℹ Total attractors : 10
+[15:24:24]   ✓ Training complete
+[15:24:24]   📊 Checkpoint: /content/FLUX/checkpoints/phase2_v2.phase.pt
+[15:24:24]   ◼ CELL Cell 5 — Training — PASS
+[15:24:59] 
+▶ CELL: Cell 6 — Training Diagnostics
+[15:24:59]   Started: 2026-03-25 15:24:59
+[15:25:01]   ✓ ALL DIAGNOSTICS PASSED — safe to upload
+[15:25:01]   ◼ CELL Cell 6 — Training Diagnostics — PASS
+[15:27:23] 
+▶ CELL: Cell 7 — Upload to HuggingFace
+[15:27:23]   Started: 2026-03-25 15:27:23
+[15:27:23]   ⚠ Repo create_repo: Illegal header value b'Bearer '
+[15:27:23]   ℹ Uploading 544.1 MB  →  UnseenGAP/FLUX/v2/phase2_v2.phase.pt
+[15:28:56] 
+▶ CELL: Cell 7 — Upload to HuggingFace
+[15:28:56]   Started: 2026-03-25 15:28:56
+[15:28:56]   ⚠ Repo create_repo: Illegal header value b'Bearer '
+[15:28:56]   ℹ Uploading 544.1 MB  →  UnseenGAP/FLUX/v2/phase2_v2.phase.pt
+[15:30:36] 
+▶ CELL: Cell 7 — Upload to HuggingFace
+[15:30:36]   Started: 2026-03-25 15:30:36
+[15:30:37]   ℹ HF_TOKEN re-loaded from Colab secrets
+[15:30:37]   ✓ HF_TOKEN resolved (len=37)
+[15:30:37]   ℹ Repo confirmed: https://huggingface.co/UnseenGAP/FLUX
+[15:30:37]   ℹ Uploading 544.1 MB  →  UnseenGAP/FLUX/v2/phase2_v2.phase.pt
+[15:31:01]   ✓ Upload complete
+[15:31:01]   📊 HF URL: https://huggingface.co/UnseenGAP/FLUX/blob/main/v2/phase2_v2.phase.pt
+[15:31:01]   ◼ CELL Cell 7 — Upload to HuggingFace — PASS
+[15:32:03] 
+▶ CELL: Cell 8 — Test 1: Attractor Formation
+[15:32:03]   Started: 2026-03-25 15:32:03
+[15:32:22]   ✓ TEST 1 PASSED — attractors=10  spread=0.0256
+[15:32:22]   ◼ CELL Cell 8 — Test 1: Attractor Formation — PASS
+[15:32:38] 
+▶ CELL: Cell 9 — Test 2: Wave → Field → Wave Cosine ≥ 0.85
+[15:32:38]   Started: 2026-03-25 15:32:38
+[15:32:38]   ✓ TEST 2 PASSED — avg=0.998  min=0.991
+[15:32:38]   ◼ CELL Cell 9 — Test 2: Wave → Field → Wave Cosine ≥ 0.85 — PASS
+[15:32:46] 
+▶ CELL: Cell 10 — Test 3: Decode Gate (via field bridge)
+[15:32:46]   Started: 2026-03-25 15:32:46
+[15:32:46]   ✓ TEST 3 PASSED — avg=97.8%  min=82.4%
+[15:32:46]   ◼ CELL Cell 10 — Test 3: Decode Gate (via field bridge) — PASS
+[15:32:55] 
+▶ CELL: Cell 11 — Demo 1: Round-Trip
+[15:32:55]   Started: 2026-03-25 15:32:55
+[15:32:55]   ✓ Demo 1 complete
+[15:32:55]   ◼ CELL Cell 11 — Demo 1: Round-Trip — PASS
+[15:33:19] 
+▶ CELL: Cell 12 — Demo 2: No Forgetting + Graphs
+[15:33:19]   Started: 2026-03-25 15:33:19
+[15:33:56]   📊 Attractor survival rate: 100%
+[15:33:56]   📊 Survival threshold: ≥ 80%
+[15:33:56]   ✓ Demo 2 PASSED — 100% of original attractors survived
+[15:33:56]   ◼ CELL Cell 12 — Demo 2: No Forgetting + Graphs — PASS
+[15:33:56] 
+▶ CELL: Cell 13 — Save Results
+[15:33:56]   Started: 2026-03-25 15:33:56
+[15:33:57]   ✓ Log copied → /content/FLUX/v2/V2_results/phase2/logs/phase2.log
+[15:33:57]   ✓ RESULTS_PHASE_2.md generated
+[15:33:58]   ✓ Logs uploaded to HuggingFace
