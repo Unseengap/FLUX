@@ -9,13 +9,20 @@
 ## HuggingFace Credentials
 
 ```python
-HF_TOKEN   = os.environ.get("HF_TOKEN", "")   # Set via Colab/Kaggle secrets — never hardcode
-HF_USER    = "UnseenGAP"
-HF_REPO_ID = "UnseenGAP/FLUX"
+HF_TOKEN      = os.environ.get("HF_TOKEN", "")      # resolved in Cell 3 — never hardcode
+GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "")  # resolved in Cell 3 — never hardcode
+HF_USER       = "UnseenGAP"
+HF_REPO_ID    = "UnseenGAP/FLUX"
 ```
 
 Models are saved to and loaded from `UnseenGAP/FLUX` on HuggingFace Hub.  
 **Tests and demos always load from HuggingFace** — never from local files.
+
+Both tokens are resolved in Cell 3 using this priority order:
+1. `os.environ` (set in Cell 2 from the env var)
+2. Colab secrets (`google.colab.userdata`)
+3. Kaggle secrets (`kaggle_secrets.UserSecretsClient`)
+4. Warning printed if still missing — cell does NOT raise, only blocks later cells
 
 ---
 
@@ -34,7 +41,7 @@ BRANCH      = "v2"
 |--------|------|----------|
 | 1 | SETUP & CLONE | First time only — installs deps, clones v2 branch |
 | 2 | **REFRESH** | Before every run — clears state, pulls latest, wipes results |
-| 3 | HARDWARE & CREDENTIALS | After Refresh |
+| 3 | HARDWARE & CREDENTIALS | After Refresh — resolves tokens, downloads prior phase checkpoint |
 | 4 | SMOKE TEST | After Hardware — verifies imports work |
 | 5 | TRAINING | Core training loop with full PhaseLogger output |
 | 6 | **TRAINING DIAGNOSTICS** | Immediately after training — catch show-stoppers |
@@ -44,7 +51,7 @@ BRANCH      = "v2"
 | 10 | TEST 3 — loads from HF | Tertiary metric |
 | 11 | DEMO 1 — loads from HF | Visual/interactive demo |
 | 12 | DEMO 2 — loads from HF | Visual/interactive demo |
-| 13 | SAVE RESULTS | Saves all logs + graphs to V2_results/<phase>/ |
+| 13 | SAVE RESULTS | Saves all logs + graphs to V2_results/<phase>/ then pushes to GitHub |
 | 14 | FINAL SUMMARY | Markdown summary block |
 
 ---
@@ -56,15 +63,43 @@ Run it at the start of every session and after fixing any bug.
 
 ```
 1. %reset -f                    → clear Python namespace completely
-2. Re-define all constants      → REPO_PATH, RESULTS_DIR, HF_TOKEN, etc.
+2. Re-define all constants      → REPO_PATH, RESULTS_DIR, HF_TOKEN, GITHUB_TOKEN, etc.
 3. torch.cuda.empty_cache()     → free GPU VRAM
 4. gc.collect()                 → free CPU RAM
 5. git pull origin v2           → pull latest code from GitHub
 6. shutil.rmtree(RESULTS_DIR)   → delete previous results (start fresh)
 7. os.makedirs(RESULTS_DIR)     → recreate clean results directory
-8. Verify key files exist       → catch missing files immediately
-9. Print summary                → confirm refresh succeeded
+8. Verify key files exist        → catch missing files immediately
+9. Print summary                → confirm refresh succeeded (shows HF_TOKEN / GITHUB_TOKEN status)
 ```
+
+---
+
+## Hardware & Credentials Cell (Cell 3)
+
+Cell 3 does three things beyond hardware detection:
+
+**Token resolution** (both HF_TOKEN and GITHUB_TOKEN):
+```
+env var → Colab secrets (google.colab.userdata) → Kaggle secrets → warning
+```
+Tokens are written back to the notebook-scope variables so all later cells can use them.
+
+**HuggingFace login** via `huggingface_hub.login()`.
+
+**Prior phase checkpoint download** — every phase from Phase 2 onward must download the
+previous phase's checkpoint from HuggingFace before training starts, because each phase
+runs in a fresh Colab/Kaggle session with no local files:
+
+```python
+# Phase N downloads phase N-1 checkpoint in Cell 3
+if not os.path.exists(LOCAL_P_PREV_CKPT):
+    hf_hub_download(repo_id=HF_REPO_ID, filename=HF_P_PREV_PATH,
+                    token=HF_TOKEN, local_dir=CHECKPOINT_DIR)
+```
+
+This must happen in Cell 3 (not Cell 5) so the smoke test in Cell 4 can verify
+the downloaded checkpoint loads correctly before training starts.
 
 ---
 
@@ -89,11 +124,26 @@ WARN checks are noted but do not block progression.
 
 Diagnostics are saved to `V2_results/<phase>/diagnostics.json`.
 
----
+## Cell 13 — Save Results
 
-## Results Directory Layout
+After generating the results report and uploading logs to HuggingFace, Cell 13
+pushes to GitHub using this exact sequence (required to avoid GitHub Push Protection):
 
 ```
+1. Scrub tokens from log files  → regex replaces hf_*/ghp_* with [TOKEN_REDACTED]
+2. git fetch origin v2          → sync remote state
+3. git reset --soft origin/v2   → discard any local commits that may contain tokens
+4. git add <result files>       → stage only clean scrubbed files
+5. git commit                   → commit only if status shows changes
+6. git push origin v2           → push to GitHub
+7. Restore clean remote URL     → strip token from git config (always, via finally block)
+```
+
+Git authentication uses HTTPS token injection into the remote URL:
+```python
+_auth_url = clean_url.replace('https://', f'https://USER:GITHUB_TOKEN@')
+```
+The token is **always** stripped back out in the `finally` block, never stored permanently.```
 v2/V2_results/
 └── phase1/
 │   ├── logs/
@@ -152,9 +202,9 @@ RESULTS_DIR = f'{REPO_PATH}/v2/V2_results/phase<N>'
 | Feature | Colab | Kaggle |
 |---------|-------|--------|
 | Working dir | `/content/` | `/kaggle/working/` |
-| GPU | T4 / A100 | P100 / T4 |
+| GPU | T4 / A100 / L4 | P100 / T4 |
 | Session length | 12h | 9h |
-| Secrets | Not needed (hardcoded) | Not needed (hardcoded) |
+| Secrets | `google.colab.userdata` | `kaggle_secrets.UserSecretsClient` |
 | Output artifacts | Download via Colab UI | `/kaggle/working/` auto-output |
 
 ---
