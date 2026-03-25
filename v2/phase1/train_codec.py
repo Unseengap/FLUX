@@ -779,21 +779,51 @@ def _save_phase1_checkpoint(
     return path
 
 
-def load_phase1_checkpoint(device: str = 'cpu') -> WaveCodec:
+def load_phase1_checkpoint(device: str = 'cpu', hf_token: str = '') -> WaveCodec:
     """
     Load a saved Phase 1 v2 checkpoint.
 
+    Falls back to downloading from HuggingFace Hub if the local checkpoint
+    is not found (e.g. fresh Colab/Kaggle session).
+
     Args:
-        device: Target device
+        device:    Target device
+        hf_token:  HuggingFace token (reads HF_TOKEN env var if not supplied)
     Returns:
         WaveCodec with loaded weights
     """
+    import os
     checkpoint_dir = Path(__file__).parent.parent.parent / 'checkpoints'
     path = checkpoint_dir / 'phase1_v2.phase.pt'
 
     if not path.exists():
+        # ── Try HuggingFace download ──────────────────────────────────
+        _token = hf_token or os.environ.get('HF_TOKEN', '')
+        if not _token:
+            raise FileNotFoundError(
+                f"Phase 1 v2 checkpoint not found at {path} and HF_TOKEN is not set.\n"
+                f"Either run Phase 1 first (python train_codec.py) or provide HF_TOKEN."
+            )
+        try:
+            from huggingface_hub import hf_hub_download
+            print("  Downloading Phase 1 v2 checkpoint from HuggingFace...")
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            hf_hub_download(
+                repo_id   = 'UnseenGAP/FLUX',
+                filename  = 'v2/phase1_v2.phase.pt',
+                token     = _token,
+                local_dir = str(checkpoint_dir),
+            )
+            print(f"  ✓ Phase 1 v2 checkpoint downloaded → {path}")
+        except Exception as _e:
+            raise FileNotFoundError(
+                f"Phase 1 v2 checkpoint not found locally and HuggingFace download failed: {_e}\n"
+                f"Run Phase 1 first: python train_codec.py"
+            ) from _e
+
+    if not path.exists():
         raise FileNotFoundError(
-            f"Phase 1 v2 checkpoint not found at {path}\n"
+            f"Phase 1 v2 checkpoint not found at {path} even after download attempt.\n"
             f"Run: python train_codec.py"
         )
 

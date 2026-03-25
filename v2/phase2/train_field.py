@@ -239,7 +239,7 @@ def train_field(
     log.info("Loading Phase 1 v2 checkpoint (will be FROZEN)...")
     try:
         from train_codec import load_phase1_checkpoint
-        codec = load_phase1_checkpoint(device=device)
+        codec = load_phase1_checkpoint(device=device, hf_token=hf_token or '')
         cse     = codec.cse.eval()
         chunker = codec.chunker.eval()
         wtt     = codec.wtt.eval()
@@ -253,11 +253,8 @@ def train_field(
             p.requires_grad_(False)
 
         log.success("Phase 1 v2 loaded and frozen")
-    except FileNotFoundError:
-        log.error(
-            "Phase 1 v2 checkpoint not found!\n"
-            "  Run Phase 1 first: python v2/phase1/train_codec.py"
-        )
+    except FileNotFoundError as _e:
+        log.error(f"Phase 1 v2 checkpoint not found!\n  {_e}")
         raise
 
     # ── Build Phase 2 components ─────────────────────────────────────
