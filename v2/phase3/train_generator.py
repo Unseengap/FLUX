@@ -187,6 +187,121 @@ def build_training_corpus(target_size: int = 10_000) -> List[str]:
 
 
 # ─────────────────────────────────────────────
+# Corpus Pre-encoder  (one-time, saves to disk)
+# ─────────────────────────────────────────────
+
+def precompute_corpus(
+    corpus:     List[str],
+    cse:        'ContinuousSemanticEncoder',
+    chunker:    'WaveChunker',
+    w2f:        'WaveToField',
+    device:     str,
+    cache_path: Path,
+    max_seq:    int = 30,
+) -> List[Dict[str, Any]]:
+    """
+    Encode every training text exactly once and persist to disk.
+
+    After the first run the cache is reloaded instantly, so the hot
+    training loop only does random sampling — zero CSE / WaveChunker /
+    WaveToField calls during training.
+
+    Record schema:
+        ctx    : Tensor [512]          — WaveToField context (CPU)
+        waves  : Tensor [max_seq, 432] — padded target waves (CPU)
+        length : int                   — valid (non-padded) wave count
+        bytes  : List[bytes]           — UTF-8 bytes per chunk
+
+    Args:
+        corpus:     Training strings
+        cse:        Frozen ContinuousSemanticEncoder
+        chunker:    Frozen WaveChunker (chunk_with_bytes gives correct bytes)
+        w2f:        Frozen WaveToField
+        device:     Encoding device (results stored on CPU)
+        cache_path: .pt file to save/load
+        max_seq:    Padding length
+
+    Returns:
+        List of record dicts (CPU tensors)
+    """
+    if cache_path.exists():
+        print(f"  ✓ Corpus cache found — loading {cache_path.name}")
+        records = torch.load(cache_path, map_location='cpu')
+        print(f"  ✓ {len(records):,} pre-encoded records loaded")
+        return records
+
+    print(f"  Pre-encoding {len(corpus):,} texts → {cache_path.name} (one-time)...")
+    records: List[Dict[str, Any]] = []
+
+    with torch.no_grad():
+        for i, text in enumerate(corpus):
+            try:
+                wave       = cse.encode(text)
+                text_bytes = text.encode('utf-8')
+                # chunk_with_bytes returns List[(chunk_wave [432], chunk_bytes)]
+                pairs = chunker.chunk_with_bytes(wave.full, text_bytes)
+                if not pairs:
+                    continue
+
+                n         = min(len(pairs), max_seq)
+                mean_wave = wave.full.mean(dim=0)
+                ctx       = w2f(mean_wave.to(device)).cpu()          # [512]
+
+                chunk_waves = torch.stack([p[0] for p in pairs[:n]])  # [n, 432]
+                chunk_bytes = [p[1] for p in pairs[:n]]               # List[bytes]
+
+                # Pad to max_seq so tensors can be stacked in sample_batch
+                pad      = torch.zeros(max_seq, 432)
+                pad[:n]  = chunk_waves
+
+                records.append({
+                    'ctx':    ctx,
+                    'waves':  pad,
+                    'length': n,
+                    'bytes':  chunk_bytes,
+                })
+            except Exception:
+                continue
+
+            if (i + 1) % 500 == 0 or (i + 1) == len(corpus):
+                print(f"    {i + 1:,}/{len(corpus):,} encoded  "
+                      f"({len(records):,} valid)")
+
+    torch.save(records, cache_path)
+    print(f"  ✓ Saved {len(records):,} records → {cache_path}")
+    return records
+
+
+def sample_batch(
+    records:    List[Dict[str, Any]],
+    batch_size: int,
+    device:     str,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[List[bytes]]]:
+    """
+    Sample a training batch from pre-encoded corpus records.
+
+    Replaces build_batch() — no CSE / WaveChunker / WaveToField calls.
+
+    Args:
+        records:    Output of precompute_corpus()
+        batch_size: Number of samples
+        device:     Target device
+
+    Returns:
+        (field_contexts [B, 512],
+         target_waves   [B, max_seq, 432],
+         lengths        [B],
+         bytes_list     [B][n_chunks bytes each])
+    """
+    batch          = random.choices(records, k=batch_size)
+    field_contexts = torch.stack([r['ctx']    for r in batch]).to(device)
+    target_waves   = torch.stack([r['waves']  for r in batch]).to(device)
+    lengths        = torch.tensor([r['length'] for r in batch], device=device)
+    bytes_list     = [r['bytes'] for r in batch]
+    return field_contexts, target_waves, lengths, bytes_list
+
+
+# ─────────────────────────────────────────────
 # Checkpoint Loaders
 # ─────────────────────────────────────────────
 
@@ -215,20 +330,19 @@ def load_phase1_components(
     state = torch.load(checkpoint_path, map_location='cpu')
     cfg   = state['config']
 
-    cse = ContinuousSemanticEncoder(
-        wave_dim=cfg.get('wave_dim', 432),
-        window_size=cfg.get('window_size', 8),
-        stride=cfg.get('stride', 1),
-    )
+    # ContinuousSemanticEncoder takes wave_dims (dict) + byte_window/byte_stride,
+    # not wave_dim/window_size/stride — use defaults which match the checkpoint.
+    cse = ContinuousSemanticEncoder()
     cse.load_state_dict(state['state_dict']['cse'])
     cse.to(device).eval()
     for p in cse.parameters():
         p.requires_grad_(False)
 
+    # Phase 1 config keys: chunker_min, chunker_max, wtt_max_bytes
     chunker = WaveChunker(
         wave_dim=cfg.get('wave_dim', 432),
-        min_chunk=cfg.get('min_chunk', 2),
-        max_chunk=cfg.get('max_chunk', 20),
+        min_chunk_size=cfg.get('chunker_min', 2),
+        max_chunk_size=cfg.get('chunker_max', 20),
     )
     chunker.load_state_dict(state['state_dict']['chunker'])
     chunker.to(device).eval()
@@ -238,7 +352,7 @@ def load_phase1_components(
     wtt = WaveToText(
         wave_dim=cfg.get('wave_dim', 432),
         hidden_dim=cfg.get('wtt_hidden_dim', 256),
-        max_bytes=cfg.get('max_bytes', 20),
+        max_bytes=cfg.get('wtt_max_bytes', 20),
     )
     wtt.load_state_dict(state['state_dict']['wtt'])
     wtt.to(device).eval()
@@ -278,7 +392,8 @@ def load_phase2_components(
         wave_dim=cfg.get('wave_dim', 432),
         field_dim=cfg.get('field_features', 512),
     )
-    w2f.load_state_dict(state['state_dict']['wave_to_field'])
+    # Phase 2 state_dict keys: bridge_wtf (WaveToField), bridge_ftw (FieldToWave)
+    w2f.load_state_dict(state['state_dict']['bridge_wtf'])
     w2f.to(device).eval()
     for p in w2f.parameters():
         p.requires_grad_(False)
@@ -287,7 +402,7 @@ def load_phase2_components(
         field_dim=cfg.get('field_features', 512),
         wave_dim=cfg.get('wave_dim', 432),
     )
-    f2w.load_state_dict(state['state_dict']['field_to_wave'])
+    f2w.load_state_dict(state['state_dict']['bridge_ftw'])
     f2w.to(device).eval()
     for p in f2w.parameters():
         p.requires_grad_(False)
@@ -363,104 +478,9 @@ def run_decode_gate(
 # Training Step Helpers
 # ─────────────────────────────────────────────
 
-def compute_decode_loss(
-    predicted_waves: torch.Tensor,
-    target_bytes_list: List[bytes],
-    wtt: 'WaveToText',
-) -> torch.Tensor:
-    """
-    Compute cross-entropy decode loss on predicted waves.
-
-    For each predicted wave, run through WTT and compare to ground truth bytes.
-    This is the key loss that forces the generator to produce decodable waves.
-
-    Args:
-        predicted_waves:   [N, wave_dim] batch of predicted waves
-        target_bytes_list: list of N byte sequences (ground truth)
-        wtt:               WaveToText decoder
-
-    Returns:
-        Scalar decode loss tensor
-    """
-    losses = []
-    for i, (wave, gt_bytes) in enumerate(zip(predicted_waves, target_bytes_list)):
-        if not gt_bytes:
-            continue
-        try:
-            logits = wtt.forward_train(wave.unsqueeze(0), gt_bytes)
-            if logits is not None:
-                gt_tensor = torch.tensor(list(gt_bytes), dtype=torch.long,
-                                         device=wave.device)
-                gt_tensor = gt_tensor[:logits.shape[0]]
-                logits    = logits[:len(gt_tensor)]
-                if len(gt_tensor) > 0:
-                    losses.append(F.cross_entropy(logits, gt_tensor))
-        except Exception:
-            continue
-    return torch.stack(losses).mean() if losses else torch.tensor(0.0, device=predicted_waves.device)
-
-
-def build_batch(
-    texts:   List[str],
-    cse:     'ContinuousSemanticEncoder',
-    chunker: 'WaveChunker',
-    w2f:     'WaveToField',
-    device:  str,
-    max_seq: int = 30,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[List[bytes]]]:
-    """
-    Build a training batch from a list of texts.
-
-    Encodes texts to waves, chunks them, and builds padded tensors.
-
-    Args:
-        texts:   List of training strings
-        cse:     Frozen CSE encoder
-        chunker: Frozen WaveChunker
-        w2f:     Frozen WaveToField
-        device:  Target device
-        max_seq: Maximum sequence length for padding
-
-    Returns:
-        (field_contexts [B, 512],
-         target_waves   [B, max_seq, 432],
-         lengths        [B],
-         bytes_list     [B][N bytes per chunk])
-    """
-    contexts, targets, lengths, bytes_list = [], [], [], []
-
-    for text in texts:
-        try:
-            with torch.no_grad():
-                wave          = cse.encode(text)               # SemanticWave
-                chunks, spans = chunker(wave.full)              # [N, 432], [N, bytes]
-                mean_wave     = wave.full.mean(dim=0)
-                ctx           = w2f(mean_wave.to(device))       # [512]
-
-            n = min(len(chunks), max_seq)
-            if n == 0:
-                continue
-
-            pad = torch.zeros(max_seq, 432, device=device)
-            pad[:n] = chunks[:n].to(device)
-
-            contexts.append(ctx)
-            targets.append(pad)
-            lengths.append(n)
-            bytes_list.append([sp for sp in spans[:n]])
-
-        except Exception:
-            continue
-
-    if not contexts:
-        return None, None, None, None
-
-    return (
-        torch.stack(contexts),
-        torch.stack(targets),
-        torch.tensor(lengths, device=device),
-        bytes_list,
-    )
+# NOTE: compute_decode_loss() and build_batch() have been superseded.
+# Use wtt.forward_batch() for batched decode loss (see training loop).
+# Use precompute_corpus() + sample_batch() instead of build_batch().
 
 
 # ─────────────────────────────────────────────
@@ -530,10 +550,22 @@ def train(
     optimizer = AdamW(generator.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=steps, eta_min=lr * 0.01)
 
-    # ── Build corpus ──
+    # ── Build corpus & pre-encode to disk (one-time cost) ──
     log.info("Building training corpus...")
     corpus = build_training_corpus(target_size=10_000)
     log.info(f"Training corpus: {len(corpus):,} texts")
+
+    corpus_cache_path = checkpoint_dir / 'phase3_v2_corpus_cache.pt'
+    log.info("Pre-encoding corpus (uses cache if already done)...")
+    corpus_records = precompute_corpus(
+        corpus=corpus,
+        cse=cse,
+        chunker=chunker,
+        w2f=w2f,
+        device=device,
+        cache_path=corpus_cache_path,
+    )
+    log.info(f"Corpus cache: {len(corpus_records):,} pre-encoded records")
 
     batch_size  = PHASE3_CONFIG['batch_size']
     ss_start    = PHASE3_CONFIG['ss_start']
@@ -552,22 +584,15 @@ def train(
     start_time      = time.time()
 
     while step < steps:
-        # Sample a batch of texts
-        batch_texts = random.choices(corpus, k=batch_size)
-
         # Scheduled sampling probability — ramps up over training
         ss_p = ss_start + (ss_end - ss_start) * (step / steps)
 
-        # Build batch
-        field_contexts, target_waves, lengths, bytes_list = build_batch(
-            texts=batch_texts,
-            cse=cse,
-            chunker=chunker,
-            w2f=w2f,
+        # Sample pre-encoded batch — zero CSE / chunker / field calls
+        field_contexts, target_waves, lengths, bytes_list = sample_batch(
+            records=corpus_records,
+            batch_size=batch_size,
             device=device,
         )
-        if field_contexts is None:
-            continue
 
         # Forward
         generator.train()
@@ -604,37 +629,26 @@ def train(
         else:
             contrastive_loss = torch.tensor(0.0, device=device)
 
-        # ── Decode loss: force generated waves to be decodable ──
-        # Sample a few predicted waves and check WTT can decode them
-        wtt.train()  # brief train mode so we can backprop through WTT
-        decode_losses = []
-        n_decode_samples = min(8, B)
-        sample_idx = random.sample(range(B), n_decode_samples)
-
-        for i in sample_idx:
-            L = lengths[i].item()
-            if L == 0 or not bytes_list[i]:
+        # ── Decode loss: single batched WTT forward (no Python loop) ──
+        wtt.train()
+        decode_waves:   List[torch.Tensor] = []
+        decode_targets: List[torch.Tensor] = []
+        for i in random.sample(range(B), min(8, B)):
+            if lengths[i].item() == 0 or not bytes_list[i] or not bytes_list[i][0]:
                 continue
-            # Use the first predicted wave vs first ground-truth chunk bytes
-            pred_wave = predicted[i, 0]       # [432] first predicted wave
-            gt_bytes  = bytes_list[i][0]      # bytes for first chunk
-            if not gt_bytes:
-                continue
-            try:
-                logits = wtt.forward_train(pred_wave.unsqueeze(0), gt_bytes)
-                if logits is not None and len(logits) > 0:
-                    gt_t = torch.tensor(list(gt_bytes), dtype=torch.long, device=device)
-                    min_len = min(len(gt_t), logits.shape[0])
-                    if min_len > 0:
-                        decode_losses.append(
-                            F.cross_entropy(logits[:min_len], gt_t[:min_len])
-                        )
-            except Exception:
-                pass
+            decode_waves.append(predicted[i, 0])          # [432] first predicted wave
+            decode_targets.append(
+                torch.tensor(list(bytes_list[i][0]), dtype=torch.long, device=device)
+            )
+        if decode_waves:
+            # forward_batch pads targets internally and returns scalar CE loss
+            decode_loss = wtt.forward_batch(
+                torch.stack(decode_waves),   # [M, 432]
+                decode_targets,              # List[Tensor[chunk_len_i]]
+            )
+        else:
+            decode_loss = torch.tensor(0.0, device=device)
         wtt.eval()
-
-        decode_loss = torch.stack(decode_losses).mean() \
-            if decode_losses else torch.tensor(0.0, device=device)
 
         # ── Total loss ──
         total_loss = (
