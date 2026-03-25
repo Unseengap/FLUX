@@ -50,6 +50,45 @@ BRANCH      = "v2"
 
 ---
 
+## SETUP Cell Behaviour (Cell 1)
+
+Run **once** on a fresh session. Do NOT re-run after Refresh (Cell 2).
+
+```
+1. Detect runtime          → check /kaggle/working or /content, set WORK_DIR
+2. pip install deps        → torch, transformers, huggingface_hub, etc.
+3. git clone v2 branch     → only if REPO_PATH does not already exist
+4. sys.path.insert(0, ...) → PRIMARY import method — always works on Colab/Kaggle
+5. pip install -e (optional) → best-effort only, wrapped in try/except
+                               NEVER use check=True — Colab's system Python
+                               rejects editable installs and will crash the cell
+```
+
+### Editable Install Rule
+
+```python
+# ✓ CORRECT — best-effort, never crashes
+try:
+    result = subprocess.run(
+        [sys.executable, '-m', 'pip', 'install', '-q', '-e', REPO_PATH],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print("  ✓ setup.py installed (editable)")
+    else:
+        print(f"  ⚠ Editable install failed (using sys.path instead)")
+except Exception as e:
+    print(f"  ⚠ Editable install skipped: {e}")
+
+# ✗ WRONG — crashes on Colab if setup.py has issues
+subprocess.run([..., '-e', REPO_PATH], check=True)   # DO NOT USE
+```
+
+`sys.path.insert` is the **primary** and **sufficient** mechanism. The editable install
+is a convenience only — its failure must never block the notebook.
+
+---
+
 ## REFRESH Cell Behaviour (Cell 2)
 
 The Refresh cell is the most important infrastructure cell.  
@@ -155,7 +194,7 @@ RESULTS_DIR = f'{REPO_PATH}/v2/V2_results/phase<N>'
 | Working dir | `/content/` | `/kaggle/working/` |
 | GPU | T4 / A100 | P100 / T4 |
 | Session length | 12h | 9h |
-| Secrets | Not needed (hardcoded) | Not needed (hardcoded) |
+| Secrets | `os.environ['HF_TOKEN']` | `os.environ['HF_TOKEN']` |
 | Output artifacts | Download via Colab UI | `/kaggle/working/` auto-output |
 
 ---
