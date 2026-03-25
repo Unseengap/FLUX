@@ -204,7 +204,6 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
         wt = load_dataset(
             "wikitext", "wikitext-103-raw-v1",
             split="train", streaming=True,
-            trust_remote_code=True,
         )
         collected = 0
         for row in wt:
@@ -223,7 +222,6 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
         ts = load_dataset(
             "roneneldan/TinyStories",
             split="train", streaming=True,
-            trust_remote_code=True,
         )
         collected = 0
         for row in ts:
@@ -242,7 +240,6 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
         csn = load_dataset(
             "code_search_net", "python",
             split="train", streaming=True,
-            trust_remote_code=True,
         )
         collected = 0
         for row in csn:
@@ -277,7 +274,6 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
                 opus = load_dataset(
                     "Helsinki-NLP/opus-100", pair,
                     split="train", streaming=True,
-                    trust_remote_code=True,
                 )
                 lang_count = 0
                 src, tgt = pair.split("-")
@@ -301,9 +297,8 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
     try:
         print("  → Loading MATH dataset...", flush=True)
         math_ds = load_dataset(
-            "lighteval/MATH",
+            "hendrycks/competition_math",
             split="train", streaming=True,
-            trust_remote_code=True,
         )
         collected = 0
         for row in math_ds:
@@ -467,7 +462,8 @@ class WaveCodec(nn.Module):
         pos_loss = F.relu(0.6 - pos_sim).mean()
 
         # ── Negative pair: anchor vs a random different text ──────
-        neg_texts = [t for t in TRAINING_TEXTS if t != text and len(t) > 4]
+        _pool = _CORPUS_CACHE if _CORPUS_CACHE else _FALLBACK_TEXTS
+        neg_texts = [t for t in _pool if t != text and len(t) > 4]
         if neg_texts:
             neg_text = random.choice(neg_texts)
             w_anchor = self.cse.encode(text).full.mean(dim=0)
