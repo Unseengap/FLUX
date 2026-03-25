@@ -24,6 +24,11 @@ Both tokens are resolved in Cell 3 using this priority order:
 3. Kaggle secrets (`kaggle_secrets.UserSecretsClient`)
 4. Warning printed if still missing — cell does NOT raise, only blocks later cells
 
+> **Critical:** Always call `.strip()` on resolved token strings.  
+> Colab and Kaggle secrets silently append `\r\n`, which causes  
+> `Illegal header value b'Bearer '` when passed to `HfApi(token=...)`.  
+> This error means the token is **empty or contains whitespace**, not that the token is wrong.
+
 ---
 
 ## GitHub Repository
@@ -100,6 +105,80 @@ if not os.path.exists(LOCAL_P_PREV_CKPT):
 
 This must happen in Cell 3 (not Cell 5) so the smoke test in Cell 4 can verify
 the downloaded checkpoint loads correctly before training starts.
+
+---
+
+## Upload Cell (Cell 7) — Token Re-Resolution
+
+**Every upload cell must re-resolve `HF_TOKEN` independently.**  
+Do NOT rely on the notebook-scope `HF_TOKEN` variable alone. The `%reset -f` in Cell 2
+clears all variables, and if the user skips Cell 3 or runs cells out of order, `HF_TOKEN`
+will be an empty string, producing `Illegal header value b'Bearer '`.
+
+Required pattern for every Cell 7 (copy exactly):
+
+```python
+# ── Re-resolve HF_TOKEN (guards against %reset -f clearing the variable) ──────
+_hf_token = HF_TOKEN if 'HF_TOKEN' in dir() else ''
+_hf_token = _hf_token or os.environ.get('HF_TOKEN', '')
+
+if not _hf_token:
+    try:
+        from google.colab import userdata
+        _hf_token = (userdata.get('HF_TOKEN') or '').strip()
+    except Exception:
+        pass
+
+if not _hf_token:
+    try:
+        from kaggle_secrets import UserSecretsClient
+        _hf_token = (UserSecretsClient().get_secret('HF_TOKEN') or '').strip()
+    except Exception:
+        pass
+
+if not _hf_token:
+    log.error("HF_TOKEN is empty — add it via Colab/Kaggle secrets and re-run Cell 3")
+    raise ValueError("HF_TOKEN is required for upload. Run Cell 3 first.")
+
+HF_TOKEN = _hf_token
+os.environ['HF_TOKEN'] = _hf_token
+log.success(f"HF_TOKEN resolved (len={len(_hf_token)})")
+
+_api = HfApi(token=_hf_token)   # ← always pass _hf_token, never bare HF_TOKEN
+```
+
+The `log.success(f"HF_TOKEN resolved (len=XX)")` line is intentional — it confirms  
+the token was actually read before a large (500+ MB) upload begins.
+
+---
+
+## Training Cell (Cell 5) — Module Reload
+
+Always force-reload the training module before calling `train_field()` (or equivalent).  
+This prevents stale bytecode from a failed prior run being used:
+
+```python
+import train_field as _tf_module
+importlib.reload(_tf_module)
+from train_field import train_field
+```
+
+This pattern must appear in every Cell 5, immediately before calling the training function.
+
+---
+
+## Final Gate Discrepancy (Known Behaviour)
+
+At the end of `train_field()` (and equivalent training scripts), a final gate check  
+runs on the **in-memory model** after the last `field.settle()` call. This sometimes  
+reports `⚠ NOT YET` even when the **saved checkpoint** (which captured the best gate  
+crossing during training) actually passes all thresholds.
+
+**Rule:** The saved checkpoint is the source of truth.  
+Cell 6 (Training Diagnostics) loads from the checkpoint file — its verdict supersedes  
+the final in-memory gate printed at the end of Cell 5.
+
+Do not block progression on the end-of-training gate printout alone. Trust Cell 6.
 
 ---
 

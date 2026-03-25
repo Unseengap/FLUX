@@ -52,10 +52,14 @@ from flux_utils import PhaseLogger, PhaseResults, get_device, save_checkpoint, u
 
 
 # ─────────────────────────────────────────────
-# Training Corpus (same as Phase 1 for consistency)
+# Training Corpus
 # ─────────────────────────────────────────────
+# Offline fallback — used when HuggingFace datasets are unavailable.
+# build_corpus_for_phase2() tries to load the same rich corpus as Phase 1
+# (WikiText-103 + TinyStories + CodeSearchNet + OPUS-100 + MATH-500).
+# If all sources fail this list is used instead.
 
-TRAINING_TEXTS: List[str] = [
+_FALLBACK_TEXTS: List[str] = [
     "The quick brown fox jumps over the lazy dog.",
     "Machine learning models translate patterns in data into actionable predictions.",
     "Physics describes the fundamental laws that govern the behavior of matter and energy.",
@@ -77,6 +81,32 @@ TRAINING_TEXTS: List[str] = [
     "Water freezes at zero degrees Celsius",
     "Energy equals mass times the speed of light squared",
 ]
+
+
+def build_corpus_for_phase2() -> List[str]:
+    """
+    Build the Phase 2 training corpus using the same pipeline as Phase 1.
+
+    Delegates to train_codec.build_training_corpus() which pulls from:
+      WikiText-103, TinyStories, CodeSearchNet, OPUS-100 multilingual,
+      GSM8K (reasoning), MATH-500 (symbolic math).
+
+    Falls back to _FALLBACK_TEXTS if the datasets library is unavailable
+    or all remote sources fail.
+
+    Returns:
+        List of training strings (~20,000 when online, 20 when offline)
+    """
+    try:
+        from train_codec import build_training_corpus
+        corpus = build_training_corpus(target_size=20_000)
+        print(f"  ✓ Training corpus: {len(corpus):,} strings (from HuggingFace datasets)",
+              flush=True)
+        return corpus
+    except Exception as _e:
+        print(f"  ⚠ build_training_corpus failed ({_e}) — using offline fallback "
+              f"({len(_FALLBACK_TEXTS)} strings)", flush=True)
+        return list(_FALLBACK_TEXTS)
 
 
 # ─────────────────────────────────────────────
@@ -261,6 +291,12 @@ def train_field(
         log.error(f"Phase 1 v2 checkpoint not found!\n  {_e}")
         raise
 
+    # ── Build training corpus (same rich sources as Phase 1) ─────────
+    log.info("Building training corpus (WikiText-103 + TinyStories + CodeSearchNet + "
+             "OPUS-100 + MATH-500)...")
+    texts = build_corpus_for_phase2()
+    log.info(f"Corpus size: {len(texts):,} strings")
+
     # ── Build Phase 2 components ─────────────────────────────────────
     field  = ResonanceField().to(device)
     bridge = FieldBridge().to(device)
@@ -290,7 +326,7 @@ def train_field(
     best_decode_loss = float('inf')
 
     # ── Training loop ─────────────────────────────────────────────────
-    texts = TRAINING_TEXTS
+    # texts already built above via build_corpus_for_phase2()
     bridge.train()
     field.wave_to_location.train()
     field.wave_to_feature.train()
@@ -334,13 +370,21 @@ def train_field(
         total_recon = recon_loss + 0.5 * cos_loss
 
         # 2. Decode: WTT(reconstructed_wave) ≈ original bytes
-        # Reconstructed waves go through the FROZEN WTT
-        decode_loss = wtt.forward_batch(reconstructed, tgt_list)
+        # cuDNN GRU backward MUST be called while:
+        #   (a) cuDNN is DISABLED — torch.backends.cudnn.flags(enabled=False)
+        #   (b) wtt is in TRAIN mode — enforced explicitly here
+        # Both the forward AND backward must happen inside the same context
+        # because backward() re-enters the cuDNN kernel.  Previously backward()
+        # was called outside the `with` block triggering the RuntimeError.
+        wtt.train()  # explicit guard — freezing only zeroes grad, not train mode
+        with torch.backends.cudnn.flags(enabled=False):
+            decode_loss = wtt.forward_batch(reconstructed, tgt_list)
+            total_loss  = recon_loss_weight * total_recon + decode_loss_weight * decode_loss
 
-        total_loss = recon_loss_weight * total_recon + decode_loss_weight * decode_loss
+            if total_loss.requires_grad:
+                total_loss.backward()
 
         if total_loss.requires_grad:
-            total_loss.backward()
             torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=1.0)
             optimizer.step()
 
