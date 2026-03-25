@@ -409,3 +409,334 @@
   Output: zo s  Go  o ma r F t   u t   t ar m   u t  at
 
 [02:20:37]   ◼ CELL Cell 8c — WG Diag — PASS
+
+
+
+
+
+# Cell 9b — Stage 4: Joint fine-tuning
+log.cell_start("Cell 9b — Joint FT Train")
+joint_result = trainer.train_joint_finetune(
+    train_texts, max_steps=2000, log_interval=200,
+    precomputed=precomputed,
+)
+log.metric("joint_cos_acc", f"{joint_result.wave_cosine_accuracy:.3f}")
+log.metric("joint_wtt_acc", f"{joint_result.wtt_word_accuracy:.1%}")
+log.cell_end("Cell 9b — Joint FT Train", "PASS")
+
+
+
+[02:43:46] 
+▶ CELL: Cell 9b — Joint FT Train
+[02:43:46]   Started: 2026-03-25 02:43:46
+
+============================================================
+  Stage 3: Joint Fine-Tuning — max_steps=2000
+============================================================
+  Trainable: WG 3,187,234 + WTT 440,705 = 3,627,939 params
+  LR: 0.000150  |  Grad accum: 4  |  SS: 0.5
+
+  ℹ Evaluating WTT word accuracy on 50 texts...
+
+  ✓ Stage 3 complete: 2000 steps (2000 skipped)
+    Combined loss: 0.0000  (mse=0.0000 + wtt=0.0000)
+    Cosine Acc:    0.000
+    WTT Word Acc:  78.8%
+    Training time: 625.7s (10.4 min)
+    Total time:    625.7s (10.4 min)
+    Throughput:    3.2 step/s
+[02:54:12]   📊 joint_cos_acc: 0.000
+[02:54:12]   📊 joint_wtt_acc: 78.8%
+[02:54:12]   ◼ CELL Cell 9b — Joint FT Train — PASS
+
+
+
+
+
+[02:54:22] 
+▶ CELL: Cell 9c — Joint FT Diag
+[02:54:22]   Started: 2026-03-25 02:54:22
+  📊 Post-Joint Generation (5 prompts)
+  ============================================================
+  Prompt: The relationship between energy and matter
+  Output: SD ow  C at t  t   a ta  u t  m  ro n h  u  u ta t  t   j o p
+
+  Prompt: Modern technology relies on
+  Output: Ek ut e be   u s   u og f   l t  w  og t   a t a t  at  u t  f
+
+  Prompt: In the year 2025, scientists proved that
+  Output: x at at at  au t  o t  nu ho  u ue   s t   u  z  u ca  u t  t
+
+  Prompt: The history of mathematics reveals
+  Output: De y  at t t   u at  m  u at  u at t   u  u  u  u t  me   t
+
+  Prompt: Research shows that quantum
+  Output: Th y   D  z  u t   o t   m  u t  t  t  re  ow l  t a at y  t
+
+  Valid word rate: 100.0% (30/30)
+[02:54:23]   📊 valid_word_rate: 100.0%
+[02:54:23]   ◼ CELL Cell 9c — Joint FT Diag — PASS
+
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 9 → Phase 9.5 HANDOFF DOCUMENT
+# ═══════════════════════════════════════════════════════════════
+#
+# This is the complete handoff for building Phase 9.5.
+# Read this ENTIRE section before writing any code.
+#
+# ═══════════════════════════════════════════════════════════════
+
+
+## 1. CHECKPOINT — phase9.phase.pt IS SELF-CONTAINED
+
+**CRITICAL: Phase 9.5 only needs to load ONE file: `checkpoints/phase9.phase.pt`**
+
+This single checkpoint contains the FULL state of every component from Phases 1–7
+plus all Phase 9 modules. You do NOT need phase7.phase.pt or any earlier checkpoint.
+
+### Exact keys inside phase9.phase.pt:
+
+**Phase 1–7 frozen components (all stored as state_dicts):**
+| Key in checkpoint            | Component                  | Params    |
+|------------------------------|----------------------------|-----------|
+| `cse_state_dict`             | ContinuousSemanticEncoder  | Phase 1   |
+| `field_state_dict`           | ResonanceField (75,561 attractors) | Phase 2 |
+| `gr_state`                   | GravitationalRelevance     | Phase 3   |
+| `tl_state`                   | ThermodynamicLearner       | Phase 4   |
+| `cgn_state`                  | CausalGeometryNode         | Phase 5   |
+| `causal_graph_state`         | CausalGraph                | Phase 5   |
+| `working_memory_state`       | WorkingMemory              | Phase 6   |
+| `episodic_memory_state`      | EpisodicMemory             | Phase 6   |
+| `semantic_memory_state`      | SemanticMemory             | Phase 6   |
+| `router_state`               | MemoryRouter               | Phase 6   |
+| `wave_to_field_state`        | Linear(432→512)            | Bridge    |
+| `field_to_wave_state`        | Linear(512→432)            | Bridge    |
+| `output_head_state`          | OutputHead                 | Phase 7   |
+
+**Phase 9 new components:**
+| Key in checkpoint            | Component      | Status                      |
+|------------------------------|----------------|-----------------------------|
+| `wave_chunker_state_dict`    | WaveChunker    | TRAINED — KEEP, freeze      |
+| `wave_generator_state_dict`  | WaveGenerator  | MODE-COLLAPSED — DISCARD    |
+| `wave_to_text_state_dict`    | WaveToText     | TRAINED — KEEP, freeze      |
+
+**Metadata keys:**
+| Key                | Contents                                          |
+|--------------------|---------------------------------------------------|
+| `config`           | FLUXModel config dict (wave_dim=432, field_features=512, etc.) |
+| `phase9_config`    | Phase 9 specific config                           |
+| `metrics`          | Training metrics from Phase 9                     |
+
+### How to load in Phase 9.5:
+
+```python
+checkpoint = torch.load('checkpoints/phase9.phase.pt', map_location='cpu')
+
+# Rebuild FLUXModel and load ALL Phase 1-7 states from this checkpoint
+model = build_flux_from_config(checkpoint['config'])
+model.cse.load_state_dict(checkpoint['cse_state_dict'])
+model.field.load_state_dict(checkpoint['field_state_dict'])
+# ... etc for all frozen components ...
+
+# Load TRAINED Phase 9 components (freeze them)
+wave_chunker.load_state_dict(checkpoint['wave_chunker_state_dict'])
+wave_to_text.load_state_dict(checkpoint['wave_to_text_state_dict'])
+for p in wave_chunker.parameters(): p.requires_grad = False
+for p in wave_to_text.parameters(): p.requires_grad = False
+
+# IGNORE checkpoint['wave_generator_state_dict'] — build fresh WaveGenerator
+wave_generator = WaveGenerator(...)  # random init, this is what we're retraining
+```
+
+### Bridge details (important):
+- `wave_to_field`: Linear(432→512), patched from `field.wave_to_feature` (Phase 2 trained weight)
+- `field_to_wave`: Linear(512→432), pseudoinverse of wave_to_field
+- Round-trip cosine verified at 1.000
+- These are in the checkpoint as `wave_to_field_state` and `field_to_wave_state`
+
+
+## 2. WHAT PHASE 9 PRODUCED — KEEP FROZEN
+
+| Component         | Status   | Metric                                    | Action       |
+|-------------------|----------|-------------------------------------------|--------------|
+| WaveToText (WTT)  | TRAINED  | loss=0.13, word_acc=79.8%, chunk_acc=82.8%| Load, freeze |
+| WaveChunker       | TRAINED  | 374,112 params, works correctly           | Load, freeze |
+| FLUXModel (Ph1-7) | FROZEN   | CSE, Field(75,561 attractors), GR, TL, CGN, Memory, bridges | Load, freeze |
+
+### WTT details:
+- Trained 25,000 steps at 74.3 step/s, batch_size=32
+- Converts wave chunks [432] → byte sequences (spelling)
+- forward_batch() supports batched training
+- 82.8% chunk-level accuracy, 79.8% word-level accuracy on spelling test
+- This component WORKS — do not retrain it
+
+### WaveChunker details:
+- Splits continuous wave sequences into discrete chunks
+- Each chunk is [432] dimensional (TOTAL_WAVE_DIM)
+- Works correctly — do not retrain it
+
+### Field details:
+- 75,561 attractors populated from 153 texts (200,000 perturbs)
+- field.query() returns top-k attractor features [512]
+- GravitationalRelevance selects attractors by mass/distance (O(log n))
+
+
+## 3. WHAT FAILED — DISCARD AND REBUILD
+
+### WaveGenerator — MODE COLLAPSED
+- Architecture: GRU-based, gru_hidden=512, 3,187,234 params
+- Input per step: [1, 1, 864] = concat(prev_wave[432], context[432])
+- `context_to_hidden`: Linear(512→512) maps merged context → initial GRU hidden state
+- **EVIDENCE OF COLLAPSE:**
+  - Merged context vectors: avg pairwise cosine = 0.980 across DIFFERENT inputs
+  - context_to_hidden output: cross-context cosine = 0.996 (nearly identical for all inputs)
+  - Wave 0 output: cross-context cosine = 1.000 (IDENTICAL output regardless of input)
+  - Loss plateau: hit 1.29 at step 400, barely moved for remaining 7,600 steps
+  - Free generation output: random gibberish ("a s y  y   u u m t Fk...")
+- **THE MODEL LEARNED TO COPY prev_wave AND IGNORE CONTEXT ENTIRELY**
+
+### Joint Fine-Tuning (Stage 3) — COMPLETE NO-OP
+- 2000 steps scheduled, 2000 steps SILENTLY SKIPPED
+- `except Exception: _skipped += 1; continue` caught and hid every error
+- Combined loss = 0.0000, cosine accuracy = 0.000 — literally zero work done
+- The exception was never logged — we don't know what the error was
+- Reported "PASS" despite doing nothing
+
+### Precomputed Data — BIASED AND FIXED
+- 8,500 samples, ALL exactly 40 chunks, ALL starting from position 0
+- `_start = 0` was hardcoded in `_precompute_wg_data()` (~line 907 in train_wave_gen.py)
+- `_MAX_CHUNKS = 40` — no variation in sequence length
+- The model only ever saw the first 80 bytes of every document
+- Zero diversity in chunk count or document position
+
+
+## 4. ROOT CAUSES — ALL 6 MUST BE FIXED
+
+### Bug 1: Context Collapse
+- **Where**: Precomputed merged vectors (output of CSE → wave_to_field → GR → CGN → field.query)
+- **Evidence**: Avg pairwise cosine = 0.980 across different texts
+- **Why it breaks training**: GRU receives nearly identical context for every input,
+  so it learns to ignore it and rely solely on teacher-forced prev_wave
+- **Fix**: L2-normalize merged vectors before feeding to GRU. Add contrastive loss
+  that penalizes same hidden states for different contexts. Consider projecting through
+  a decorrelation layer. Or: instead of a single merged [512] vector, keep top-k
+  attractor features as a sequence and use cross-attention.
+
+### Bug 2: Fixed 40 Chunks from Position 0
+- **Where**: `_precompute_wg_data()` in `train_wave_gen.py`, ~line 907
+- **Code**: `_start = 0` (hardcoded), `_MAX_CHUNKS = 40` (no variation)
+- **Why it breaks training**: Model only sees first ~80 bytes of documents.
+  All sequences same length → no learning of variable-length generation.
+- **Fix**: `_start = random.randint(0, max(0, total_chunks - max_len))`.
+  Sample chunk counts from `randint(5, 40)` per example.
+
+### Bug 3: Batch Size 1, 17% GPU Utilization
+- **Where**: `train_wave_generator()` loop — processes one sample at a time,
+  one GRU step at a time, in a Python for-loop
+- **Evidence**: 17.4 step/s on T4 (22.5GB), only 3.9GB used
+- **Why it's slow**: Each GRU call processes tensor [1, 1, 864]. Python loop overhead
+  dominates. GPU starved for work.
+- **Fix**: Batch multiple sequences. Use `pack_padded_sequence` for variable lengths.
+  Process entire sequence in one GRU call: [batch, seq_len, 864] → [batch, seq_len, 512].
+  Target batch_size=128+, keep precomputed tensors on GPU (~600MB easily fits in 22.5GB).
+  Target: >500 steps/s (Phase 9 achieved only 17.4).
+
+### Bug 4: Scheduled Sampling Started at 0%
+- **Where**: `train_wave_generator()` — ss_p=0.00 for first 1600 steps (warmup=1600)
+- **Evidence**: Logs show `ss_p=0.00` from step 1 to step 1600
+- **Why it breaks training**: For 1600 steps (20% of training), the model ALWAYS gets
+  the ground-truth previous wave. It learns to be a copy machine. By step 400 loss
+  plateaus at ~1.29 and barely decreases again. When ss_p finally ramps up, the model
+  has already learned bad habits.
+- **Fix**: Start ss_p at 0.5 from step 1, or higher. Better yet: use a curriculum that
+  starts with short free-running windows (2-3 steps) and grows to full sequence.
+  At minimum, never let ss_p be 0.0 after the first 100 warmup steps.
+
+### Bug 5: Training-Inference Mismatch
+- **Where**: Training uses static precomputed merged vector. Inference (`generate_text()`)
+  uses dynamic `query_field_attractors()` which re-queries the field at each step.
+- **Evidence**: The model never saw attractor-sampled context during training.
+  At inference time, the field returns different (potentially noisy) results.
+- **Fix**: Either train with live field queries (slower but faithful), or add noise/
+  augmentation to precomputed contexts during training. At minimum, during fine-tuning
+  stage, switch to live field queries to close the gap.
+
+### Bug 6: Silent Error Swallowing in Joint FT
+- **Where**: `train_joint_finetune()` in `train_wave_gen.py`
+- **Code**: `except Exception: _skipped += 1; continue` — catches ALL exceptions
+- **Evidence**: 2000/2000 steps skipped, loss=0.0000, reported "PASS"
+- **Fix**: Log the FULL exception traceback for at least the first 5 errors.
+  If skip_rate > 10%, abort training and report FAIL. Never use bare
+  `except Exception: continue` in a training loop.
+
+
+## 5. PHASE 9.5 IMPLEMENTATION PLAN
+
+### Goal
+Retrain ONLY the WaveGenerator from scratch. Everything else stays frozen from phase9.phase.pt.
+
+### Architecture (keep or modify)
+The GRU architecture in `phases/phase9/wave_generator.py` is structurally sound:
+- GRU hidden dim 512, input = concat(prev_wave[432], context[432]) = [864]
+- `context_to_hidden`: maps merged context → initial hidden state
+- `wave_project_out`: maps GRU output → predicted next wave [432]
+- `query_field_attractors()`: dynamic field re-query at inference
+
+Consider adding:
+- `context_projection`: decorrelation layer before context_to_hidden
+- Dropout on GRU output (0.1-0.2)
+- LayerNorm on context before concat
+
+### Training Stages for 9.5
+
+**Stage 1: WaveGenerator Training (MAIN FOCUS)**
+- Load phase9.phase.pt, restore everything, freeze all except fresh WaveGenerator
+- Precompute data with RANDOM windows and VARIABLE lengths
+- Batch_size=128+, pack_padded_sequence for GRU
+- Scheduled sampling at 50% from start, ramp to 90%
+- Train 15,000-20,000 steps (more steps since now much faster per step)
+- Add context contrastive loss: different inputs must produce different Wave 0
+
+**Stage 2: Joint Fine-Tuning (WG + WTT together)**
+- Unfreeze WTT alongside WG
+- Lower LR (e.g., 1e-4 for WG, 5e-5 for WTT)
+- MUST have proper error handling — log exceptions, abort on >10% skip rate
+- 3,000 steps with live field queries (close training-inference gap)
+
+**Stage 3: Evaluation**
+- Cross-context Wave 0 cosine MUST be < 0.85 (was 1.000 in Phase 9)
+- Hidden init cross-context cosine MUST be < 0.90 (was 0.996)
+- Free generation must produce recognizable English words
+- GPU utilization > 60% (was 17%)
+- Training speed > 200 steps/s (was 17.4)
+- No silently skipped steps
+- Loss must still be decreasing at end of training
+
+### Key Dimensions Reference
+```
+wave_dim        = 432  (TOTAL_WAVE_DIM = phonetic:64 + syntactic:64 + semantic:256 + temporal:32 + intensity:16)
+field_features  = 512
+gru_hidden      = 512
+gru_input       = 864  (prev_wave:432 + context:432)
+field_to_wave   = Linear(512→432)  — pseudoinverse of wave_to_field
+wave_to_field   = Linear(432→512)  — patched from field.wave_to_feature (Phase 2)
+```
+
+### File References
+- Phase 9 training script: `phases/phase9/train_wave_gen.py` (1927 lines) — reference for loading logic
+- WaveGenerator module: `phases/phase9/wave_generator.py` (473 lines) — GRU architecture
+- WaveToText module: `phases/phase9/wave_to_text.py` (229 lines) — keep frozen
+- FLUXModel construction: see `build_flux_for_phase9()` in train_wave_gen.py
+- Bridge patching: see `_patch_bridges_from_field()` in train_wave_gen.py
+- Checkpoint save format: see `save_phase9_checkpoint()` at line 1452 in train_wave_gen.py
+- flux_utils.py: shared utilities (save/load checkpoint, PhaseLogger, PhaseResults, get_device)
+
+### Success Criteria (before declaring Phase 9.5 complete)
+1. Free generation produces readable multi-word English output for 5+ different prompts
+2. Cross-context Wave 0 cosine < 0.85
+3. Hidden init cross-context cosine < 0.90
+4. Training loss steadily decreasing (no plateau after step 400)
+5. GPU utilization > 60% on T4
+6. Zero silently skipped training steps
+7. Joint FT actually runs and improves metrics
