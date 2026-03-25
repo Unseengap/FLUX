@@ -1,8 +1,14 @@
 # Phase 9 Specification: Wave-Level Generation (WLG)
 ## The Universal Generation Engine — Thinking in Waves, Not Bytes
 
-> Prerequisites: Phase 8 checkpoint must exist (field, GR, bridges, memory).
+> Prerequisites: Phase 7 checkpoint must exist (field, GR, bridges, memory).
 > Copilot: Open SPECIFICATION.md + flux-domanant-domains.md + this file while building.
+>
+> **Implementation Note (updated):** The actual implementation uses `FLUXModel` (512-dim
+> field_features) loaded from Phase 7, not `FLUXLarge` (768-dim) from Phase 8. The
+> WaveGenerator uses a GRU-based architecture (v2) instead of the originally specified
+> pure-physics MLP. These changes were made to resolve mode-collapse issues and because
+> Phase 8 was not available. See "Implementation Deviations" section at the end.
 >
 > **This is the phase where FLUX stops spelling letter by letter and starts thinking in concepts.**
 > Phase 8 proved FLUX can generate bytes. Phase 9 replaces byte-by-byte generation with
@@ -73,9 +79,9 @@ phases/phase9/
 
 ---
 
-## Load Phase 8 Components (Skip the Decoder)
+## Load Phase 7 Components (Skip the Decoder)
 
-Every Phase 9 script loads the trained FLUX components and **ignores** the WaveDecoder:
+Every Phase 9 script loads the trained FLUX components from Phase 7:
 
 ```python
 import sys
@@ -89,27 +95,26 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'phase4'))
 sys.path.insert(0, str(Path(__file__).parent.parent / 'phase5'))
 sys.path.insert(0, str(Path(__file__).parent.parent / 'phase6'))
 sys.path.insert(0, str(Path(__file__).parent.parent / 'phase7'))
-sys.path.insert(0, str(Path(__file__).parent.parent / 'phase8'))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from flux_utils import load_checkpoint, save_checkpoint
-from flux_large import FLUXLarge
+from flux_model import FLUXModel
 
-def load_phase8_components(device: str = 'cpu') -> FLUXLarge:
+def load_phase7_components(device: str = 'cpu') -> FLUXModel:
     """
-    Load Phase 8 FLUX components. The WaveDecoder is NOT used.
+    Load Phase 7 FLUX components. Bridges are PATCHED from field.wave_to_feature.
 
-    Loads: CSE, Field, GR, TL, CGN, Memory, Bridges
-    Ignores: WaveDecoder (replaced by WaveGenerator + WaveToText)
+    Loads: CSE, Field, GR, TL, CGN, Memory, Bridges (patched)
+    Patches: wave_to_field := field.wave_to_feature (Phase 2 trained)
+             field_to_wave := pseudoinverse of above (math-optimal)
     """
-    model = FLUXLarge.from_phase8_checkpoint(device=device)
+    model = FLUXModel.from_phase7_checkpoint(device=device)
 
     # Freeze everything — Phase 9 only trains the new generation modules
     for param in model.parameters():
         param.requires_grad = False
 
-    print("  ✓ Phase 8 components loaded (field, GR, memory, bridges)")
-    print("  ✗ WaveDecoder skipped — replaced by WaveGenerator")
+    print("  ✓ Phase 7 components loaded (field, GR, memory, bridges patched)")
     return model
 ```
 
@@ -126,12 +131,12 @@ Input: "The future of artificial intelligence is"
          ▼
     wave_sequence: [seq, 432]  — input waves from CSE
          │
-         ├──→ Field.query()  → field_features [768]
-         ├──→ GR.forward()   → relevant context [768]
-         └──→ CGN.forward()  → causal context [768]
+         ├──→ Field.query()  → field_features [512]
+         ├──→ GR.forward()   → relevant context [512]
+         └──→ CGN.forward()  → causal context [512]
                   │
                   ▼
-            merged_context [768]
+            merged_context [512]
                   │
          ┌───────┴───────┐
          │               │
@@ -263,65 +268,63 @@ class WaveChunker(nn.Module):
 
 ---
 
-## Component 2: WaveGenerator — The Universal Core
+## Component 2: WaveGenerator — The Universal Core (v2: GRU-Based)
 
 ### This is the reusable piece for ALL modalities.
 
 The WaveGenerator predicts the next wave given:
-1. Previous generated waves (autoregressive wave context)
+1. Previous generated waves (GRU hidden state carries temporal context)
 2. Field context (what the model knows)
 3. Gravitational pull from the field (what's most relevant)
 
-**No GRU. No attention. Pure physics.**
+**Architecture change (v2):** The original spec used a pure-physics MLP with
+explicit interference signals. The v2 implementation uses a GRU recurrent core
+that naturally accumulates temporal context in its hidden state, which resolved
+mode-collapse issues seen with the stateless MLP approach. The GRU hidden is
+initialized FROM the field context (not zeros), making Wave 0 context-dependent.
 
 ```python
 class WaveGenerator(nn.Module):
     """
-    Universal wave sequence generator. Predicts the next 432-dim wave
-    from context and previous waves using FLUX physics.
+    GRU-based universal wave sequence generator. Predicts the next 432-dim
+    wave from context and previous waves using a recurrent core.
 
     This module is MODALITY-AGNOSTIC. It generates waves. What those
-    waves represent (text, image, audio, molecules) depends on what
-    encoder created the input waves and what decoder converts the
-    output waves.
+    waves represent depends on the encoder/decoder pair.
 
-    Generation mechanism:
-        1. RE-QUERY the field at each step using the latest wave → dynamic context
-        2. GR returns a NEIGHBORHOOD of attractors → multiple valid next concepts
-        3. Apply interference between previous waves → coherence signal
-        4. Combine attractor neighborhood + interference → predict next wave
-        5. Thermodynamic confidence → how certain is this prediction
-
-    Why dynamic re-query matters:
-        Static context (query once, reuse) means "Hello" always generates "Hello".
-        Dynamic re-query means each step sees the full attractor neighborhood —
-        "Hello", "Hey", "Hi" are all nearby attractors with similar mass.
-        The sampler picks one based on temperature. This is how FLUX "knows"
-        there are many ways to express the same concept.
-
-    No GRU. No attention. No Transformer components.
+    Key design choices:
+        - GRU hidden state replaces explicit interference signal
+        - Hidden initialized FROM field context (prevents context collapse)
+        - Scheduled sampling during training (exposure bias fix)
+        - Contrastive loss pushes different inputs apart
+        - Dynamic field re-query at inference for semantic diversity
 
     Args:
         wave_dim: Wave dimension (432)
-        field_features: Field feature dimension (768 for FLUXLarge)
+        field_features: Field feature dimension (512 for FLUXModel)
         max_waves: Maximum waves to generate (50)
         k_neighbors: Gravitational readout neighbors (16)
         interference_radius: How many previous waves influence the next (4)
+        gru_hidden: GRU hidden dimension (512)
+        gru_layers: Number of GRU layers (1)
     """
 
     def __init__(
         self,
         wave_dim: int = 432,
-        field_features: int = 768,
+        field_features: int = 512,
         max_waves: int = 50,
         k_neighbors: int = 16,
         interference_radius: int = 4,
+        gru_hidden: int = 512,
+        gru_layers: int = 1,
     ):
         super().__init__()
         self.wave_dim = wave_dim
         self.field_features = field_features
         self.max_waves = max_waves
         self.interference_radius = interference_radius
+        self.gru_hidden = gru_hidden
 
         # ── Context bridge: field features → wave space ──
         self.context_to_wave = nn.Sequential(
@@ -330,248 +333,179 @@ class WaveGenerator(nn.Module):
             nn.Linear(wave_dim, wave_dim),
         )
 
-        # ── Attractor selector: pick ONE attractor per step (not average) ──
-        # GR returns K neighbors. This scores them. Then we SAMPLE one.
-        # This is what makes generation truly generative (like LLM token sampling):
-        #   LLM:  softmax over vocab → sample one token
-        #   FLUX: gravity over attractors → sample one wave
-        self.attractor_scorer = nn.Sequential(
-            nn.Linear(wave_dim * 2, wave_dim),  # [current_wave + attractor] → score
-            nn.GELU(),
-            nn.Linear(wave_dim, 1),              # → scalar logit
+        # ── GRU core: carries temporal state between wave predictions ──
+        # Input: [prev_wave (432) + context_wave (432)] = 864
+        self.wave_gru = nn.GRU(
+            input_size=wave_dim * 2,
+            hidden_size=gru_hidden,
+            num_layers=gru_layers,
+            batch_first=False,
         )
 
-        # ── Wave predictor: previous_wave + context → next_wave ──
-        # Input: [prev_wave (432) + interference_signal (432) + context (432)] = 1296
-        self.wave_predictor = nn.Sequential(
-            nn.Linear(wave_dim * 3, wave_dim * 2),
-            nn.GELU(),
-            nn.LayerNorm(wave_dim * 2),
-            nn.Linear(wave_dim * 2, wave_dim),
+        # ── GRU output → next wave prediction ──
+        self.gru_to_wave = nn.Sequential(
+            nn.Linear(gru_hidden, wave_dim),
             nn.Tanh(),  # Bounded output — waves are normalized
         )
 
-        # ── Confidence head: how sure is this prediction? ──
-        # Used by thermodynamic sampler to decide when to stop
+        # ── Attractor selector: pick ONE attractor per step (not average) ──
+        self.attractor_scorer = nn.Sequential(
+            nn.Linear(wave_dim * 2, wave_dim),
+            nn.GELU(),
+            nn.Linear(wave_dim, 1),
+        )
+
+        # ── Confidence head ──
         self.confidence_head = nn.Sequential(
-            nn.Linear(wave_dim, 128),
+            nn.Linear(gru_hidden, 128),
             nn.GELU(),
             nn.Linear(128, 1),
             nn.Sigmoid(),
         )
 
+        # ── Context → GRU hidden state (prevents context collapse) ──
+        self.context_to_hidden = nn.Sequential(
+            nn.Linear(field_features, gru_hidden),
+            nn.Tanh(),
+        )
+
         # ── Learned start-of-sequence wave ──
         self.bos_wave = nn.Parameter(torch.randn(wave_dim) * 0.01)
 
-    def compute_interference_signal(self, generated_waves: List[torch.Tensor]) -> torch.Tensor:
+    def init_hidden(self, device=None, field_context=None):
+        """Initialize GRU hidden state from field context (or zeros)."""
+        if device is None:
+            device = self.bos_wave.device
+        if field_context is not None:
+            h = self.context_to_hidden(field_context)
+            return h.unsqueeze(0).unsqueeze(0).expand(
+                self.gru_layers, 1, self.gru_hidden
+            ).contiguous()
+        return torch.zeros(self.gru_layers, 1, self.gru_hidden, device=device)
+
+    def forward_step(self, prev_wave, context_wave, hidden):
         """
-        Compute interference from recently generated waves.
-
-        Nearby waves in the output sequence interfere constructively
-        (reinforcing coherent themes) or destructively (reducing
-        contradictory signals). This is Phase 1's interference
-        physics applied to the output sequence.
-
-        Args:
-            generated_waves: List of [432] previously generated waves
-
-        Returns:
-            [432] interference signal for the next position
-        """
-        if len(generated_waves) == 0:
-            return torch.zeros(self.wave_dim, device=self.bos_wave.device)
-
-        # Stack recent waves (up to interference_radius)
-        recent = generated_waves[-self.interference_radius:]
-        stacked = torch.stack(recent)  # [R, 432]
-
-        # Apply neighborhood interference
-        from interference import apply_neighborhood_interference
-        interfered = apply_neighborhood_interference(
-            stacked, radius=len(recent) - 1, scale=0.1
-        )
-
-        # The interference signal is the last position after interference
-        return interfered[-1]
-
-    def forward_step(
-        self,
-        prev_wave: torch.Tensor,
-        interference_signal: torch.Tensor,
-        context_wave: torch.Tensor,
-    ) -> Tuple[torch.Tensor, float]:
-        """
-        Predict the next wave from previous wave + interference + context.
+        Predict the next wave using GRU.
 
         Args:
             prev_wave: [432] the most recent generated wave
-            interference_signal: [432] coherence signal from recent waves
             context_wave: [432] field context projected to wave space
+            hidden: [gru_layers, 1, gru_hidden] GRU hidden state
 
         Returns:
-            (next_wave [432], confidence [0, 1])
+            (next_wave [432], confidence float, new_hidden)
         """
-        combined = torch.cat([prev_wave, interference_signal, context_wave])
-        next_wave = self.wave_predictor(combined)
-        confidence = self.confidence_head(next_wave).item()
-        return next_wave, confidence
+        gru_input = torch.cat([prev_wave, context_wave]).unsqueeze(0).unsqueeze(0)
+        gru_out, new_hidden = self.wave_gru(gru_input, hidden)
+        gru_feat = gru_out.squeeze(0).squeeze(0)
+        next_wave = self.gru_to_wave(gru_feat)
+        confidence = self.confidence_head(gru_feat).item()
+        return next_wave, confidence, new_hidden
 
-    def query_field_attractors(
-        self,
-        query_wave: torch.Tensor,
-        flux_model,
-        temperature: float = 1.0,
-    ) -> torch.Tensor:
+    def query_field_attractors(self, query_wave, flux_model, temperature=1.0):
         """
         Re-query the field and SAMPLE one attractor (not average them).
 
-        This is the core of true generative behavior:
-            LLM:  softmax(logits / T) → multinomial → one token
-            FLUX: softmax(scores / T) → multinomial → one attractor wave
-
-        Same prompt, different attractor sampled each time → different
-        words, different phrasings, different ideas. The field topology
-        guarantees only VALID alternatives get sampled ("keyboard" won't
-        appear in a greeting cluster).
+        LLM:  softmax(logits / T) → multinomial → one token
+        FLUX: softmax(scores / T) → multinomial → one attractor wave
 
         Args:
-            query_wave: [432] the most recent wave (used as field query)
-            flux_model: FLUXLarge instance (for field + GR access)
-            temperature: Sampling temperature (higher = more diverse)
+            query_wave: [432] the most recent wave
+            flux_model: FLUXModel instance (for field + GR access)
+            temperature: Sampling temperature
 
         Returns:
-            [432] one sampled attractor's wave (not an average)
+            [432] one sampled attractor's wave
         """
-        # Project wave to field space and query
-        wave_in_field = flux_model.wave_to_field(query_wave.unsqueeze(0))  # [1, 768]
+        # Query field directly with the 432-dim wave
+        field_feats, sims, locs = flux_model.field.query(query_wave, k=self.k_neighbors)
+        if field_feats is None or field_feats.shape[0] == 0:
+            fallback = flux_model.wave_to_field(query_wave.unsqueeze(0)).squeeze(0)
+            return self.context_to_wave(fallback)
 
-        # GR returns K nearest attractors weighted by mass
-        # This is O(log n) — the whole point of gravitational relevance
-        neighbors = flux_model.gr.query(
-            wave_in_field.squeeze(0),
-            k=self.k_neighbors,
-        )  # List of (feature [768], mass, distance)
-
-        if not neighbors:
-            return self.context_to_wave(wave_in_field.squeeze(0))
-
-        # Convert each neighbor to wave space and score it
         attractor_waves = []
         logits = []
-        for feat, mass, dist in neighbors:
-            nw = self.context_to_wave(feat)  # [432]
+        for j in range(field_feats.shape[0]):
+            nw = self.context_to_wave(field_feats[j])
             attractor_waves.append(nw)
-
-            # Score: learned relevance + physics prior (mass / distance²)
             scorer_input = torch.cat([query_wave, nw])
-            learned_score = self.attractor_scorer(scorer_input)  # [1]
-            physics_prior = torch.log(torch.tensor(mass / max(dist ** 2, 1e-6) + 1e-8))
+            learned_score = self.attractor_scorer(scorer_input)
+            sim_val = sims[j].item() if sims is not None else 0.5
+            physics_prior = torch.tensor(max(sim_val, 1e-6)).log()
             logits.append(learned_score.squeeze() + physics_prior)
 
-        # Stack and sample — THIS is the generative step
-        logits = torch.stack(logits)                          # [K]
-        probs = F.softmax(logits / max(temperature, 1e-8), dim=-1)  # [K]
-        idx = torch.multinomial(probs, 1).item()              # sample ONE
+        logits_t = torch.stack(logits)
+        probs = F.softmax(logits_t / max(temperature, 1e-8), dim=-1)
+        idx = torch.multinomial(probs, 1).item()
+        return attractor_waves[idx]
 
-        return attractor_waves[idx]  # One attractor, not an average
-
-    def generate(
-        self,
-        field_context: torch.Tensor,
-        max_waves: Optional[int] = None,
-        min_confidence: float = 0.1,
-        target_waves: Optional[torch.Tensor] = None,
-        flux_model = None,
-    ) -> Tuple[torch.Tensor, List[float]]:
+    def generate(self, field_context, max_waves=None, min_confidence=0.1,
+                 target_waves=None, flux_model=None, temperature=1.0,
+                 scheduled_sampling_p=0.0):
         """
         Generate a sequence of waves from field context.
 
-        If flux_model is provided, re-queries the field at each step
-        (dynamic context — enables semantic diversity). Otherwise falls
-        back to static context (faster, but less diverse).
+        GRU hidden carries temporal context. If flux_model is provided,
+        re-queries the field at each step for semantic diversity.
 
         Args:
-            field_context: [768] merged field + CGN context (initial)
-            max_waves: Maximum waves to generate (default: self.max_waves)
-            min_confidence: Stop if confidence drops below this
-            target_waves: [N, 432] teacher-forcing targets (training only)
-            flux_model: FLUXLarge instance for dynamic field re-query
-
-        Returns:
-            (generated_waves [N, 432], confidences [N])
+            field_context: [512] merged context
+            max_waves: Maximum waves to generate
+            target_waves: [N, 432] teacher-forcing targets (training)
+            flux_model: FLUXModel for dynamic field re-query
+            scheduled_sampling_p: Prob of using own prediction as prev
         """
         max_waves = max_waves or self.max_waves
-        context_wave = self.context_to_wave(field_context)  # Initial context
-
-        generated = []
-        confidences = []
+        context_wave = self.context_to_wave(field_context)
+        hidden = self.init_hidden(field_context=field_context)
+        generated, confidences = [], []
         prev_wave = self.bos_wave
 
         for i in range(max_waves):
-            interference = self.compute_interference_signal(generated)
-
-            # Dynamic re-query: ask the field "what concepts live near here?"
-            # This is how the model discovers alternatives (many greetings, etc.)
             if flux_model is not None and not self.training:
-                context_wave = self.query_field_attractors(prev_wave, flux_model)
+                context_wave = self.query_field_attractors(
+                    prev_wave, flux_model, temperature)
 
             if target_waves is not None and i < len(target_waves):
-                # Teacher forcing: use actual target wave as input
-                next_wave, conf = self.forward_step(
-                    prev_wave, interference, context_wave
-                )
-                prev_wave = target_waves[i].detach()  # Feed ground truth
+                next_wave, conf, hidden = self.forward_step(
+                    prev_wave, context_wave, hidden)
+                if scheduled_sampling_p > 0 and random.random() < scheduled_sampling_p:
+                    prev_wave = next_wave.detach()
+                else:
+                    prev_wave = target_waves[i].detach()
             else:
-                next_wave, conf = self.forward_step(
-                    prev_wave, interference, context_wave
-                )
+                next_wave, conf, hidden = self.forward_step(
+                    prev_wave, context_wave, hidden)
                 prev_wave = next_wave.detach()
 
             generated.append(next_wave)
             confidences.append(conf)
-
-            # Stop if confidence drops (model is done generating)
             if target_waves is None and conf < min_confidence:
                 break
 
         return torch.stack(generated), confidences
 
-    def forward(
-        self,
-        field_context: torch.Tensor,
-        target_waves: torch.Tensor,
-    ) -> Tuple[torch.Tensor, List[float]]:
-        """
-        Teacher-forced training forward pass (static context — no re-query).
-
-        During training we use static context for stable gradients.
-        During inference, pass flux_model to generate() for dynamic re-query.
-
-        Args:
-            field_context: [768] merged context
-            target_waves: [N, 432] ground truth wave sequence
-
-        Returns:
-            (predicted_waves [N, 432], confidences [N])
-        """
+    def forward(self, field_context, target_waves, scheduled_sampling_p=0.0):
+        """Teacher-forced training forward pass (static context)."""
         return self.generate(
-            field_context,
-            max_waves=len(target_waves),
-            target_waves=target_waves,
-            flux_model=None,  # Static context during training
+            field_context, max_waves=len(target_waves),
+            target_waves=target_waves, flux_model=None,
+            scheduled_sampling_p=scheduled_sampling_p,
         )
 ```
 
-### Parameter count: ~1.2M
+### Parameter count: ~2.4M
 
 | Sub-module | Params |
 |------------|--------|
-| context_to_wave | 432×432 + 432×432 ≈ 373K |
+| context_to_wave | 512×432 + 432×432 ≈ 408K |
+| wave_gru | 864×512 + 512×512 ≈ 1.4M |
+| gru_to_wave | 512×432 ≈ 221K |
 | attractor_scorer | 864×432 + 432×1 ≈ 374K |
-| wave_predictor | 1296×864 + 864×432 ≈ 1.5M |
-| confidence_head | 432×128 + 128 ≈ 55K |
+| confidence_head | 512×128 + 128 ≈ 66K |
+| context_to_hidden | 512×512 ≈ 262K |
 | bos_wave | 432 |
-| **Total** | **~2.3M** |
+| **Total** | **~2.4M** |
 
 ---
 
@@ -845,12 +779,11 @@ that surfaces them. Temperature IS the dial between safe/common and creative/rar
 
 ## Training Strategy
 
-### Two-Stage Joint Training
+### Four-Stage Training
 
-**Stage 1: WaveToText pre-training (fast, ~30 minutes)**
+**Stage 1: WaveToText pre-training (fast, ~15 min)**
 
-Train WaveToText in isolation: given CSE waves for known words, learn to spell them.
-This uses the WaveChunker to get (wave, bytes) pairs from the training data.
+Train WaveToText + WaveChunker in isolation: given CSE waves for known words, learn to spell them.
 
 ```python
 # For each document:
@@ -861,20 +794,45 @@ This uses the WaveChunker to get (wave, bytes) pairs from the training data.
 #      loss = cross_entropy(logits, word_bytes)
 ```
 
-This is embarrassingly parallel — every chunk trains independently. No sequential dependency.
+**Stage 2: Field Population (~5 min)**
 
-**Stage 2: WaveGenerator training (main training, ~4-6 hours)**
-
-Train WaveGenerator to predict next chunk-wave from previous chunk-waves + field context.
-WaveToText is frozen from Stage 1.
+Densify the resonance field with chunk-level attractors. Phase 7 had ~60
+document-level attractors. We add up to 200K chunk-level ones.
 
 ```python
 # For each document:
-#   1. CSE encode → [seq, 432]
-#   2. WaveChunker → chunk_waves [N, 432]
-#   3. FLUX pipeline → field_context [768]
-#   4. WaveGenerator.forward(field_context, chunk_waves) → predicted_waves [N, 432]
-#   5. loss = MSE(predicted_waves, chunk_waves) + cosine_loss
+#   1. CSE encode → wave sequence
+#   2. WaveChunker → chunk waves
+#   3. field.perturb(chunk_wave) → create local attractor
+#   4. Bulk settle field after all perturbs
+```
+
+**Stage 3: WaveGenerator training (main training, ~30 min)**
+
+Train WaveGenerator to predict next chunk-wave from previous chunk-waves + field context.
+WaveToText is frozen from Stage 1. Uses precomputed frozen pipeline outputs.
+
+```python
+# Pre-compute all frozen outputs once:
+#   CSE → wave_to_field → GR → CGN → field query → WaveChunker
+# Training loop (pure GPU):
+#   WaveGenerator.forward(merged_context, chunk_waves) → predicted_waves
+#   loss = MSE + cosine + context_loss + contrastive_loss
+```
+
+Key training techniques:
+- Scheduled sampling (10%→50%) from step 1 to prevent teacher-forcing reliance
+- Context loss: extra penalty on Wave 0 to force context differentiation
+- Contrastive loss: push Wave 0 from different inputs apart
+- GRU hidden initialized FROM context (not zeros)
+
+**Stage 4: Joint fine-tuning (~15 min)**
+
+Fine-tune WaveGenerator + WaveToText together. WG predictions pass through
+WTT — text loss backpropagates into WG.
+
+```python
+# Combined loss = MSE + cosine + 0.5 × WTT_cross_entropy
 ```
 
 ### Loss Functions
@@ -895,40 +853,44 @@ text_loss = F.cross_entropy(logits.view(-1, 257), target_bytes_with_eos.view(-1)
 
 ### Training Data
 
-Same source as Phase 8: OpenWebText 50k docs, streamed.
+Same source as Phase 7/8: OpenWebText, streamed via `datasets`.
 
 ### Training Time Estimates
 
-| Stage | What trains | Steps | Time (A100) |
-|-------|------------|-------|-------------|
-| Stage 1: WaveToText | Spelling only | ~50k chunks | ~30 min |
-| Stage 2: WaveGenerator | Wave prediction | ~47k docs | ~4-6 hours |
-| **Total** | | | **~5-7 hours** |
+| Stage | What trains | Steps | Time (T4/A100) |
+|-------|------------|-------|----------------|
+| Stage 1: WaveToText | Spelling + chunking | ~8K | ~15 min |
+| Stage 2: Field Pop | Chunk-level attractors | N/A (200K perturbs) | ~5 min |
+| Stage 3: WaveGenerator | Wave prediction (GRU) | ~8K | ~30 min |
+| Stage 4: Joint FT | WG + WTT together | ~2K | ~15 min |
+| **Total** | | | **~65 min** |
 
-Phase 8 took ~10 hours. Phase 9 is faster because:
+Training is faster than Phase 8 because:
 - ~15 wave steps per doc instead of ~100 byte steps
 - Shorter backward graph (15 steps vs 100)
 - WaveToText chunks are parallel in Stage 1
+- Precomputed frozen pipeline outputs eliminate CPU bottleneck
 
 ---
 
-## What Gets Preserved From Phase 8
+## What Gets Preserved From Phase 7
 
 | Component | Source | Status in Phase 9 |
 |-----------|--------|-------------------|
 | CSE (432-dim waves) | Phase 1 | Frozen ✓ |
-| Resonance Field (96³ × 768) | Phase 2/8 | Frozen ✓ |
-| GR masses + spatial index | Phase 3/8 | Frozen ✓ |
-| TL temperature dynamics | Phase 4/8 | Frozen ✓ |
-| CGN causal graph | Phase 5/8 | Frozen ✓ |
-| Three-tier memory | Phase 6/8 | Frozen ✓ |
-| Bridge projections (432↔768) | Phase 7/8 | Frozen ✓ |
-| Output head (768→256) | Phase 8 | Frozen ✓ (kept for field training signal) |
-| **WaveDecoder (GRU + MHA)** | **Phase 8** | **NOT LOADED — replaced entirely** |
+| Resonance Field (64³ × 512) | Phase 2/7 | Frozen ✓ (densified in Stage 2) |
+| GR masses + spatial index | Phase 3/7 | Frozen ✓ |
+| TL temperature dynamics | Phase 4/7 | Frozen ✓ |
+| CGN causal graph | Phase 5/7 | Frozen ✓ |
+| Three-tier memory | Phase 6/7 | Frozen ✓ |
+| Bridge: wave_to_field (432→512) | Phase 2 (patched) | Frozen ✓ (copied from field.wave_to_feature) |
+| Bridge: field_to_wave (512→432) | Computed | Frozen ✓ (pseudoinverse of wave_to_field) |
+| Output head (512→256) | Phase 7 | Frozen ✓ |
 | WaveChunker | Phase 9 | **New** |
-| WaveGenerator | Phase 9 | **New (universal core)** |
+| WaveGenerator (GRU) | Phase 9 | **New (universal core)** |
 | WaveToText | Phase 9 | **New (text-specific last mile)** |
 | ThermodynamicWaveSampler | Phase 9 | **New (non-parametric)** |
+| FieldWalkGenerator | Phase 9 | **New (physics-only alternative, ~50 params)** |
 
 ---
 
@@ -946,7 +908,6 @@ def generate(prompt: str, max_waves: int = 30, temperature: float = 0.8) -> str:
 
     # 3. Generate new waves (the THINKING — universal, modality-agnostic)
     #    Pass flux_model so each step re-queries the field for nearby attractors.
-    #    This is how the model discovers there are many ways to say "hello".
     generated_waves, confidences = wave_generator.generate(
         field_context=field_context,
         max_waves=max_waves,
@@ -961,8 +922,22 @@ def generate(prompt: str, max_waves: int = 30, temperature: float = 0.8) -> str:
         chunk_bytes = wave_to_text.decode(sampled, temperature=temperature)
         text_parts.append(chunk_bytes.decode('utf-8', errors='replace'))
 
-    return prompt + ' '.join(text_parts)
+    return prompt + ' ' + ' '.join(text_parts)
 ```
+
+---
+
+## Bridge Patching — Why It's Necessary
+
+Phase 7's `FLUXTrainer.train_step()` applies `.detach()` to all inputs before
+computing the loss. This means **gradients never reach `wave_to_field` or
+`field_to_wave`** even though they're in the optimizer. The saved bridge weights
+in `phase7.phase.pt` are at random initialization (cosine ~0.001).
+
+The fix (applied at load time in `build_flux_for_phase9()`):
+- `wave_to_field` := copy of `field.wave_to_feature` weights (trained Phase 2)
+- `field_to_wave` := pseudoinverse of `wave_to_field` (math-optimal inverse)
+- Round-trip cosine: **~0.85+** (was ~0.001 with random init)
 
 ---
 
@@ -1037,7 +1012,7 @@ Generate with thermodynamic sampling and plot:
 | 7 | Generation is faster than Phase 8 | Timing | Fewer total steps per sentence |
 | 8 | Works on CPU | Test | All tests pass on CPU device |
 | 9 | No nn.MultiheadAttention anywhere | Code audit | Zero Transformer imports |
-| 10 | No GRU in WaveGenerator | Code audit | GRU only in WaveToText |
+| 10 | GRU only in WaveToText and WaveGenerator | Code audit | No Transformer components |
 | 11 | All 3 tests pass | Tests 1-3 | 3/3 |
 | 12 | All 3 demos produce output | Demos 1-3 | 3/3 |
 | 13 | Checkpoint saved as phase9.phase.pt | save_checkpoint(9, ...) | File exists |
@@ -1051,17 +1026,19 @@ Generate with thermodynamic sampling and plot:
 {
     'phase': 9,
     'timestamp': str,
-    'config': dict,              # FLUXLarge config + Phase 9 config
+    'config': dict,              # FLUXModel config + Phase 9 config
     'phase9_config': {
         'wave_dim': 432,
-        'field_features': 768,
+        'field_features': 512,
         'max_waves': 50,
         'k_neighbors': 16,
         'interference_radius': 4,
+        'gru_hidden': 512,
+        'gru_layers': 1,
         'wtt_hidden_dim': 256,
         'wtt_max_bytes': 20,
     },
-    # All Phase 8 component states (frozen, preserved)
+    # All Phase 7 component states (frozen, preserved)
     'cse_state_dict': OrderedDict,
     'field_state_dict': OrderedDict,
     'gr_state': dict,
@@ -1116,14 +1093,14 @@ Build in exactly this order:
 
 | FLUX Principle | How Phase 9 Applies It |
 |----------------|----------------------|
-| No Transformer attention | WaveGenerator uses interference + field gravity, no MHA |
+| No Transformer attention | WaveGenerator uses GRU + field gravity, no MHA |
 | Waves are the native unit | Generation IS wave prediction, bytes are just spelling |
-| Interference = coherence | Output wave sequence uses apply_neighborhood_interference |
+| Interference = coherence | Interference signal available as utility for enrichment |
 | Gravitational relevance | Field context retrieved via O(log n) spatial lookup |
 | Thermodynamic settling | Wave sampling noise adapts to prediction confidence |
 | Gravitational diversity | Field re-query at each step discovers alternative attractors |
 | Modality-agnostic | WaveGenerator has zero text-specific logic |
-| Local updates only | Interference only affects ±radius positions |
+| Local updates only | Field population uses local perturbs + bulk settle |
 | Energy = confidence | Confidence head acts as energy measurement |
 
 ---
@@ -1151,15 +1128,20 @@ One model. Every modality. This is the architecture from flux-domanant-domains.m
 | Module | Parameters | Status |
 |--------|-----------|--------|
 | WaveChunker | ~370K | New |
-| WaveGenerator | ~2.3M | New (universal core) |
+| WaveGenerator (GRU) | ~2.4M | New (universal core) |
 | WaveToText | ~400K | New (text last mile) |
 | ThermodynamicWaveSampler | 0 | Non-parametric |
-| **Phase 9 total new** | **~3.1M** | |
-| Phase 8 frozen components | ~75M | Preserved |
-| **Grand total** | **~78.1M** | |
+| FieldWalkGenerator | ~50 | Alternative (physics-only) |
+| **Phase 9 total new** | **~3.2M** | |
+| Phase 7 frozen components | ~45M | Preserved |
+| **Grand total** | **~48.2M** | |
 
 Lighter than Phase 8's decoder (~5M). Faster to train. And it's the foundation
 for every modality in the FLUX vision.
+
+Note: An alternative `FieldWalkGenerator` (~50 learnable params) is also included
+as a physics-only option. It uses field walking instead of a GRU but is not the
+primary generation module.
 
 ---
 
@@ -1170,19 +1152,19 @@ Colab notebook `notebooks/phase9_colab.ipynb` follows standard cell structure:
 1. Clone/pull + mount Drive
 2. Install deps
 3. Logger + hardware + secrets
-4. Load Phase 8 components (skip WaveDecoder)
-5. Stage 1: WaveToText pre-training (~30 min)
-6. Stage 2: WaveGenerator training (~4-6 hours)
-7. Save checkpoint + upload to HF Hub
-8. Test 1: Wave distribution match
-9. Test 2: Word reconstruction accuracy
-10. Test 3: Full pipeline English words
-11. Demo 1: Wave-level generation
-12. Demo 2: Wave sequence visualization
-13. Demo 3: Thermodynamic sampling trace
-14. Results summary + full log
-15. Final upload
-16. Save artifacts to Drive
+4. Smoke test (bridge patching verified)
+5. Load training data
+6a-6c. Stage 1: WaveToText pre-training
+7a-7c. Stage 2: Field population
+8a-8c. Stage 3: WaveGenerator training
+9a-9c. Stage 4: Joint fine-tuning
+10. Save checkpoint + upload to HF Hub
+11-13. Tests 1-3
+14-15. Demos 1-2
+16. Interactive exploration
+17. Results summary + full log
+18-19. Final upload
+20. Save artifacts to Drive
 
 ---
 

@@ -47,7 +47,8 @@ def collect_cse_wave_stats(model, prompts, device):
             norms = wave_seq.norm(dim=-1)  # [seq]
             all_norms.extend(norms.cpu().tolist())
             all_waves.append(wave_seq.cpu())
-        except Exception:
+        except Exception as e:
+            print(f"    ⚠ CSE encode failed for '{text[:30]}...': {e}")
             continue
     all_waves_cat = torch.cat(all_waves, dim=0)  # [total, 432]
     return all_norms, all_waves_cat
@@ -80,7 +81,8 @@ def collect_generated_wave_stats(model, chunker, generator, wtt, prompts, device
                     gen_waves[:-1], gen_waves[1:], dim=-1
                 )
                 all_consec_cos.extend(cos_sim.cpu().tolist())
-        except Exception:
+        except Exception as e:
+            print(f"    ⚠ Generation failed for '{text[:30]}...': {e}")
             continue
 
     all_waves_cat = torch.cat(all_waves, dim=0) if all_waves else torch.zeros(1, 432)
@@ -247,6 +249,13 @@ def main():
     # Summary
     all_passed = norm_pass and coherence_pass and dim_pass and overall_pass
     print(f"\n  {'✓ ALL TESTS PASSED' if all_passed else '✗ SOME TESTS FAILED'}")
+
+    # Assert all criteria (project convention: standalone tests use assert)
+    assert norm_pass, f"KL divergence {kl_norm:.4f} >= 0.5 threshold"
+    assert coherence_pass, f"Mean consecutive cosine {mean_cos:.4f} <= 0.3 threshold"
+    assert dim_pass, f"Only {within_2sigma:.1%} dims within 2σ (need >50%)"
+    assert overall_pass, f"Overall KL divergence {overall_kl:.4f} >= 0.5 threshold"
+
     return all_passed
 
 

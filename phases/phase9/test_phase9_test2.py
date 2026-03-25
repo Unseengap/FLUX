@@ -178,7 +178,8 @@ def main():
 
             total += 1
 
-        except Exception:
+        except Exception as e:
+            print(f"    ⚠ Decode failed for '{word}': {e}")
             total += 1
             cer_scores.append(1.0)
 
@@ -226,6 +227,11 @@ def main():
     results.save()
 
     print(f"\n  {'✓ ALL TESTS PASSED' if overall_pass else '✗ SOME TESTS FAILED'}")
+
+    # Assert all criteria (project convention: standalone tests use assert)
+    assert acc_pass, f"Word accuracy {accuracy:.1%} < 80% threshold ({correct}/{total})"
+    assert cer_pass, f"Character error rate {avg_cer:.4f} >= 0.2 threshold"
+
     return overall_pass
 
 

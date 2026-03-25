@@ -99,9 +99,10 @@ def check_valid_word(word: str) -> bool:
 
     # Common suffixes heuristic
     for suffix in ['s', 'ed', 'ing', 'ly', 'er', 'est', 'tion', 'ment', 'ness', 'able', 'ible']:
-        stem = clean.rstrip(suffix) if clean.endswith(suffix) else None
-        if stem and stem in ENGLISH_WORDS:
-            return True
+        if clean.endswith(suffix):
+            stem = clean[:-len(suffix)]
+            if stem and stem in ENGLISH_WORDS:
+                return True
 
     return False
 
@@ -260,6 +261,12 @@ def main():
     results.save()
 
     print(f"\n  {'✓ ALL TESTS PASSED' if overall_pass else '✗ SOME TESTS FAILED'}")
+
+    # Assert all criteria (project convention: standalone tests use assert)
+    assert valid_pass, f"Valid word rate {valid_rate:.1%} < 50% threshold ({all_valid}/{all_total})"
+    assert length_pass, f"Average word length {avg_word_len:.1f} outside 3-8 range"
+    assert spaces_pass, f"Only {has_spaces}/{len(prompts)} outputs have spaces (need ≥50%)"
+
     return overall_pass
 
 

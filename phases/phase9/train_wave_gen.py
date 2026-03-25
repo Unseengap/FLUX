@@ -1627,6 +1627,8 @@ def build_phase9_modules(
         max_waves=cfg['max_waves'],
         k_neighbors=cfg['k_neighbors'],
         interference_radius=cfg['interference_radius'],
+        gru_hidden=cfg.get('gru_hidden', 512),
+        gru_layers=cfg.get('gru_layers', 1),
     ).to(device)
 
     wtt = WaveToText(
