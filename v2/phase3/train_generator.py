@@ -79,13 +79,14 @@ PHASE3_CONFIG: Dict[str, Any] = {
     'steps':               20_000,
     'batch_size':          64,
     'lr':                  3e-4,
-    'ss_start':            0.5,    # scheduled sampling start probability
-    'ss_end':              0.9,    # scheduled sampling end probability
+    'ss_start':            0.0,    # pure teacher forcing early — ramps up slowly
+    'ss_end':              0.4,    # never exceed 40% to avoid training on noise
     # Loss weights
+    # wave_loss is NORMALISED by target magnitude → ~0-1 range, same as decode
     'wave_loss_weight':    1.0,
     'cosine_loss_weight':  0.5,
-    'contrastive_weight':  2.0,
-    'decode_loss_weight':  1.0,    # ← The key fix: decode loss from step 1
+    'contrastive_weight':  0.5,    # reduced — was drowning decode signal
+    'decode_loss_weight':  10.0,   # ← 10× because decode is the key signal
     # Decode gate
     'gate_avg_threshold':  0.90,
     'gate_min_threshold':  0.70,
@@ -579,6 +580,7 @@ def train(
     best_gate_avg   = 0.0
     step            = 0
     running_loss    = 0.0
+    last_good_loss  = 1.0   # tracks last finite wave_loss — never passes NaN to checkpoint
     log_interval    = 500
 
     start_time      = time.time()
@@ -611,7 +613,19 @@ def train(
             mask[i, :l] = 1.0
         mask = mask.unsqueeze(-1)  # [B, S, 1]
 
-        wave_loss   = (F.mse_loss(predicted, target_waves, reduction='none') * mask).sum() / mask.sum()
+        mse_raw     = (F.mse_loss(predicted, target_waves, reduction='none') * mask).sum() / mask.sum()
+        # Normalise by target wave magnitude so wave_loss ~ 0-1 (same scale as decode_loss)
+        # Without this, wave_loss ~3300 drowns decode_loss ~1.5 — decode gradient = 0.05%
+        target_mag  = ((target_waves.pow(2) * mask).sum() / mask.sum()).detach().clamp(min=1e-6)
+        wave_loss   = mse_raw / target_mag
+
+        # Guard: skip step entirely if wave_loss is NaN/Inf (exploded batch)
+        if not torch.isfinite(wave_loss):
+            optimizer.zero_grad()
+            step += 1
+            continue
+
+        last_good_loss = wave_loss.item()
         cosine_loss = (1 - F.cosine_similarity(predicted, target_waves, dim=-1)).unsqueeze(-1)
         cosine_loss = (cosine_loss * mask).sum() / mask.sum()
 
@@ -675,7 +689,7 @@ def train(
             lr_now  = scheduler.get_last_lr()[0]
             print(
                 f"  step {step:6d}/{steps}: "
-                f"wave={wave_loss.item():.4f}  "
+                f"wave_norm={wave_loss.item():.4f}  "
                 f"cosine={cosine_loss.item():.4f}  "
                 f"decode={decode_loss.item():.4f}  "
                 f"total={avg_loss:.4f}  "
@@ -702,7 +716,7 @@ def train(
                 _save_checkpoint(
                     generator=generator,
                     step=step,
-                    loss=wave_loss.item(),
+                    loss=last_good_loss,
                     decode_gate_avg=avg_acc,
                     decode_gate_min=min_acc,
                     checkpoint_path=checkpoint_out,
@@ -720,7 +734,7 @@ def train(
             _save_checkpoint(
                 generator=generator,
                 step=step,
-                loss=wave_loss.item(),
+                loss=last_good_loss,
                 decode_gate_avg=best_gate_avg,
                 decode_gate_min=0.0,
                 checkpoint_path=checkpoint_out,
@@ -734,7 +748,7 @@ def train(
     _save_checkpoint(
         generator=generator,
         step=step,
-        loss=wave_loss.item(),
+        loss=last_good_loss,
         decode_gate_avg=final_gate_avg,
         decode_gate_min=final_gate_min,
         checkpoint_path=checkpoint_out,
@@ -783,6 +797,11 @@ def _save_checkpoint(
             checkpoint_path.stem + suffix + checkpoint_path.suffix
         )
 
+    # Guard against NaN loss values (can occur if last batch had numerical instability)
+    loss_val = float(loss)
+    if loss_val != loss_val:   # NaN check (NaN != NaN)
+        loss_val = -1.0        # sentinel — diagnostics can detect this explicitly
+
     state = {
         'phase':     3,
         'version':   'v2',
@@ -793,7 +812,7 @@ def _save_checkpoint(
             'generator': OrderedDict(generator.state_dict()),
         },
         'metrics': {
-            'loss':            loss,
+            'loss':            loss_val,
             'decode_gate_avg': decode_gate_avg,
             'decode_gate_min': decode_gate_min,
         },
