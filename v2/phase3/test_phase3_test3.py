@@ -35,6 +35,7 @@ from cse            import ContinuousSemanticEncoder
 from wave_chunker   import WaveChunker
 from wave_to_text   import WaveToText
 from wave_to_field  import WaveToField
+from field_to_wave  import FieldToWave
 from wave_generator import WaveGenerator
 from flux_utils     import PhaseResults, get_device
 
@@ -175,8 +176,15 @@ def load_components(ckpt_dir: Path, device: str):
         wave_dim=cfg2.get('wave_dim', 432),
         field_dim=cfg2.get('field_features', 512),
     )
-    w2f.load_state_dict(p2['state_dict']['wave_to_field'])
+    w2f.load_state_dict(p2['state_dict']['bridge_wtf'])
     w2f.to(device).eval()
+
+    f2w = FieldToWave(
+        field_dim=cfg2.get('field_features', 512),
+        wave_dim=cfg2.get('wave_dim', 432),
+    )
+    f2w.load_state_dict(p2['state_dict']['bridge_ftw'])
+    f2w.to(device).eval()
 
     p3  = torch.load(ckpt_dir / 'phase3_v2.phase.pt', map_location='cpu')
     cfg3 = p3['config']
@@ -190,7 +198,7 @@ def load_components(ckpt_dir: Path, device: str):
     generator.load_state_dict(p3['state_dict']['generator'])
     generator.to(device).eval()
 
-    return cse, chunker, wtt, w2f, generator
+    return cse, chunker, wtt, w2f, f2w, generator
 
 
 @torch.no_grad()
@@ -200,12 +208,13 @@ def generate_text(
     chunker:   WaveChunker,
     wtt:       WaveToText,
     w2f:       WaveToField,
+    f2w:       FieldToWave,
     generator: WaveGenerator,
     device:    str,
     max_waves: int = 20,
 ) -> Tuple[str, int]:
     """
-    Generate text from a prompt.
+    Generate text from a prompt, routing through the Phase 2 bridge.
 
     Returns:
         (generated_text, num_waves_generated)
@@ -214,12 +223,15 @@ def generate_text(
     mean_wave = wave.full.mean(dim=0).to(device)
     ctx       = w2f(mean_wave)
 
-    waves, confs = generator.generate(field_context=ctx, max_waves=max_waves)
-    n_waves      = waves.shape[0]
+    waves, confs  = generator.generate(field_context=ctx, max_waves=max_waves)
+    n_waves       = waves.shape[0]
+
+    # Snap onto CSE manifold before WTT decoding
+    bridged_waves = f2w(w2f(waves))  # [N, 432]
 
     decoded_bytes = b''
     for i in range(n_waves):
-        chunk_bytes = wtt.decode(waves[i])
+        chunk_bytes = wtt.decode(bridged_waves[i])
         if chunk_bytes:
             decoded_bytes += bytes(chunk_bytes)
 
@@ -233,10 +245,10 @@ def main():
     assert (ckpt_dir / 'phase3_v2.phase.pt').exists(), \
         "Phase 3 checkpoint not found. Run train_generator.py first."
 
-    cse, chunker, wtt, w2f, generator = load_components(ckpt_dir, device)
+    cse, chunker, wtt, w2f, f2w, generator = load_components(ckpt_dir, device)
     results = PhaseResults(phase=3, component_name="Wave Generator")
 
-    print(f"\n── Test 3: Valid Word Rate (20 prompts) ──\n")
+    print(f"\n\u2500\u2500 Test 3: Valid Word Rate (20 prompts) \u2500\u2500\n")
     print(f"  Word list size: {len(WORD_LIST):,}\n")
 
     all_rates    = []
@@ -247,7 +259,7 @@ def main():
     for i, prompt in enumerate(TEST_PROMPTS):
         try:
             generated, n_waves = generate_text(
-                prompt, cse, chunker, wtt, w2f, generator, device
+                prompt, cse, chunker, wtt, w2f, f2w, generator, device
             )
             rate, n_tokens = valid_word_rate(generated)
             all_rates.append(rate)

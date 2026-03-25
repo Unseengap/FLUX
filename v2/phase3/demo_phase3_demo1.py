@@ -33,6 +33,7 @@ from cse            import ContinuousSemanticEncoder
 from wave_chunker   import WaveChunker
 from wave_to_text   import WaveToText
 from wave_to_field  import WaveToField
+from field_to_wave  import FieldToWave
 from wave_generator import WaveGenerator
 from flux_utils     import get_device
 
@@ -83,8 +84,15 @@ def load_components(ckpt_dir: Path, device: str):
         wave_dim=cfg2.get('wave_dim', 432),
         field_dim=cfg2.get('field_features', 512),
     )
-    w2f.load_state_dict(p2['state_dict']['wave_to_field'])
+    w2f.load_state_dict(p2['state_dict']['bridge_wtf'])
     w2f.to(device).eval()
+
+    f2w = FieldToWave(
+        field_dim=cfg2.get('field_features', 512),
+        wave_dim=cfg2.get('wave_dim', 432),
+    )
+    f2w.load_state_dict(p2['state_dict']['bridge_ftw'])
+    f2w.to(device).eval()
 
     p3   = torch.load(ckpt_dir / 'phase3_v2.phase.pt', map_location='cpu')
     cfg3 = p3['config']
@@ -99,7 +107,7 @@ def load_components(ckpt_dir: Path, device: str):
     generator.load_state_dict(p3['state_dict']['generator'])
     generator.to(device).eval()
 
-    return cse, chunker, wtt, w2f, generator
+    return cse, chunker, wtt, w2f, f2w, generator
 
 
 @torch.no_grad()
@@ -109,11 +117,12 @@ def run_pipeline(
     chunker:   WaveChunker,
     wtt:       WaveToText,
     w2f:       WaveToField,
+    f2w:       FieldToWave,
     generator: WaveGenerator,
     device:    str,
     max_waves: int = 20,
 ):
-    """Full pipeline: text → waves → field context → generate → decode."""
+    """Full pipeline: text → waves → field context → generate → bridge → decode."""
     # Encode prompt
     wave       = cse.encode(prompt)
     mean_wave  = wave.full.mean(dim=0).to(device)
@@ -125,10 +134,13 @@ def run_pipeline(
         max_waves=max_waves,
     )
 
-    # Decode each generated wave
+    # Snap onto Phase 2 CSE manifold before WTT decoding
+    bridged_waves = f2w(w2f(gen_waves))  # [N, 432]
+
+    # Decode each bridged wave
     decoded_chunks = []
-    for i in range(gen_waves.shape[0]):
-        chunk_bytes = wtt.decode(gen_waves[i])
+    for i in range(bridged_waves.shape[0]):
+        chunk_bytes = wtt.decode(bridged_waves[i])
         text_chunk  = bytes(chunk_bytes).decode('utf-8', errors='replace') if chunk_bytes else ''
         decoded_chunks.append((text_chunk, confs[i]))
 
@@ -168,11 +180,11 @@ def main():
     print(f"  Device: {device}")
     print()
 
-    cse, chunker, wtt, w2f, generator = load_components(ckpt_dir, device)
+    cse, chunker, wtt, w2f, f2w, generator = load_components(ckpt_dir, device)
 
     for prompt in DEMO_PROMPTS:
         output, chunks, avg_sim, n_waves = run_pipeline(
-            prompt, cse, chunker, wtt, w2f, generator, device
+            prompt, cse, chunker, wtt, w2f, f2w, generator, device
         )
 
         print(f"  Prompt  : {prompt}")
@@ -201,7 +213,7 @@ def main():
                 continue
 
             output, chunks, avg_sim, n_waves = run_pipeline(
-                user_prompt, cse, chunker, wtt, w2f, generator, device
+                user_prompt, cse, chunker, wtt, w2f, f2w, generator, device
             )
             print(f"  Output  : {output[:120]!r}")
             print(f"  Waves: {n_waves}  avg_cosine={avg_sim:.3f}\n")

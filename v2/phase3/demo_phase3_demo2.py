@@ -90,7 +90,7 @@ def load_components(ckpt_dir: Path, device: str):
         wave_dim=cfg2.get('wave_dim', 432),
         field_dim=cfg2.get('field_features', 512),
     )
-    w2f.load_state_dict(p2['state_dict']['wave_to_field'])
+    w2f.load_state_dict(p2['state_dict']['bridge_wtf'])
     w2f.to(device).eval()
 
     p3   = torch.load(ckpt_dir / 'phase3_v2.phase.pt', map_location='cpu')

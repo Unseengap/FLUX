@@ -102,7 +102,7 @@ def load_all_components(checkpoint_dir: Path, device: str):
         wave_dim=cfg2.get('wave_dim', 432),
         field_dim=cfg2.get('field_features', 512),
     )
-    w2f.load_state_dict(p2['state_dict']['wave_to_field'])
+    w2f.load_state_dict(p2['state_dict']['bridge_wtf'])
     w2f.to(device).eval()
 
     f2w = FieldToWave(
@@ -137,10 +137,11 @@ def eval_text(
     chunker:   WaveChunker,
     wtt:       WaveToText,
     w2f:       WaveToField,
+    f2w:       FieldToWave,
     generator: WaveGenerator,
     device:    str,
 ) -> Tuple[float, str]:
-    """Encode text → get field context → generate waves → decode → measure accuracy."""
+    """Encode text → get field context → generate waves → bridge → decode → accuracy."""
     text_bytes = text.encode('utf-8')
     wave       = cse.encode(text)
     mean_wave  = wave.full.mean(dim=0).to(device)
@@ -151,9 +152,13 @@ def eval_text(
         max_waves=len(text_bytes) // 3 + 10,
     )
 
+    # Snap generated waves onto the Phase 2 CSE manifold before WTT decoding.
+    # Phase 2 guarantees f2w(w2f(cse_wave)) decodes at 97.79% accuracy.
+    bridged_waves = f2w(w2f(generated_waves))  # [N, 432]
+
     decoded_bytes = b''
-    for i in range(generated_waves.shape[0]):
-        chunk_bytes = wtt.decode(generated_waves[i])
+    for i in range(bridged_waves.shape[0]):
+        chunk_bytes = wtt.decode(bridged_waves[i])
         if chunk_bytes:
             decoded_bytes += bytes(chunk_bytes)
 
