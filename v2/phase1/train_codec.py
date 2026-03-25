@@ -304,10 +304,12 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
     except Exception as e:
         print(f"  ⚠ OPUS-100 failed: {e}", flush=True)
 
-    # ── 5a. GSM8K — grade school math word problems ────────────────
-    # Reliable, widely mirrored, contains numeric + symbolic text
+    # ── 5a. GSM8K — reasoning text with numbers & arithmetic ──────
+    # NOT symbolic math — these are plain English word problems.
+    # Useful for: numbers, dollar signs, operators (+, -, ×, ÷), varied English.
+    # Example: "Janet earns $30 per hour. If she works 8 hours..."
     try:
-        print("  → Loading GSM8K...", flush=True)
+        print("  → Loading GSM8K (reasoning/numbers)...", flush=True)
         gsm = load_dataset(
             "openai/gsm8k", "main",
             split="train", streaming=True,
@@ -320,13 +322,14 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
                 collected += 1
             if collected >= per_source // 2:
                 break
-        print(f"  ✓ GSM8K: {collected} problems", flush=True)
+        print(f"  ✓ GSM8K (reasoning): {collected} problems", flush=True)
     except Exception as e:
         print(f"  ⚠ GSM8K failed: {e}", flush=True)
 
-    # ── 5b. MATH-500 — competition math with Unicode formulas ──────
+    # ── 5b. MATH-500 — competition math with Unicode/LaTeX formulas ─
+    # Contains actual symbolic math: √, π, ∫, ≤, ∈, fractions, exponents.
     try:
-        print("  → Loading MATH-500...", flush=True)
+        print("  → Loading MATH-500 (symbolic math)...", flush=True)
         math500 = load_dataset(
             "HuggingFaceH4/MATH-500",
             split="test", streaming=True,
@@ -341,6 +344,30 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
         print(f"  ✓ MATH-500: {collected} problems", flush=True)
     except Exception as e:
         print(f"  ⚠ MATH-500 failed: {e}", flush=True)
+
+    # ── 5c. StackMathQA — Stack Exchange math with real Unicode symbols ─
+    # Unlike GSM8K (word problems), these questions contain actual symbols:
+    # ∫, √, π, ≤, ≥, ∈, ∉, →, ↔, ∀, ∃, ∑, ∏, ℝ, ℂ, ℤ, LaTeX notation.
+    # Critical for the encoder to learn Unicode math codepoints correctly.
+    try:
+        print("  → Loading StackMathQA (Unicode math symbols)...", flush=True)
+        smqa = load_dataset(
+            "math-ai/StackMathQA",
+            split="train", streaming=True,
+        )
+        collected = 0
+        for row in smqa:
+            q = (row.get("question") or "").strip()
+            # Take only the first sentence/line to keep length manageable
+            first = q.split("\n")[0].strip()
+            if 15 <= len(first) <= 220:
+                corpus.append(first)
+                collected += 1
+            if collected >= per_source // 2:
+                break
+        print(f"  ✓ StackMathQA: {collected} questions", flush=True)
+    except Exception as e:
+        print(f"  ⚠ StackMathQA failed: {e}", flush=True)
 
     # ── Fallback if all datasets failed ───────────────────────────
     if len(corpus) < 200:
