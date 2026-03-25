@@ -140,7 +140,9 @@ _FALLBACK_TEXTS: List[str] = [
     "Το σύμπαν είναι απέραντο",
     "العقل البشري يتعلم من التجربة",
     "מדעי המחשב הם בסיס הבינה המלאכותית",
-    # ── Math / symbolic ───────────────────────────────────────────
+    # ── Math / symbolic ─────────────────────────────────────────────────────
+    # Hardcoded math strings ensure Unicode symbol coverage even in offline mode.
+    # (Online coverage handled by MATH-500 in build_training_corpus.)
     "∑_{k=1}^{∞} 1/k² = π²/6",
     "E = mc² describes mass-energy equivalence",
     "a² + b² = c²",
@@ -149,6 +151,21 @@ _FALLBACK_TEXTS: List[str] = [
     "∇²φ = ρ/ε₀",
     "P(A|B) = P(B|A)P(A) / P(B)",
     "det(AB) = det(A)det(B)",
+    "∫₀^∞ e^(-x²) dx = √(π)/2",
+    "∫ sin(x) dx = -cos(x) + C",
+    "∂f/∂x = lim_{h→0} (f(x+h) - f(x)) / h",
+    "∀ε>0 ∃δ>0: |x-a|<δ ⟹ |f(x)-L|<ε",
+    "x ∈ ℝ, y ∈ ℂ, n ∈ ℤ, p ∈ ℕ",
+    "A ⊆ B ⟺ (∀x: x∈A → x∈B)",
+    "‖v‖ = √(v₁² + v₂² + … + vₙ²)",
+    "λ is an eigenvalue ⟺ det(A - λI) = 0",
+    "∮ E·dA = Q/ε₀  (Gauss's law)",
+    "ΔS ≥ 0 for any irreversible process",
+    "f: ℝ → ℝ, g: ℕ → ℤ, h: ℂ → ℂ",
+    "⌊x⌋ ≤ x < ⌈x⌉",
+    "α + β = π, sin²α + cos²α = 1",
+    "∏_{i=1}^{n} i = n!",
+    "x̄ = (1/n) ∑_{i=1}^{n} xᵢ",
     # ── Short / edge cases ────────────────────────────────────────
     "a", "hello", "world", "yes", "no",
     "UPPERCASE AND lowercase MiXeD",
@@ -345,29 +362,10 @@ def build_training_corpus(target_size: int = 20_000) -> List[str]:
     except Exception as e:
         print(f"  ⚠ MATH-500 failed: {e}", flush=True)
 
-    # ── 5c. StackMathQA — Stack Exchange math with real Unicode symbols ─
-    # Unlike GSM8K (word problems), these questions contain actual symbols:
-    # ∫, √, π, ≤, ≥, ∈, ∉, →, ↔, ∀, ∃, ∑, ∏, ℝ, ℂ, ℤ, LaTeX notation.
-    # Critical for the encoder to learn Unicode math codepoints correctly.
-    try:
-        print("  → Loading StackMathQA (Unicode math symbols)...", flush=True)
-        smqa = load_dataset(
-            "math-ai/StackMathQA",
-            split="train", streaming=True,
-        )
-        collected = 0
-        for row in smqa:
-            q = (row.get("question") or "").strip()
-            # Take only the first sentence/line to keep length manageable
-            first = q.split("\n")[0].strip()
-            if 15 <= len(first) <= 220:
-                corpus.append(first)
-                collected += 1
-            if collected >= per_source // 2:
-                break
-        print(f"  ✓ StackMathQA: {collected} questions", flush=True)
-    except Exception as e:
-        print(f"  ⚠ StackMathQA failed: {e}", flush=True)
+    # NOTE: StackMathQA removed — dataset hangs on streaming init (too large).
+    # Unicode math symbol coverage is handled by:
+    #   • MATH-500 above (online, 409 problems with ∫, √, π, ≤, ∈, etc.)
+    #   • _FALLBACK_TEXTS (offline, ~20 hardcoded math-symbol strings)
 
     # ── Fallback if all datasets failed ───────────────────────────
     if len(corpus) < 200:
