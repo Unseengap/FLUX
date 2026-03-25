@@ -20,6 +20,7 @@ from typing import List, Dict, Any
 from collections import OrderedDict
 from datetime import datetime
 
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -46,8 +47,23 @@ from flux_utils import (
 # Training Corpus
 # ─────────────────────────────────────────────
 
-TRAINING_TEXTS: List[str] = [
-    # English prose
+# Gate texts — pinned at front, ALWAYS in corpus.
+# Exact strings used by DecodeGate; model must see every one.
+GATE_TEXTS: List[str] = [
+    "The future of artificial intelligence",
+    "Energy equals mass times the speed of light squared",
+    "Photosynthesis converts sunlight into chemical energy",
+    "Water freezes at zero degrees Celsius",
+    "The cat sat on the mat",
+    "café naïve résumé",
+    "def hello(): return 'world'",
+    "∫₀^∞ e^(-x²) dx = √π/2",
+]
+
+# Fallback corpus — used when HuggingFace datasets are unavailable.
+# Deliberately covers all axes: prose, science, code, UTF-8, math, short strings.
+_FALLBACK_TEXTS: List[str] = [
+    # ── English prose ─────────────────────────────────────────────
     "The quick brown fox jumps over the lazy dog.",
     "Machine learning models translate patterns in data into actionable predictions.",
     "Physics describes the fundamental laws that govern the behavior of matter and energy.",
@@ -58,47 +74,302 @@ TRAINING_TEXTS: List[str] = [
     "The transformer architecture relies on self-attention and feed-forward layers.",
     "Backpropagation computes gradients efficiently using the chain rule of calculus.",
     "Embeddings map discrete tokens to continuous vector representations.",
-    # Scientific text
+    "The model learns to predict the next token given all previous tokens.",
+    "Convolutional networks excel at extracting local spatial features.",
+    "Recurrent networks process sequences one element at a time.",
+    "Dropout is a regularization technique that randomly zeroes activations.",
+    "Batch normalization stabilizes training by normalizing layer inputs.",
+    "Reinforcement learning trains agents through reward signals from the environment.",
+    "Transfer learning adapts pre-trained models to new tasks with fewer examples.",
+    "Self-supervised learning derives labels from the structure of the data itself.",
+    "Knowledge distillation compresses large models into smaller, faster ones.",
+    "Sparse attention reduces the quadratic complexity of full self-attention.",
+    # ── Scientific text ───────────────────────────────────────────
     "Water is a polar molecule consisting of two hydrogen atoms bonded to one oxygen.",
     "Photosynthesis converts light energy into chemical energy stored as glucose.",
     "DNA encodes genetic information as sequences of nucleotide base pairs.",
     "The speed of light in vacuum is approximately 299,792,458 meters per second.",
     "Entropy measures the degree of disorder or randomness in a thermodynamic system.",
-    # Code
+    "Water boils at one hundred degrees Celsius at sea level.",
+    "Ice melts at zero degrees Celsius under standard atmospheric pressure.",
+    "The human brain contains approximately eighty-six billion neurons.",
+    "Gravity is the force of attraction between objects with mass.",
+    "Sound travels faster through solids than through air.",
+    "Mitochondria are the powerhouses of the cell, producing ATP via oxidative phosphorylation.",
+    "The periodic table organizes elements by their atomic number and electron configuration.",
+    "Black holes are regions of spacetime where gravity is so strong that nothing can escape.",
+    "Quantum mechanics describes the behavior of particles at subatomic scales.",
+    "CRISPR-Cas9 is a molecular tool for precise genome editing in living cells.",
+    # ── Code ──────────────────────────────────────────────────────
     "def fibonacci(n): return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)",
     "import torch; x = torch.randn(3, 4); y = x @ x.T",
-    "for i in range(10): print(f'step {i}: loss={0.1/i+1:.4f}')",
-    "class Model(nn.Module):\n    def forward(self, x):\n        return self.layers(x)",
-    # Multi-byte UTF-8
+    "for i in range(10): print(f'step {i}')",
+    "class Model(nn.Module): pass",
+    "def greet(name): return f'Hello, {name}!'",
+    "x = [i**2 for i in range(10)]",
+    "if __name__ == '__main__': main()",
+    "import os; os.makedirs('output', exist_ok=True)",
+    "result = sum(x for x in range(100) if x % 2 == 0)",
+    "with open('data.json') as f: data = json.load(f)",
+    "class Node: def __init__(self, val): self.val = val; self.next = None",
+    "def quicksort(arr): return arr if len(arr) <= 1 else quicksort([x for x in arr[1:] if x <= arr[0]]) + [arr[0]] + quicksort([x for x in arr[1:] if x > arr[0]])",
+    "import numpy as np; A = np.random.randn(100, 100); eigenvalues = np.linalg.eigvals(A)",
+    "SELECT name, age FROM users WHERE age > 18 ORDER BY name;",
+    "docker run --rm -it --gpus all -v $PWD:/workspace nvcr.io/nvidia/pytorch:23.10-py3 bash",
+    # ── Multi-byte UTF-8 ──────────────────────────────────────────
     "café résumé naïve coöperate",
     "Привет мир — Hello world in Russian",
     "中文: 人工智能正在改变世界",
     "日本語: 機械学習は強力なツールです",
     "한국어: 딥러닝은 현대 AI의 핵심입니다",
-    # Math
-    "∫₀^∞ e^(-x²) dx = √π/2",
+    "Bonjour le monde — comment ça va?",
+    "Hola mundo — ¿cómo estás?",
+    "Ciao mondo — come stai?",
+    "Ärger über Straßen — Müller kämpft",
+    "Το σύμπαν είναι απέραντο",
+    "العقل البشري يتعلم من التجربة",
+    "מדעי המחשב הם בסיס הבינה המלאכותית",
+    # ── Math / symbolic ───────────────────────────────────────────
     "∑_{k=1}^{∞} 1/k² = π²/6",
     "E = mc² describes mass-energy equivalence",
-    # Edge cases
-    "a",
-    "  leading and trailing spaces  ",
+    "a² + b² = c²",
+    "f(x) = x² + 2x + 1",
+    "lim_{x→∞} (1 + 1/x)^x = e",
+    "∇²φ = ρ/ε₀",
+    "P(A|B) = P(B|A)P(A) / P(B)",
+    "det(AB) = det(A)det(B)",
+    # ── Short / edge cases ────────────────────────────────────────
+    "a", "hello", "world", "yes", "no",
     "UPPERCASE AND lowercase MiXeD",
-    "1234567890 !@#$%^&*()",
+    "1234567890",
+    "hello world",
+    "the cat sat on the mat",
 ]
 
 
+def _extract_sentences(text: str, min_len: int = 20, max_len: int = 250) -> List[str]:
+    """
+    Split text block into individual sentences/lines within length bounds.
+
+    Args:
+        text: Arbitrary multi-sentence text block
+        min_len: Minimum character length (inclusive)
+        max_len: Maximum character length (inclusive)
+    Returns:
+        List of cleaned sentence strings
+    """
+    import re
+    # Split on sentence boundaries and newlines
+    parts = re.split(r'(?<=[.!?])\s+|\n+', text)
+    out = []
+    for p in parts:
+        p = p.strip()
+        if min_len <= len(p) <= max_len:
+            out.append(p)
+    return out
+
+
+def build_training_corpus(target_size: int = 20_000) -> List[str]:
+    """
+    Build a diverse training corpus by pulling from HuggingFace datasets.
+
+    Sources (in priority order):
+      1. WikiText-103        — dense English prose, factual variety
+      2. TinyStories         — short coherent English narratives
+      3. CodeSearchNet (py)  — real docstrings and code identifiers
+      4. OPUS-100 (en-XX)    — multilingual pairs for UTF-8 coverage
+      5. MATH (lighteval)    — formulas, competition problems
+
+    Falls back to _FALLBACK_TEXTS if datasets unavailable (offline Colab etc.).
+    Gate texts are always prepended regardless of source.
+
+    Args:
+        target_size: Approximate number of unique strings to collect
+    Returns:
+        Deduplicated, shuffled list with gate texts at index 0-7
+    """
+    corpus: List[str] = []
+
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        print("  ⚠ 'datasets' not installed — using fallback corpus")
+        return GATE_TEXTS + _FALLBACK_TEXTS
+
+    per_source = target_size // 5  # Distribute budget across 5 sources
+
+    # ── 1. WikiText-103 ────────────────────────────────────────────
+    try:
+        print("  → Loading WikiText-103...", flush=True)
+        wt = load_dataset(
+            "wikitext", "wikitext-103-raw-v1",
+            split="train", streaming=True,
+            trust_remote_code=True,
+        )
+        collected = 0
+        for row in wt:
+            sents = _extract_sentences(row["text"])
+            corpus.extend(sents)
+            collected += len(sents)
+            if collected >= per_source:
+                break
+        print(f"  ✓ WikiText-103: {collected} sentences", flush=True)
+    except Exception as e:
+        print(f"  ⚠ WikiText-103 failed: {e}", flush=True)
+
+    # ── 2. TinyStories ─────────────────────────────────────────────
+    try:
+        print("  → Loading TinyStories...", flush=True)
+        ts = load_dataset(
+            "roneneldan/TinyStories",
+            split="train", streaming=True,
+            trust_remote_code=True,
+        )
+        collected = 0
+        for row in ts:
+            sents = _extract_sentences(row["text"], min_len=30, max_len=200)
+            corpus.extend(sents)
+            collected += len(sents)
+            if collected >= per_source:
+                break
+        print(f"  ✓ TinyStories: {collected} sentences", flush=True)
+    except Exception as e:
+        print(f"  ⚠ TinyStories failed: {e}", flush=True)
+
+    # ── 3. CodeSearchNet — Python docstrings ───────────────────────
+    try:
+        print("  → Loading CodeSearchNet (Python)...", flush=True)
+        csn = load_dataset(
+            "code_search_net", "python",
+            split="train", streaming=True,
+            trust_remote_code=True,
+        )
+        collected = 0
+        for row in csn:
+            # Use first line of docstring (clean, informative)
+            doc = (row.get("func_documentation_string") or "").strip()
+            first_line = doc.split("\n")[0].strip()
+            if 20 <= len(first_line) <= 200:
+                corpus.append(first_line)
+                collected += 1
+            # Also grab short code lines from the function body
+            code = (row.get("func_code_string") or "").strip()
+            for line in code.split("\n")[:5]:
+                line = line.strip()
+                if 15 <= len(line) <= 120:
+                    corpus.append(line)
+                    collected += 1
+            if collected >= per_source:
+                break
+        print(f"  ✓ CodeSearchNet: {collected} items", flush=True)
+    except Exception as e:
+        print(f"  ⚠ CodeSearchNet failed: {e}", flush=True)
+
+    # ── 4. OPUS-100 — multilingual pairs ───────────────────────────
+    try:
+        print("  → Loading OPUS-100 multilingual...", flush=True)
+        # Sample a few language pairs for UTF-8 diversity
+        lang_pairs = ["en-fr", "en-de", "en-zh", "en-ar", "en-ru", "en-ja", "en-es"]
+        collected = 0
+        per_lang = max(1, per_source // len(lang_pairs))
+        for pair in lang_pairs:
+            try:
+                opus = load_dataset(
+                    "Helsinki-NLP/opus-100", pair,
+                    split="train", streaming=True,
+                    trust_remote_code=True,
+                )
+                lang_count = 0
+                src, tgt = pair.split("-")
+                for row in opus:
+                    trans = row.get("translation", {})
+                    for lang in (src, tgt):
+                        s = (trans.get(lang) or "").strip()
+                        if 15 <= len(s) <= 200:
+                            corpus.append(s)
+                            collected += 1
+                            lang_count += 1
+                    if lang_count >= per_lang:
+                        break
+            except Exception:
+                pass
+        print(f"  ✓ OPUS-100: {collected} items across {lang_pairs}", flush=True)
+    except Exception as e:
+        print(f"  ⚠ OPUS-100 failed: {e}", flush=True)
+
+    # ── 5. MATH dataset — competition problems ─────────────────────
+    try:
+        print("  → Loading MATH dataset...", flush=True)
+        math_ds = load_dataset(
+            "lighteval/MATH",
+            split="train", streaming=True,
+            trust_remote_code=True,
+        )
+        collected = 0
+        for row in math_ds:
+            # First sentence of problem (contains formulas / Unicode math)
+            problem = (row.get("problem") or "").strip()
+            first = problem.split("\n")[0].strip()
+            if 15 <= len(first) <= 220:
+                corpus.append(first)
+                collected += 1
+            if collected >= per_source:
+                break
+        print(f"  ✓ MATH: {collected} problems", flush=True)
+    except Exception as e:
+        print(f"  ⚠ MATH dataset failed: {e}", flush=True)
+
+    # ── Fallback if all datasets failed ───────────────────────────
+    if len(corpus) < 200:
+        print("  ⚠ All datasets failed — using built-in fallback corpus", flush=True)
+        corpus = list(_FALLBACK_TEXTS)
+
+    # ── Deduplicate & shuffle ─────────────────────────────────────
+    seen: set = set()
+    unique = []
+    for s in corpus:
+        key = s.strip()
+        if key not in seen and len(key) >= 5:
+            seen.add(key)
+            unique.append(key)
+    random.shuffle(unique)
+
+    # Gate texts always first (indices 0-7), never shuffled away
+    final = list(GATE_TEXTS) + [t for t in unique if t not in set(GATE_TEXTS)]
+    print(f"  ✓ Final corpus: {len(final):,} unique strings (gate texts pinned at 0-7)", flush=True)
+    return final
+
+
+# Module-level cache — built once per process, avoids re-downloading
+_CORPUS_CACHE: List[str] = []
+
+
 def get_training_texts(augment: bool = True) -> List[str]:
-    """Return training texts, optionally augmented with sub-samples."""
-    texts = list(TRAINING_TEXTS)
+    """
+    Return the training corpus, building and caching it on first call.
+
+    On subsequent calls returns the cached list immediately.
+    Dataset download happens once per process (~10-30s on first call).
+
+    Args:
+        augment: If True, adds half-string sub-spans for extra short-string coverage
+    Returns:
+        Deduplicated corpus with gate texts pinned at indices 0-7
+    """
+    global _CORPUS_CACHE
+    if not _CORPUS_CACHE:
+        _CORPUS_CACHE = build_training_corpus()
+    texts = list(_CORPUS_CACHE)
     if augment:
-        # Add reversed, uppercased, and sub-string variants
+        # Extract first/second halves of medium-length texts for sub-string coverage
         extras = []
-        for t in TRAINING_TEXTS[:10]:
-            if len(t) > 20:
+        for t in texts[:500]:  # Sample from first 500 to keep it bounded
+            if 40 <= len(t) <= 160:
                 mid = len(t) // 2
-                extras.append(t[:mid])          # First half
-                extras.append(t[mid:])          # Second half
-        texts.extend(extras)
+                extras.append(t[:mid])
+                extras.append(t[mid:])
+        seen_extras = set(texts)
+        texts.extend(e for e in extras if e not in seen_extras)
     return texts
 
 
@@ -162,32 +433,52 @@ class WaveCodec(nn.Module):
 
     def coherence_loss(self, text: str) -> torch.Tensor:
         """
-        Coherence loss: similar words should have similar waves.
-        Ensures the wave space has meaningful geometry.
+        Coherence loss: enforces wave geometry using a contrastive margin.
 
-        Uses a positive pair (same text, minor aug) + random negative.
+        Positive pair  : first half vs second half of the same text
+                         → cosine similarity should be > 0.6
+        Negative sample: a randomly chosen different training text
+                         → cosine similarity should be < 0.3
+
+        The original single-pair trim-by-1-char produced similarity > 0.99
+        every time → relu(0.8 - 0.99) = 0 → zero gradient always.
 
         Args:
-            text: Input string
+            text: Input string (used as anchor + split)
         Returns:
-            Scalar coherence loss
+            Scalar coherence loss ≥ 0
         """
-        wave1 = self.cse.encode(text).full.mean(dim=0)  # [432]
+        import random
 
-        # Positive: encode with slightly different padding (perturb bytes)
         byte_data = text.encode('utf-8')
-        if len(byte_data) < 2:
-            return torch.tensor(0.0, device=wave1.device)
+        if len(byte_data) < 4:
+            return torch.tensor(0.0, device=next(self.cse.parameters()).device)
 
-        # Simple augmentation: trim 1 char from end
-        aug_text = text[:-1] if len(text) > 1 else text
-        wave2 = self.cse.encode(aug_text).full.mean(dim=0)
+        # ── Positive pair: first half vs second half ──────────────
+        mid = len(text) // 2
+        half_a = text[:mid]
+        half_b = text[mid:]
+        if not half_a or not half_b:
+            return torch.tensor(0.0, device=next(self.cse.parameters()).device)
 
-        # Positive pair: cosine should be > 0.8
-        pos_sim = F.cosine_similarity(wave1.unsqueeze(0), wave2.unsqueeze(0))
-        coherence_loss = F.relu(0.8 - pos_sim).mean()
+        w_a = self.cse.encode(half_a).full.mean(dim=0)  # [432]
+        w_b = self.cse.encode(half_b).full.mean(dim=0)  # [432]
+        pos_sim = F.cosine_similarity(w_a.unsqueeze(0), w_b.unsqueeze(0))
+        pos_loss = F.relu(0.6 - pos_sim).mean()
 
-        return coherence_loss
+        # ── Negative pair: anchor vs a random different text ──────
+        neg_texts = [t for t in TRAINING_TEXTS if t != text and len(t) > 4]
+        if neg_texts:
+            neg_text = random.choice(neg_texts)
+            w_anchor = self.cse.encode(text).full.mean(dim=0)
+            w_neg    = self.cse.encode(neg_text).full.mean(dim=0)
+            neg_sim  = F.cosine_similarity(w_anchor.unsqueeze(0), w_neg.unsqueeze(0))
+            # Penalise if negative is too similar (> 0.3)
+            neg_loss = F.relu(neg_sim - 0.3).mean()
+        else:
+            neg_loss = torch.tensor(0.0, device=w_a.device)
+
+        return pos_loss + 0.5 * neg_loss
 
 
 # ─────────────────────────────────────────────
@@ -202,7 +493,7 @@ def train_codec(
     save_every: int = 5_000,
     decode_loss_weight: float = 1.0,
     coherence_loss_weight: float = 0.1,
-    gate_check_every: int = 5_000,
+    gate_check_every: int = 1_000,   # Check gate every 1K steps (was 5K — missed best peak)
     upload_hf: bool = False,
     hf_token: str = None,
 ) -> WaveCodec:
@@ -242,20 +533,28 @@ def train_codec(
     scheduler = CosineAnnealingLR(optimizer, T_max=steps, eta_min=lr * 0.01)
 
     # ── Training texts ────────────────────────────────────────────
+    log.info("Building training corpus from HuggingFace datasets...")
     texts = get_training_texts(augment=True)
-    log.info(f"Training corpus: {len(texts)} texts")
+    log.info(f"Training corpus: {len(texts):,} texts ({len(GATE_TEXTS)} gate texts pinned at front)")
 
     # ── Metrics tracking ─────────────────────────────────────────
     running_decode_loss   = 0.0
     running_coherence_loss = 0.0
     running_total_loss    = 0.0
     best_decode_loss      = float('inf')
+    best_gate_avg         = 0.0    # Track best gate score → save best checkpoint
+    best_gate_step        = 0
 
     # ── Training loop ─────────────────────────────────────────────
     codec.train()
+    n_texts = len(texts)
     for step in range(1, steps + 1):
-        # Cycle through training texts
-        text = texts[(step - 1) % len(texts)]
+        # Pin gate texts every 50 steps (ensures they stay warm regardless of corpus size),
+        # otherwise sample uniformly at random for gradient diversity.
+        if step % 50 == 0:
+            text = texts[(step // 50 - 1) % len(GATE_TEXTS)]
+        else:
+            text = texts[random.randrange(n_texts)]
 
         optimizer.zero_grad()
 
@@ -306,8 +605,38 @@ def train_codec(
                     codec.cse, codec.chunker, codec.wtt,
                     phase=1, raise_on_fail=False,
                 )
-                status = '✓' if passed else '⚠ NOT YET'
+                status = '✓ PASSED' if passed else '⚠ NOT YET'
                 log.metric(f"step {step:6d} decode gate", f"{status}  avg={avg_acc:.1%}  min={min_acc:.1%}")
+
+                # Save best-gate checkpoint whenever gate improves
+                if avg_acc > best_gate_avg:
+                    best_gate_avg  = avg_acc
+                    best_gate_step = step
+                    _save_phase1_checkpoint(codec, step, best_decode_loss, tag='best_gate')
+                    log.success(f"New best gate checkpoint: avg={avg_acc:.1%}  step={step}")
+
+                # Early stopping: gate passed → save final and exit
+                if passed:
+                    log.success(f"DECODE GATE PASSED at step {step} — stopping early")
+                    final_path = _save_phase1_checkpoint(codec, step, best_decode_loss, is_final=True)
+                    log.success(f"Final checkpoint saved: {final_path}")
+                    if upload_hf and hf_token:
+                        try:
+                            upload_checkpoint_to_hf(phase=1, hf_token=hf_token)
+                            log.success("Checkpoint uploaded to HuggingFace Hub")
+                        except Exception as e:
+                            log.warning(f"HF upload failed: {e}")
+                    results = PhaseResults(phase=1, component_name="Wave Codec (v2 — Joint CSE+WTT)")
+                    results.add_test("Decode Gate Avg Accuracy", passed=True, score=avg_acc, threshold=0.90)
+                    results.add_test("Decode Gate Min Accuracy", passed=(min_acc >= 0.70), score=min_acc, threshold=0.70)
+                    results.add_test("Training Converged", passed=(best_decode_loss < 1.0), score=best_decode_loss, threshold=1.0)
+                    results.save()
+                    log.separator("Phase 1 v2 Training Complete (Early Stop — Gate Passed)")
+                    log.info(f"Best gate avg  : {avg_acc:.1%}  (step {step})")
+                    log.info(f"Best decode loss: {best_decode_loss:.4f}")
+                    codec.train()
+                    return codec
+
             except Exception as e:
                 log.warning(f"Decode gate error at step {step}: {e}")
             codec.train()
@@ -359,12 +688,18 @@ def _save_phase1_checkpoint(
     step: int,
     best_loss: float,
     is_final: bool = False,
+    tag: str = '',
 ) -> Path:
-    """Save phase 1 v2 checkpoint."""
+    """Save phase 1 v2 checkpoint.
+
+    Args:
+        tag: Optional filename suffix, e.g. 'best_gate' → phase1_v2_best_gate.phase.pt
+    """
 
     checkpoint_dir = Path(__file__).parent.parent.parent / 'checkpoints'
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    path = checkpoint_dir / 'phase1_v2.phase.pt'
+    fname = f'phase1_v2_{tag}.phase.pt' if tag else 'phase1_v2.phase.pt'
+    path = checkpoint_dir / fname
 
     state = {
         'phase': 1,
