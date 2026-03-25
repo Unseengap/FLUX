@@ -229,6 +229,10 @@ def train_field(
     if device == 'auto':
         device = get_device()
 
+    # Strip \r\n that Colab/Kaggle secrets silently append to token strings
+    if hf_token:
+        hf_token = hf_token.strip()
+
     log = PhaseLogger(phase=2)
     log.separator("Phase 2 v2 — Resonance Field with Decode Loss")
     log.info(f"Device: {device}")
