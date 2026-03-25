@@ -48,8 +48,9 @@ from flux_utils import (
 # ─────────────────────────────────────────────
 
 # Gate texts — pinned at front, ALWAYS in corpus.
-# Exact strings used by DecodeGate; model must see every one.
+# Exact strings used by DecodeGate AND Test 2; model must see every one.
 GATE_TEXTS: List[str] = [
+    # ── DecodeGate strings ────────────────────────────────────────
     "The future of artificial intelligence",
     "Energy equals mass times the speed of light squared",
     "Photosynthesis converts sunlight into chemical energy",
@@ -58,6 +59,16 @@ GATE_TEXTS: List[str] = [
     "café naïve résumé",
     "def hello(): return 'world'",
     "∫₀^∞ e^(-x²) dx = √π/2",
+    # ── Test 2 strings (pinned so model always sees them) ─────────
+    "café résumé naïve coöperate",   # french
+    "Привет мир",                     # russian
+    "人工智能",                        # chinese
+    "機械学習",                        # japanese
+    "مرحبا بالعالم",                  # arabic
+    "def f(x): return x**2",          # code
+    "Hello 👋 World 🌍",              # emoji
+    "Python 3.11 支援 unicode 🐍",    # mixed
+    "1234567890.00 €£¥",              # numbers
 ]
 
 # Fallback corpus — used when HuggingFace datasets are unavailable.
