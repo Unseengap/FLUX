@@ -849,11 +849,8 @@ def load_phase9_for_9_1(device: str = 'cpu'):
     ckpt = load_checkpoint(9)
     config = ckpt.get('config', {})
 
-    # Build and load CSE
-    cse = ContinuousSemanticEncoder(**{
-        k: v for k, v in config.items()
-        if k in ['wave_dim', 'window_size', 'stride']
-    })
+    # Build CSE with defaults (config keys don't match CSE constructor names)
+    cse = ContinuousSemanticEncoder()
     if 'cse_state_dict' in ckpt:
         cse.load_state_dict(ckpt['cse_state_dict'])
     cse.eval()
@@ -920,11 +917,8 @@ def load_phase9_1_modules(device: str = 'cpu'):
     config = ckpt.get('config', {})
     p91cfg = ckpt.get('phase9_1_config', PHASE9_1_CONFIG)
 
-    # CSE
-    cse = ContinuousSemanticEncoder(**{
-        k: v for k, v in config.items()
-        if k in ['wave_dim', 'window_size', 'stride']
-    })
+    # CSE — use defaults (config keys don't match CSE constructor names)
+    cse = ContinuousSemanticEncoder()
     if 'cse_state_dict' in ckpt:
         cse.load_state_dict(ckpt['cse_state_dict'])
     cse.eval()
