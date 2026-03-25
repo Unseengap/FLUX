@@ -1,0 +1,209 @@
+[13:11:49] ============================================================
+[13:11:49] FLUX Phase 1 Log
+[13:11:49] Started: 2026-03-25 13:11:49
+[13:11:49] ============================================================
+
+[13:11:49] 
+▶ CELL: Cell 3 — Hardware & Credentials
+[13:11:49]   Started: 2026-03-25 13:11:49
+[13:11:49]   ℹ Runtime   : colab
+[13:11:49]   ℹ WORK_DIR  : /content
+[13:11:49]   ℹ REPO_PATH : /content/FLUX
+[13:11:49]   ℹ Device    : cuda
+[13:11:49]   ✓ GPU: NVIDIA L4
+[13:11:49]   📊 Total VRAM: 23.7 GB
+[13:11:49]   📊 Free VRAM: 23.7 GB
+[13:11:53]   ℹ HF_TOKEN loaded from Colab secrets
+[13:11:53]   ⚠ HuggingFace login failed: Illegal header value b'Bearer [TOKEN_REDACTED]\r\n'
+[13:11:53]   ◼ CELL Cell 3 — Hardware & Credentials — PASS
+[13:11:53] 
+▶ CELL: Cell 4 — Smoke Test
+[13:11:53]   Started: 2026-03-25 13:11:53
+[13:11:54]   ✓ SMOKE TEST PASSED — all imports and shapes OK
+[13:11:54]   ◼ CELL Cell 4 — Smoke Test — PASS
+[13:11:54] 
+▶ CELL: Cell 5 — Training
+[13:11:54]   Started: 2026-03-25 13:11:54
+[13:11:54]   ℹ Steps          : 30,000
+[13:11:54]   ℹ Learning rate  : 0.0003
+[13:11:54]   ℹ Device         : cuda
+[13:11:54]   ℹ Checkpoint out : /content/FLUX/checkpoints/phase1_v2.phase.pt
+[13:11:54]   ℹ Gate check every 1,000 steps — saves best-gate checkpoint automatically
+[13:11:54] 
+──────────────────── Starting joint training... ────────────────────
+[13:11:54] 
+──────────────────── Phase 1 v2 — Wave Codec Joint Training ────────────────────
+[13:11:54]   ℹ Device: cuda
+[13:11:54]   ℹ Steps: 30,000
+[13:11:54]   ℹ decode_loss_weight=1.0  coherence_loss_weight=0.1
+[13:11:54]   ℹ Model parameters: 2,152,081
+[13:11:59]   ℹ Building training corpus from HuggingFace datasets...
+[13:12:43]   ℹ Training corpus: 17,144 texts (17 gate texts pinned at front)
+[13:13:23]   📊 step    500: decode=3.2380  coherence=0.3243  total=3.2704  lr=0.000300
+[13:13:58]   📊 step   1000: decode=2.8589  coherence=0.3140  total=2.8902  lr=0.000299
+[13:13:59]   📊 step   1000 decode gate: ⚠ NOT YET  avg=7.0%  min=0.0%
+[13:13:59]   ✓ New best gate checkpoint: avg=7.0%  step=1000
+[13:14:34]   📊 step   1500: decode=2.6325  coherence=0.2958  total=2.6620  lr=0.000298
+[13:15:18]   📊 step   2000: decode=1.4092  coherence=0.2848  total=1.4377  lr=0.000297
+[13:15:18]   📊 step   2000 decode gate: ⚠ NOT YET  avg=35.8%  min=3.1%
+[13:15:18]   ✓ New best gate checkpoint: avg=35.8%  step=2000
+[13:16:03]   📊 step   2500: decode=0.6082  coherence=0.2718  total=0.6353  lr=0.000295
+[13:16:49]   📊 step   3000: decode=0.3877  coherence=0.2540  total=0.4131  lr=0.000293
+[13:16:49]   📊 step   3000 decode gate: ⚠ NOT YET  avg=52.2%  min=3.1%
+[13:16:49]   ✓ New best gate checkpoint: avg=52.2%  step=3000
+[13:17:35]   📊 step   3500: decode=0.3513  coherence=0.2471  total=0.3760  lr=0.000290
+[13:18:20]   📊 step   4000: decode=0.2582  coherence=0.2604  total=0.2843  lr=0.000287
+[13:18:21]   📊 step   4000 decode gate: ⚠ NOT YET  avg=58.9%  min=6.2%
+[13:18:21]   ✓ New best gate checkpoint: avg=58.9%  step=4000
+[13:19:06]   📊 step   4500: decode=0.2488  coherence=0.2464  total=0.2734  lr=0.000284
+[13:19:51]   📊 step   5000: decode=0.2599  coherence=0.2364  total=0.2836  lr=0.000280
+[13:19:51]   📊 step   5000 decode gate: ⚠ NOT YET  avg=60.3%  min=6.2%
+[13:19:51]   ✓ New best gate checkpoint: avg=60.3%  step=5000
+[13:19:51]   ✓ Checkpoint saved at step 5000
+[13:20:37]   📊 step   5500: decode=0.1892  coherence=0.2478  total=0.2140  lr=0.000276
+[13:21:22]   📊 step   6000: decode=0.1953  coherence=0.2292  total=0.2182  lr=0.000272
+[13:21:22]   📊 step   6000 decode gate: ⚠ NOT YET  avg=82.2%  min=3.1%
+[13:21:22]   ✓ New best gate checkpoint: avg=82.2%  step=6000
+[13:22:08]   📊 step   6500: decode=0.1632  coherence=0.2432  total=0.1875  lr=0.000267
+[13:22:54]   📊 step   7000: decode=0.1833  coherence=0.2307  total=0.2064  lr=0.000262
+[13:22:55]   📊 step   7000 decode gate: ⚠ NOT YET  avg=70.1%  min=12.1%
+[13:23:40]   📊 step   7500: decode=0.1602  coherence=0.2248  total=0.1827  lr=0.000257
+[13:24:25]   📊 step   8000: decode=0.1320  coherence=0.2096  total=0.1529  lr=0.000251
+[13:24:26]   📊 step   8000 decode gate: ⚠ NOT YET  avg=86.4%  min=15.2%
+[13:24:26]   ✓ New best gate checkpoint: avg=86.4%  step=8000
+[13:25:10]   📊 step   8500: decode=0.1887  coherence=0.2149  total=0.2102  lr=0.000245
+[13:25:55]   📊 step   9000: decode=0.1147  coherence=0.2152  total=0.1362  lr=0.000239
+[13:25:56]   📊 step   9000 decode gate: ⚠ NOT YET  avg=75.2%  min=3.1%
+[13:26:41]   📊 step   9500: decode=0.1549  coherence=0.1739  total=0.1723  lr=0.000232
+[13:27:27]   📊 step  10000: decode=0.1506  coherence=0.1504  total=0.1657  lr=0.000226
+[13:27:27]   📊 step  10000 decode gate: ⚠ NOT YET  avg=89.2%  min=18.9%
+[13:27:27]   ✓ New best gate checkpoint: avg=89.2%  step=10000
+[13:27:27]   ✓ Checkpoint saved at step 10000
+[13:28:13]   📊 step  10500: decode=0.1166  coherence=0.1403  total=0.1307  lr=0.000219
+[13:29:00]   📊 step  11000: decode=0.1259  coherence=0.1319  total=0.1390  lr=0.000212
+[13:29:00]   📊 step  11000 decode gate: ⚠ NOT YET  avg=87.5%  min=0.0%
+[13:29:46]   📊 step  11500: decode=0.0785  coherence=0.1196  total=0.0905  lr=0.000205
+[13:30:33]   📊 step  12000: decode=0.1076  coherence=0.1083  total=0.1184  lr=0.000197
+[13:30:33]   📊 step  12000 decode gate: ⚠ NOT YET  avg=77.9%  min=13.2%
+[13:31:20]   📊 step  12500: decode=0.0757  coherence=0.1035  total=0.0860  lr=0.000190
+[13:32:06]   📊 step  13000: decode=0.0892  coherence=0.1065  total=0.0999  lr=0.000182
+[13:32:06]   📊 step  13000 decode gate: ⚠ NOT YET  avg=88.2%  min=5.4%
+[13:32:51]   📊 step  13500: decode=0.0865  coherence=0.0933  total=0.0958  lr=0.000175
+[13:33:38]   📊 step  14000: decode=0.0581  coherence=0.0958  total=0.0677  lr=0.000167
+[13:33:38]   📊 step  14000 decode gate: ⚠ NOT YET  avg=88.0%  min=18.4%
+[13:34:24]   📊 step  14500: decode=0.0739  coherence=0.0886  total=0.0828  lr=0.000159
+[13:35:10]   📊 step  15000: decode=0.0727  coherence=0.0825  total=0.0810  lr=0.000152
+[13:35:11]   📊 step  15000 decode gate: ⚠ NOT YET  avg=89.0%  min=12.1%
+[13:35:11]   ✓ Checkpoint saved at step 15000
+[13:35:56]   📊 step  15500: decode=0.0636  coherence=0.0860  total=0.0722  lr=0.000144
+[13:36:41]   📊 step  16000: decode=0.0685  coherence=0.0778  total=0.0763  lr=0.000136
+[13:36:42]   📊 step  16000 decode gate: ⚠ NOT YET  avg=89.8%  min=18.8%
+[13:36:42]   ✓ New best gate checkpoint: avg=89.8%  step=16000
+[13:37:26]   📊 step  16500: decode=0.0556  coherence=0.0756  total=0.0632  lr=0.000128
+[13:38:13]   📊 step  17000: decode=0.0687  coherence=0.0802  total=0.0767  lr=0.000121
+[13:38:13]   📊 step  17000 decode gate: ✓ PASSED  avg=100.0%  min=100.0%
+[13:38:13]   ✓ New best gate checkpoint: avg=100.0%  step=17000
+[13:38:13]   ✓ DECODE GATE PASSED at step 17000 — stopping early
+[13:38:13]   ✓ Final checkpoint saved: /content/FLUX/checkpoints/phase1_v2.phase.pt
+[13:38:13] 
+──────────────────── Phase 1 v2 Training Complete (Early Stop — Gate Passed) ────────────────────
+[13:38:13]   ℹ Best gate avg  : 100.0%  (step 17000)
+[13:38:13]   ℹ Best decode loss: 0.0556
+[13:38:13]   ✓ Training complete
+[13:38:13]   📊 Checkpoint: /content/FLUX/checkpoints/phase1_v2.phase.pt
+[13:38:13]   ◼ CELL Cell 5 — Training — PASS
+[13:38:13] 
+▶ CELL: Cell 6 — Training Diagnostics
+[13:38:13]   Started: 2026-03-25 13:38:13
+[13:38:13]   ✓ ALL DIAGNOSTICS PASSED — safe to upload
+[13:38:13]   ◼ CELL Cell 6 — Training Diagnostics — PASS
+[13:38:13] 
+▶ CELL: Cell 7 — Upload to HuggingFace
+[13:38:13]   Started: 2026-03-25 13:38:13
+[13:38:14]   ℹ Repo confirmed: https://huggingface.co/UnseenGAP/FLUX
+[13:38:14]   ℹ Uploading 8.6 MB  →  UnseenGAP/FLUX/v2/phase1_v2.phase.pt
+[13:38:19]   ✓ Upload complete
+[13:38:19]   📊 HF URL: https://huggingface.co/UnseenGAP/FLUX/blob/main/v2/phase1_v2.phase.pt
+[13:38:19]   ◼ CELL Cell 7 — Upload to HuggingFace — PASS
+[13:38:19] 
+▶ CELL: Cell 8 — Test 1: Round-Trip Byte Accuracy
+[13:38:19]   Started: 2026-03-25 13:38:19
+[13:39:05] 
+▶ CELL: Cell 6 — Training Diagnostics
+[13:39:05]   Started: 2026-03-25 13:39:05
+[13:39:05]   ✓ ALL DIAGNOSTICS PASSED — safe to upload
+[13:39:05]   ◼ CELL Cell 6 — Training Diagnostics — PASS
+[13:43:03] 
+▶ CELL: Cell 8 — Test 1: Round-Trip Byte Accuracy
+[13:43:03]   Started: 2026-03-25 13:43:03
+[13:43:42] 
+▶ CELL: Cell 8 — Test 1: Round-Trip Byte Accuracy
+[13:43:42]   Started: 2026-03-25 13:43:42
+[13:43:46]   ✗ TEST 1 FAILED — avg=94.5% (need ≥95%)  min=56.0% (need ≥70%)
+[13:43:46]   ◼ CELL Cell 8 — Test 1: Round-Trip Byte Accuracy — FAIL
+[13:43:56] 
+▶ CELL: Cell 9 — Test 2: Language-Agnostic Decode
+[13:43:56]   Started: 2026-03-25 13:43:56
+[13:43:56]   ✗ TEST 2 FAILED — only 67% passed (need ≥67%)
+[13:43:56]   ◼ CELL Cell 9 — Test 2: Language-Agnostic Decode — FAIL
+[13:44:07] 
+▶ CELL: Cell 10 — Test 3: Wave Similarity Structure
+[13:44:07]   Started: 2026-03-25 13:44:07
+[13:44:07]   ✓ TEST 3 PASSED — sim=86%  ordering=✓  deterministic=✓
+[13:44:07]   ◼ CELL Cell 10 — Test 3: Wave Similarity Structure — PASS
+[13:44:13] 
+▶ CELL: Cell 11 — Demo 1: Round-Trip
+[13:44:13]   Started: 2026-03-25 13:44:13
+[13:44:13]   ✓ Demo 1 complete
+[13:44:13]   ◼ CELL Cell 11 — Demo 1: Round-Trip — PASS
+[13:44:19] 
+▶ CELL: Cell 12 — Demo 2: Similarity Heatmap + Graphs
+[13:44:19]   Started: 2026-03-25 13:44:19
+[13:44:20]   ✓ Demo 2 complete — all graphs saved
+[13:44:20]   ◼ CELL Cell 12 — Demo 2: Similarity Heatmap + Graphs — PASS
+[13:44:27] 
+▶ CELL: Cell 13 — Save Results
+[13:44:27]   Started: 2026-03-25 13:44:27
+[13:44:27]   ✓ Log copied → /content/FLUX/v2/V2_results/phase1/logs/phase1.log
+[13:44:27]   ✓ RESULTS_PHASE_1.md → /content/FLUX/v2/V2_results/phase1/RESULTS_PHASE_1.md
+[13:44:29]   ✓ Git push completed
+[13:44:29]   ◼ CELL Cell 13 — Save Results — PASS
+[13:52:08] 
+▶ CELL: Cell 13 — Save Results
+[13:52:08]   Started: 2026-03-25 13:52:08
+[13:52:08]   ✓ Log copied → /content/FLUX/v2/V2_results/phase1/logs/phase1.log
+[13:52:08]   ✓ RESULTS_PHASE_1.md → /content/FLUX/v2/V2_results/phase1/RESULTS_PHASE_1.md
+[13:52:09]   ✓ Logs uploaded to HuggingFace
+[13:52:10]   ℹ GITHUB_TOKEN loaded from Colab secrets
+[13:52:10]   ℹ Git remote URL updated with token auth
+[13:52:10]   ✓ git commit: [v2 bd7231d] Phase 1 v2 — results, logs, graphs [auto]
+ 10 files changed, 508 in
+[13:52:11]   ✗ Git push FAILED: remote: error: GH013: Repository rule violations found for refs/heads/v2.        
+remote: 
+remote: - GITHUB PUSH PROTECTION        
+remote:   —————————————————————————————————————————        
+remote: 
+[13:52:11]   ✗ Check that GITHUB_TOKEN has 'repo' write scope
+[13:52:11]   ◼ CELL Cell 13 — Save Results — PASS
+[13:55:14] 
+▶ CELL: Cell 13 — Save Results
+[13:55:14]   Started: 2026-03-25 13:55:14
+[13:55:14]   ✓ Log copied → /content/FLUX/v2/V2_results/phase1/logs/phase1.log
+[13:55:14]   ✓ RESULTS_PHASE_1.md → /content/FLUX/v2/V2_results/phase1/RESULTS_PHASE_1.md
+[13:55:15]   ✓ Logs uploaded to HuggingFace
+[13:55:15]   ℹ Git remote authenticated
+[13:55:15]   ✓ git commit: [v2 94debc9] Phase 1 v2 — results, logs, graphs [auto]
+ 4 files changed, 39 inse
+[13:55:17]   ✗ Git push FAILED:
+remote: error: GH013: Repository rule violations found for refs/heads/v2.        
+remote: 
+remote: - GITHUB PUSH PROTECTION        
+remote:   —————————————————————————————————————————        
+remote:     Resolve the following violations before pushing again        
+remote: 
+remote:     - Push cannot
+[13:55:17]   ℹ Git remote URL restored (token removed)
+[13:55:17]   ◼ CELL Cell 13 — Save Results — PASS
+[13:58:54] 
+▶ CELL: Cell 13 — Save Results
+[13:58:54]   Started: 2026-03-25 13:58:54

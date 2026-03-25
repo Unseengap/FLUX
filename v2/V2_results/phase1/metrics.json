@@ -1,0 +1,82 @@
+{
+  "test1_avg_byte_accuracy": 0.945,
+  "test1_min_byte_accuracy": 0.56,
+  "test1_per_text": {
+    "The future of artificial intelligence": 1.0,
+    "Energy equals mass times the speed of li": 1.0,
+    "Photosynthesis converts sunlight into ch": 1.0,
+    "Water freezes at zero degrees Celsius": 1.0,
+    "The cat sat on the mat": 1.0,
+    "caf\u00e9 na\u00efve r\u00e9sum\u00e9": 1.0,
+    "def hello(): return 'world'": 1.0,
+    "\u222b\u2080^\u221e e^(-x\u00b2) dx = \u221a\u03c0/2": 0.6944
+  },
+  "test2_pass_rate": 0.6667,
+  "test2_per_language": {
+    "english": {
+      "acc": 1.0,
+      "threshold": 0.9,
+      "passed": true
+    },
+    "french": {
+      "acc": 1.0,
+      "threshold": 0.7,
+      "passed": true
+    },
+    "russian": {
+      "acc": 1.0,
+      "threshold": 0.6,
+      "passed": true
+    },
+    "chinese": {
+      "acc": 0.2222,
+      "threshold": 0.4,
+      "passed": false
+    },
+    "japanese": {
+      "acc": 0.2222,
+      "threshold": 0.4,
+      "passed": false
+    },
+    "arabic": {
+      "acc": 0.3846,
+      "threshold": 0.35,
+      "passed": true
+    },
+    "math": {
+      "acc": 1.0,
+      "threshold": 0.7,
+      "passed": true
+    },
+    "code": {
+      "acc": 0.9048,
+      "threshold": 0.85,
+      "passed": true
+    },
+    "emoji": {
+      "acc": 1.0,
+      "threshold": 0.5,
+      "passed": true
+    },
+    "mixed": {
+      "acc": 0.9677,
+      "threshold": 0.55,
+      "passed": true
+    },
+    "numbers": {
+      "acc": 0.3333,
+      "threshold": 0.65,
+      "passed": false
+    },
+    "short": {
+      "acc": 0.5,
+      "threshold": 0.9,
+      "passed": false
+    }
+  },
+  "test3_similar_pass_rate": 0.8571,
+  "test3_ordering_ok": true,
+  "test3_self_similarity_ok": true,
+  "test3_avg_similar_cosine": 0.817,
+  "test3_avg_dissimilar_cosine": 0.2544
+}

@@ -1,0 +1,17 @@
+{
+  "phase": 1,
+  "version": "v2",
+  "checks": {
+    "Checkpoint exists on disk": "PASS",
+    "Checkpoint loads without error": "PASS",
+    "All state_dict keys present": "PASS",
+    "Loss is finite (no NaN/Inf)": "PASS",
+    "Loss below threshold (< 2.0)": "PASS",
+    "Model forward pass OK": "PASS",
+    "Wave shape correct [N, 432]": "PASS",
+    "Wave is not degenerate (std > 0)": "PASS",
+    "Mini decode gate (avg > 50%)": "PASS"
+  },
+  "loss": 0.05558866542993201,
+  "mini_decode_avg": 1.0
+}
