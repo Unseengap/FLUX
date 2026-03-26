@@ -1,7 +1,7 @@
 """
 Phase 8 — Test 2: Perplexity on WikiText-2
 
-Measures FLUXLarge byte-level perplexity on WikiText-2 test set.
+Measures FLUXModel (Phase 8) byte-level perplexity on WikiText-2 test set.
 
 Pass Criteria:
   - Perplexity is finite

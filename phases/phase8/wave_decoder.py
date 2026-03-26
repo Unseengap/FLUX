@@ -43,7 +43,7 @@ class WaveDecoder(nn.Module):
 
     Args:
         wave_dim: CSE wave dimension (432)
-        field_features: Field feature dimension (768 for FLUXLarge)
+        field_features: Field feature dimension (512 for Phase 8)
         embed_dim: Byte embedding dimension
         hidden_dim: GRU hidden dimension
         num_layers: Number of GRU layers
@@ -55,7 +55,7 @@ class WaveDecoder(nn.Module):
     def __init__(
         self,
         wave_dim: int = 432,
-        field_features: int = 768,
+        field_features: int = 512,
         embed_dim: int = 128,
         hidden_dim: int = 512,
         num_layers: int = 2,
@@ -305,7 +305,7 @@ class WaveDecoder(nn.Module):
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     print("WaveDecoder self-test (cross-attention)")
-    decoder = WaveDecoder(wave_dim=432, field_features=768)
+    decoder = WaveDecoder(wave_dim=432, field_features=512)
     n_params = sum(p.numel() for p in decoder.parameters())
     print(f"  Parameters: {n_params:,}")
 

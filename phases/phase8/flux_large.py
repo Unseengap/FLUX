@@ -1,18 +1,22 @@
 """
-Phase 8: FLUXLarge — Scaled FLUX Configuration for GPT-2 Benchmark
+Phase 8: FLUXModel + WaveDecoder — Scaled FLUX for GPT-2 Benchmark
 
-Scales the Phase 7 FLUXModel to approximately GPT-2 small (117M) parameter
-count. Uses a larger field, more CGN nodes, and wider internal features.
+Uses the SAME FLUXModel from Phase 7 with compatible field_features=512,
+so all Phase 1-7 trained weights transfer directly. Scales capacity via:
+- Larger spatial field (96³ vs 64³) — more attractor slots
+- More CGN nodes (32/16/8 vs 16/8/4) — finer causal reasoning
+- Larger working memory (2048 vs 512) — longer context
+- WaveDecoder: new autoregressive byte-level decoder (~5M params)
 
-The CSE (Phase 1) always outputs 432-dim waves — this is fixed. FLUXLarge
-adds an upscale projection (432 → 768) so all downstream components operate
-in the larger 768-dim feature space.
+CRITICAL: field_features stays at 512 to preserve Phase 7 compatibility.
+The previous FLUXLarge used 768, which broke all trained weights from
+Phases 1-7 and forced retraining from scratch on only 13MB of data.
 
 The scaling philosophy follows the physics paradigm:
 - Larger field = more knowledge capacity (96³ vs 64³)
 - More CGN nodes = finer-grained causal reasoning (56 vs 28)
-- Wider field features = richer representations (768 vs 512)
 - Deeper working memory window = longer effective context (2048 vs 512)
+- WaveDecoder = autoregressive byte generation guided by field semantics
 """
 
 import sys
@@ -66,35 +70,33 @@ from flux_utils import (
 CSE_WAVE_DIM = TOTAL_WAVE_DIM  # 432 — always, cannot be changed
 
 # ─────────────────────────────────────────────
-# Scaled Internal Dimensions
+# Field features — MUST stay 512 for Phase 7 compatibility
 # ─────────────────────────────────────────────
-INTERNAL_DIM_LARGE = 768       # Internal feature width (matches GPT-2 embed dim)
+FIELD_FEATURES_PHASE8 = 512    # Same as Phase 7 — all trained weights transfer
 
 # ─────────────────────────────────────────────
-# Scaled Field Dimensions
+# Scaled Field Spatial Dimensions (capacity scaling)
 # ─────────────────────────────────────────────
 FIELD_H_LARGE = 96
 FIELD_W_LARGE = 96
 FIELD_D_LARGE = 96
-FIELD_FEATURES_LARGE = 768
 
 
 # ─────────────────────────────────────────────
-# FLUXLarge Configuration
+# Phase 8 Configuration — compatible with Phase 7 weights
 # ─────────────────────────────────────────────
 FLUX_LARGE_CONFIG = {
     # CSE (Phase 1) — wave_dim stays 432 (CSE is frozen / fixed)
-    # The upscale projection handles 432 → 768
     'wave_dim': CSE_WAVE_DIM,              # 432 — must match CSE output
     'byte_window': 8,
     'byte_stride': 1,
     'interference_radius': 6,               # wider interference
 
-    # Field (Phase 2) — scaled
-    'field_h': FIELD_H_LARGE,               # 96
-    'field_w': FIELD_W_LARGE,               # 96
-    'field_d': FIELD_D_LARGE,               # 96
-    'field_features': FIELD_FEATURES_LARGE,  # 768
+    # Field (Phase 2) — scaled spatial dims, SAME feature width
+    'field_h': FIELD_H_LARGE,               # 96 (up from 64)
+    'field_w': FIELD_W_LARGE,               # 96 (up from 64)
+    'field_d': FIELD_D_LARGE,               # 96 (up from 64)
+    'field_features': FIELD_FEATURES_PHASE8, # 512 — SAME as Phase 7
 
     # GR (Phase 3) — scaled
     'gr_k_neighbors': 64,
@@ -107,14 +109,13 @@ FLUX_LARGE_CONFIG = {
     'tl_decay': 0.9999,
     'tl_settle_iterations': 15,
 
-    # CGN (Phase 5) — scaled
-    'cgn_feature_dim': FIELD_FEATURES_LARGE,
+    # CGN (Phase 5) — scaled node counts, SAME feature dim
+    'cgn_feature_dim': FIELD_FEATURES_PHASE8,  # 512 — SAME as Phase 7
     'cgn_n_fast': 32,
     'cgn_n_medium': 16,
     'cgn_n_slow': 8,
 
-    # Memory (Phase 6) — scaled
-    # wave_dim for memory = 432 (CSE output), feature_dim = 512
+    # Memory (Phase 6) — scaled window + episodic dim
     'wm_window_size': 2048,
     'feature_dim': 512,
     'episodic_dim': 512,
@@ -125,10 +126,6 @@ FLUX_LARGE_CONFIG = {
     'output_vocab_size': 256,               # byte-level output
     'max_gen_length': 500,
     'temperature': 0.8,
-
-    # Internal scaling metadata
-    'internal_dim': INTERNAL_DIM_LARGE,     # 768
-    'cse_wave_dim': CSE_WAVE_DIM,           # 432 (actual CSE output)
 }
 
 
@@ -146,21 +143,17 @@ class ScaleProfile:
 
 class FLUXLarge(FLUXModel):
     """
-    Scaled FLUX model targeting GPT-2 small (~117M) parameter count.
+    Phase 8 FLUX model — FLUXModel + WaveDecoder for generation.
 
-    Inherits from FLUXModel (Phase 7) and overrides configuration
-    to use a larger field, more nodes, and wider internal features.
-
-    The CSE always outputs 432-dim waves (Phase 1 is frozen). FLUXLarge
-    adds a learnable upscale projection (432 → 768) so all downstream
-    components can operate in a richer feature space.
-
-    Key scaling changes:
-    - field: 64³ → 96³ (more knowledge capacity)
-    - field_features: 512 → 768 (wider internal representations)
+    Uses the SAME field_features=512 as Phase 7, so all trained weights
+    from Phases 1-7 transfer perfectly. Scales capacity via:
+    - field: 64³ → 96³ (more attractor slots / knowledge capacity)
     - CGN nodes: 28 → 56 (finer causal reasoning)
     - Working memory: 512 → 2048 (longer context)
-    - wave_to_field bridge: 432 → 768 (upscale from CSE output)
+    - WaveDecoder: autoregressive byte-level generation (~5M params)
+
+    The FLUX pipeline decides WHAT to say (semantic meaning via field).
+    The WaveDecoder decides HOW to spell it (byte generation).
 
     Usage:
         model = FLUXLarge(device='cuda')
@@ -172,21 +165,20 @@ class FLUXLarge(FLUXModel):
         super().__init__(config=merged, device=device)
 
         # The parent FLUXModel creates all components using the config:
-        #   - CSE always outputs 432-dim (wave_dim=432 in config, matching Phase 1)
-        #   - wave_to_field bridge: nn.Linear(432, 768) — upscales to larger field
-        #   - field_to_wave bridge: nn.Linear(768, 432) — downscales back
-        #   - field: 96³ × 768 features (larger than Phase 7's 64³ × 512)
-        #   - output_head: accepts field_features=768, wave_context=432
+        #   - CSE always outputs 432-dim (wave_dim=432, matching Phase 1)
+        #   - wave_to_field bridge: nn.Linear(432, 512) — SAME as Phase 7
+        #   - field_to_wave bridge: nn.Linear(512, 432) — SAME as Phase 7
+        #   - field: 96³ × 512 features (larger spatial, same feature width)
+        #   - output_head: accepts field_features=512, wave_context=432
         #
-        # No dimension mismatch — wave_dim stays 432 (CSE is frozen),
-        # while field_features scales to 768 for more capacity.
+        # All Phase 7 trained weights load without dimension mismatch.
 
         # ── WaveDecoder: autoregressive byte-level generation ──
         # The OutputHead predicts byte distributions for training.
         # The WaveDecoder generates coherent byte SEQUENCES.
         self.decoder = WaveDecoder(
-            wave_dim=merged['wave_dim'],           # 432
-            field_features=merged['field_features'],  # 768
+            wave_dim=merged['wave_dim'],              # 432
+            field_features=merged['field_features'],  # 512
             embed_dim=128,
             hidden_dim=512,
             num_layers=2,
@@ -300,7 +292,7 @@ class FLUXLarge(FLUXModel):
         stats = self.get_stats()
         cfg = self.config
         return ScaleProfile(
-            name='FLUXLarge',
+            name='FLUXModel (Phase 8)',
             total_params=stats.total_params,
             wave_dim=cfg['wave_dim'],
             field_dims=(cfg['field_h'], cfg['field_w'], cfg['field_d']),
@@ -313,54 +305,43 @@ class FLUXLarge(FLUXModel):
     def from_phase7_checkpoint(cls, device: str = 'cpu',
                                config: Optional[Dict[str, Any]] = None) -> 'FLUXLarge':
         """
-        Build FLUXLarge by loading Phase 7 checkpoint and scaling up.
+        Build FLUXLarge by loading Phase 7 checkpoint with full weight transfer.
 
-        The Phase 7 checkpoint has smaller dimensions, so we:
-        1. Create a fresh FLUXLarge with larger dimensions
-        2. Load Phase 7 weights where shapes are compatible
-        3. Initialize new capacity with random weights
+        Since field_features=512 matches Phase 7, ALL component weights
+        transfer directly — no dimension mismatch, no retraining needed.
+        Only the spatial field size differs (96³ vs 64³), which means field
+        attractors don't transfer but all nn.Module weights do.
 
         Args:
             device: Target device
             config: Optional config overrides
 
         Returns:
-            FLUXLarge with Phase 7 knowledge + expanded capacity
+            FLUXLarge with Phase 7 trained weights + WaveDecoder (fresh)
         """
-        # Create fresh large model
+        # Create fresh model with Phase 8 config
         model = cls(config=config, device=device)
 
         # Try to load Phase 7 checkpoint for knowledge transfer
-        # Uses load_checkpoint() which falls back to HuggingFace Hub
-        # if the local file is missing (e.g. fresh Colab session)
         ckpt7 = None
         try:
             ckpt7 = load_checkpoint(7)
             print(f"  ✓ Phase 7 checkpoint loaded for knowledge transfer")
         except FileNotFoundError:
-            print(f"  ℹ No Phase 7 checkpoint (local or HF Hub) — starting FLUXLarge from scratch")
+            print(f"  ℹ No Phase 7 checkpoint (local or HF Hub) — starting from scratch")
 
         if ckpt7 is not None:
-            # Transfer compatible weights (partial load)
-            # Phase 7 → FLUXLarge dimension map:
-            #   CSE:        432 → 432  (IDENTICAL — transfers perfectly)
-            #   Field:      64³×512 → 96³×768  (incompatible)
-            #   Bridges:    432→512 → 432→768  (incompatible)
-            #   OutputHead: 512 → 768  (incompatible)
-            #   CausalGraph: architecture-independent (transfers)
-            #   TL state:   architecture-independent (transfers)
             transferred = 0
 
-            # CSE — wave_dim=432 is identical in Phase 7 and FLUXLarge
+            # CSE — wave_dim=432 is identical (always)
             if 'cse_state_dict' in ckpt7:
                 try:
                     model.cse.load_state_dict(ckpt7['cse_state_dict'])
                     transferred += 1
                     print(f"  ✓ CSE transferred (wave_dim=432, trained Phase 1 weights)")
                 except Exception as e:
-                    print(f"  ⚠ CSE transfer failed: {e} — using fresh init")
+                    print(f"  ⚠ CSE transfer failed: {e}")
             else:
-                # Fallback: try loading Phase 1 checkpoint directly for CSE
                 try:
                     ckpt1 = load_checkpoint(1)
                     if 'state_dict' in ckpt1:
@@ -370,60 +351,111 @@ class FLUXLarge(FLUXModel):
                 except Exception:
                     print(f"  ℹ CSE: fresh init (no trained weights found)")
 
-            # For components with compatible architectures, try partial transfer
-            try:
-                if 'tl_state' in ckpt7:
-                    try:
-                        model.tl.load_state(ckpt7['tl_state'])
-                        transferred += 1
-                        print(f"  ✓ ThermodynamicLearner state transferred")
-                    except Exception:
-                        print(f"  ℹ TL: fresh init (state incompatible)")
+            # wave_to_field bridge — 432→512, SAME as Phase 7
+            if 'wave_to_field_state' in ckpt7:
+                try:
+                    model.wave_to_field.load_state_dict(ckpt7['wave_to_field_state'])
+                    transferred += 1
+                    print(f"  ✓ wave_to_field bridge transferred (432→512)")
+                except Exception as e:
+                    print(f"  ⚠ wave_to_field transfer failed: {e}")
 
-                if 'gr_state' in ckpt7:
-                    print(f"  ℹ GR: fresh init (feature_dim scaled 512→768)")
+            # field_to_wave bridge — 512→432, SAME as Phase 7
+            if 'field_to_wave_state' in ckpt7:
+                try:
+                    model.field_to_wave.load_state_dict(ckpt7['field_to_wave_state'])
+                    transferred += 1
+                    print(f"  ✓ field_to_wave bridge transferred (512→432)")
+                except Exception as e:
+                    print(f"  ⚠ field_to_wave transfer failed: {e}")
 
-                if 'causal_graph_state' in ckpt7:
+            # OutputHead — field_features=512, SAME as Phase 7
+            if 'output_head_state' in ckpt7:
+                try:
+                    model.output_head.load_state_dict(ckpt7['output_head_state'])
+                    transferred += 1
+                    print(f"  ✓ OutputHead transferred (field_features=512)")
+                except Exception as e:
+                    print(f"  ⚠ OutputHead transfer failed: {e}")
+
+            # GR — feature_dim=512, SAME as Phase 7
+            if 'gr_state' in ckpt7:
+                try:
+                    model.gr = GravitationalRelevance.load_state(ckpt7['gr_state'], device=device)
+                    transferred += 1
+                    print(f"  ✓ GravitationalRelevance transferred (feature_dim=512)")
+                except Exception as e:
+                    print(f"  ⚠ GR transfer failed: {e}")
+
+            # CGN — feature_dim=512, SAME as Phase 7
+            # Node counts differ (32/16/8 vs 16/8/4) but feature_dim matches
+            if 'cgn_state' in ckpt7:
+                try:
+                    model.cgn.load_state(ckpt7['cgn_state'])
+                    transferred += 1
+                    print(f"  ✓ CGN transferred (feature_dim=512)")
+                except Exception:
+                    print(f"  ℹ CGN: fresh init (node count changed, feature_dim compatible)")
+
+            # TL — architecture-independent
+            if 'tl_state' in ckpt7:
+                try:
+                    model.tl.load_state(ckpt7['tl_state'])
+                    transferred += 1
+                    print(f"  ✓ ThermodynamicLearner state transferred")
+                except Exception:
+                    print(f"  ℹ TL: fresh init")
+
+            # Causal graph — architecture-independent
+            if 'causal_graph_state' in ckpt7:
+                try:
                     model.causal_graph.load_state(ckpt7['causal_graph_state'])
                     transferred += 1
                     print(f"  ✓ Causal graph transferred")
+                except Exception:
+                    pass
 
-                if 'episodic_memory_state' in ckpt7:
-                    try:
-                        model.episodic_memory.load_state(ckpt7['episodic_memory_state'])
-                        transferred += 1
-                        print(f"  ✓ Episodic memory transferred")
-                    except Exception:
-                        print(f"  ℹ Episodic memory: fresh init (incompatible)")
+            # Episodic memory
+            if 'episodic_memory_state' in ckpt7:
+                try:
+                    model.episodic_memory.load_state(ckpt7['episodic_memory_state'])
+                    transferred += 1
+                    print(f"  ✓ Episodic memory transferred")
+                except Exception:
+                    print(f"  ℹ Episodic memory: fresh init")
 
-                if 'semantic_memory_state' in ckpt7:
-                    try:
-                        model.semantic_memory.load_state(ckpt7['semantic_memory_state'])
-                        transferred += 1
-                        print(f"  ✓ Semantic memory transferred")
-                    except Exception:
-                        print(f"  ℹ Semantic memory: fresh init (incompatible)")
-            except Exception as e:
-                print(f"  ℹ Partial transfer skipped: {e}")
+            # Semantic memory
+            if 'semantic_memory_state' in ckpt7:
+                try:
+                    model.semantic_memory.load_state(ckpt7['semantic_memory_state'])
+                    transferred += 1
+                    print(f"  ✓ Semantic memory transferred")
+                except Exception:
+                    print(f"  ℹ Semantic memory: fresh init")
 
-            # Components that are dimension-incompatible (512→768)
-            skipped = []
+            # Router
+            if 'router_state' in ckpt7:
+                try:
+                    model.memory_router.load_state(ckpt7['router_state'])
+                    transferred += 1
+                    print(f"  ✓ Memory router transferred")
+                except Exception:
+                    pass
+
+            # Field attractors — spatial size changed (64³→96³), can't transfer state_dict
+            # but individual attractors could be migrated in future
             if 'field_state_dict' in ckpt7:
-                skipped.append('Field (64³×512 → 96³×768)')
-            if 'wave_to_field_state' in ckpt7:
-                skipped.append('wave_to_field (432→512 → 432→768)')
-            if 'field_to_wave_state' in ckpt7:
-                skipped.append('field_to_wave (512→432 → 768→432)')
-            if 'output_head_state' in ckpt7:
-                skipped.append('OutputHead (512 → 768)')
-            if skipped:
-                print(f"  ℹ Skipped (dim mismatch): {', '.join(skipped)}")
+                print(f"  ℹ Field: spatial size changed (64³→96³), attractors start fresh")
+                print(f"    (field_features=512 is compatible — only spatial layout differs)")
 
-            print(f"  ✓ Knowledge transfer complete: {transferred} components")
+            print(f"  ✓ Knowledge transfer complete: {transferred} components transferred")
 
         model = model.to(device)
         stats = model.get_stats()
-        print(f"\n  ═══ FLUXLarge assembled: {stats.total_params:,} total parameters ═══")
+        print(f"\n  ═══ FLUXModel (Phase 8) assembled: {stats.total_params:,} total parameters ═══")
+        print(f"      field_features=512 (Phase 7 compatible)")
+        print(f"      field_spatial=96³ (scaled from 64³)")
+        print(f"      WaveDecoder: fresh init (needs training)")
         return model
 
     @classmethod
@@ -439,6 +471,15 @@ class FLUXLarge(FLUXModel):
         """
         ckpt = load_checkpoint(8)
         config = ckpt.get('config', FLUX_LARGE_CONFIG)
+
+        # Handle legacy checkpoints that used field_features=768
+        # by overriding to the correct 512
+        if config.get('field_features', 512) == 768:
+            print("  ⚠ Legacy checkpoint with field_features=768 detected")
+            print("    Rebuilding with field_features=512 (Phase 7 compatible)")
+            config['field_features'] = 512
+            config['cgn_feature_dim'] = 512
+
         model = cls(config=config, device=device)
 
         # Load all component states
@@ -528,7 +569,7 @@ class FLUXLarge(FLUXModel):
         model = model.to(device)
 
         stats = model.get_stats()
-        print(f"  ✓ FLUXLarge loaded from Phase 8 checkpoint: {stats.total_params:,} params")
+        print(f"  ✓ FLUXModel (Phase 8) loaded from checkpoint: {stats.total_params:,} params")
         return model
 
 
@@ -555,7 +596,7 @@ def compare_scales() -> Dict[str, ScaleProfile]:
     )
 
     large_profile = ScaleProfile(
-        name='FLUXLarge (Phase 8)',
+        name='FLUXModel (Phase 8)',
         total_params=0,  # computed at runtime
         wave_dim=FLUX_LARGE_CONFIG['wave_dim'],
         field_dims=(
@@ -580,7 +621,7 @@ def compare_scales() -> Dict[str, ScaleProfile]:
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     print("=" * 60)
-    print("  FLUXLarge — Scale Profile")
+    print("  FLUXModel (Phase 8) — Scale Profile")
     print("=" * 60)
 
     profiles = compare_scales()
@@ -592,10 +633,10 @@ if __name__ == '__main__':
         print(f"    CGN nodes:      {p.cgn_nodes}")
         print(f"    WM window:      {p.wm_window}")
 
-    print(f"\n  Building FLUXLarge...")
+    print(f"\n  Building FLUXModel (Phase 8)...")
     device = get_device()
     model = FLUXLarge(device=device)
     stats = model.get_stats()
-    print(f"  ✓ FLUXLarge built: {stats.total_params:,} parameters")
-    print(f"  ✓ Target: ~117M (GPT-2 small)")
-    print(f"  ✓ Ratio: {stats.total_params / 117e6:.2f}x GPT-2 small")
+    print(f"  ✓ Built: {stats.total_params:,} parameters")
+    print(f"  ✓ field_features=512 (Phase 7 compatible)")
+    print(f"  ✓ field_spatial=96³ (scaled from 64³)")

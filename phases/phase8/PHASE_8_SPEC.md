@@ -18,7 +18,7 @@ and benchmark head-to-head on standard NLP tasks AND FLUX-specific advantages.
 ```
 phases/phase8/
 ├── PHASE_8_SPEC.md              ← This file
-├── flux_large.py                ← FLUXLarge — scaled FLUX configuration
+├── flux_large.py                ← FLUXModel + WaveDecoder (Phase 7 compatible)
 ├── train_openwebtext.py         ← Training on OpenWebText dataset
 ├── benchmark_gpt2.py            ← Full benchmark suite vs GPT-2
 ├── kaggle_train.py              ← Kaggle-optimized training script
@@ -34,16 +34,18 @@ phases/phase8/
 
 ---
 
-## Scaled Architecture: FLUXLarge
+## Scaled Architecture: FLUXModel (Phase 8)
 
-FLUXLarge scales the Phase 7 model to GPT-2 small equivalence:
+Phase 8 uses the SAME FLUXModel from Phase 7 with compatible field_features=512,
+so all Phase 1-7 trained weights transfer directly. Capacity scales via larger
+spatial field, more CGN nodes, and the new WaveDecoder for byte generation.
 
-| Component | Phase 7 (Base) | Phase 8 (Large) | Notes |
-|-----------|---------------|-----------------|-------|
+| Component | Phase 7 (Base) | Phase 8 (Scaled) | Notes |
+|-----------|---------------|------------------|-------|
 | CSE wave_dim | 432 | 432 | Frozen Phase 1 — always 432 |
 | Field dims | 64³ | 96³ | Larger field = more capacity |
-| Field features | 512 | 768 | Wider internal representations |
-| wave_to_field bridge | 432→512 | 432→768 | Upscales CSE → field features |
+| Field features | 512 | 512 | **SAME** — all weights transfer |
+| wave_to_field bridge | 432→512 | 432→512 | **SAME** — all weights transfer |
 | GR k_neighbors | 32 | 64 | Deeper relevance search |
 | CGN fast nodes | 16 | 32 | More surface pattern capacity |
 | CGN medium nodes | 8 | 16 | More semantic capacity |
@@ -51,20 +53,20 @@ FLUXLarge scales the Phase 7 model to GPT-2 small equivalence:
 | Working memory | 512 | 2048 | Longer context |
 | Episodic dim | 256 | 512 | Richer fact storage |
 | Output vocab | 256 | 256 | Still byte-level |
-| **Target params** | ~140M | ~117M | Match GPT-2 small |
+| WaveDecoder | — | ~5M params | NEW: autoregressive byte generation |
 
 ### Dimension Strategy
 
 The CSE (Phase 1) always outputs 432-dim waves — this is a frozen component.
-FLUXLarge scales the **internal** dimensions (field features, CGN, memory) to 768
-via the bridge projections `wave_to_field: nn.Linear(432, 768)`.
+Phase 8 keeps field_features=512 to preserve Phase 7 compatibility.
+Capacity scales via spatial field size, CGN nodes, and WaveDecoder.
 
 ```python
 # CSE output (fixed):
 CSE_WAVE_DIM = 432    # Frozen Phase 1 output, never changes
 
-# Internal scaling:
-FIELD_FEATURES = 768  # Wider representations for more capacity
+# Phase 8 scaling (Phase 7 compatible):
+FIELD_FEATURES = 512  # SAME as Phase 7 — all trained weights transfer
 FIELD_DIMS = (96, 96, 96)  # Larger field = more knowledge storage
 ```
 
@@ -123,7 +125,7 @@ Phase D: Benchmark vs GPT-2 small
 
 ## Acceptance Criteria
 
-- [ ] FLUXLarge builds with ~117M parameters (±20%)
+- [ ] FLUXModel (Phase 8) builds successfully with Phase 7 weight transfer
 - [ ] Model trains on OpenWebText subset without errors
 - [ ] Penn Treebank perplexity measurable (even if not beating GPT-2)
 - [ ] WikiText-2 perplexity measurable

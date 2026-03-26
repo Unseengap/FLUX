@@ -43,7 +43,7 @@ def main():
         model = FLUXLarge.from_phase8_checkpoint(device=device)
     else:
         model = FLUXLarge(device=device)
-        print("  ⚠ Using untrained FLUXLarge")
+        print("  ⚠ Using untrained FLUXModel")
 
     initial_episodic = model.episodic_memory.size
     initial_steps = model._learning_steps

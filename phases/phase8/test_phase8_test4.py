@@ -1,7 +1,7 @@
 """
 Phase 8 — Test 4: Long Sequence Speed (FLUX wins)
 
-Measures FLUXLarge processing speed on progressively longer sequences
+Measures FLUXModel (Phase 8) processing speed on progressively longer sequences
 and compares to GPT-2's O(n²) attention scaling.
 
 FLUX uses O(log n) gravitational relevance — should scale better
@@ -34,7 +34,7 @@ from flux_utils import get_device, checkpoint_exists
 
 
 def measure_flux_speed(model: FLUXLarge, text: str) -> float:
-    """Measure forward pass speed in bytes/second."""
+    """Measure forward pass speed in bytes/second.""""
     # Warm up
     model.forward(text[:100], learn=False)
 
@@ -57,7 +57,7 @@ def main():
     if checkpoint_exists(8):
         model = FLUXLarge.from_phase8_checkpoint(device=device)
     else:
-        print("  ⚠ No Phase 8 checkpoint — testing with fresh FLUXLarge")
+        print("  ⚠ No Phase 8 checkpoint — testing with fresh FLUXModel")
         model = FLUXLarge(device=device)
 
     # Generate test sequences of increasing length

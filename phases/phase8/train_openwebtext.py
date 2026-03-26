@@ -1,7 +1,7 @@
 """
 Phase 8: Train FLUX on OpenWebText
 
-Streams OpenWebText through FLUXLarge in a single pass (no epochs).
+Streams OpenWebText through FLUXModel (Phase 8 config) in a single pass (no epochs).
 The field learns through thermodynamic settling while the output head
 uses gradient-based optimization for byte prediction.
 
@@ -34,7 +34,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 if str(Path(__file__).parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).parent))
 
-from flux_large import FLUXLarge, FLUX_LARGE_CONFIG
+from flux_large import FLUXLarge, FLUX_LARGE_CONFIG  # FLUXLarge = FLUXModel subclass
 from wave_decoder import WaveDecoder
 from flux_utils import (
     get_device, save_checkpoint, load_checkpoint, checkpoint_exists,
@@ -71,7 +71,7 @@ class TrainRunResult:
 
 class OpenWebTextTrainer:
     """
-    Trainer for FLUXLarge on OpenWebText.
+    Trainer for FLUXModel (Phase 8) on OpenWebText.
 
     Training strategy:
     1. Stream documents from OpenWebText (HuggingFace datasets)
@@ -84,7 +84,7 @@ class OpenWebTextTrainer:
     4. Resume from latest checkpoint if interrupted
 
     Args:
-        model: FLUXLarge model
+        model: FLUXModel (Phase 8) with WaveDecoder
         lr: Learning rate for output head + bridge
         grad_accum: Gradient accumulation steps
         checkpoint_interval: Steps between checkpoints
@@ -519,14 +519,14 @@ def _synthetic_corpus(n: int = 10000) -> List[str]:
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     print("=" * 60)
-    print("  Phase 8: Train FLUXLarge on OpenWebText")
+    print("  Phase 8: Train FLUXModel on OpenWebText")
     print("=" * 60)
 
     device = get_device()
     log = PhaseLogger(phase=8)
 
     # Build model
-    model = FLUXLarge.from_phase7_checkpoint(device=device)
+    model = FLUXLarge.from_phase7_checkpoint(device=device)  # Loads Phase 7 weights directly
 
     # Load data
     texts = load_openwebtext_subset(max_docs=1000)

@@ -87,7 +87,7 @@ def kaggle_train(
         model = FLUXLarge.from_phase8_checkpoint(device=device)
         resumed = True
     else:
-        print("\n  ℹ Building FLUXLarge from scratch...")
+        print("\n  ℹ Building FLUXModel from Phase 7 checkpoint...")
         model = FLUXLarge.from_phase7_checkpoint(device=device)
         resumed = False
 

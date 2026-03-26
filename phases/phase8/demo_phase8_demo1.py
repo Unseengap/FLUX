@@ -1,7 +1,7 @@
 """
 Phase 8 — Demo 1: FLUX vs GPT-2 Generation Quality
 
-Side-by-side comparison of text generation from FLUXLarge
+Side-by-side comparison of text generation from FLUXModel (Phase 8)
 and GPT-2 small on the same prompts.
 
 Shows:
@@ -39,15 +39,15 @@ def main():
     device = get_device()
 
     # Load FLUX
-    print("\n  Loading FLUXLarge...")
+    print("\n  Loading FLUXModel (Phase 8)...")
     if checkpoint_exists(8):
         flux = FLUXLarge.from_phase8_checkpoint(device=device)
     else:
         flux = FLUXLarge(device=device)
-        print("  ⚠ Using untrained FLUXLarge (no checkpoint)")
+        print("  ⚠ Using untrained FLUXModel (no checkpoint)")
 
     stats = flux.get_stats()
-    print(f"  ✓ FLUXLarge: {stats.total_params:,} params")
+    print(f"  ✓ FLUXModel: {stats.total_params:,} params")
 
     # Load GPT-2
     print("\n  Loading GPT-2 small...")

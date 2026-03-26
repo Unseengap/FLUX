@@ -161,7 +161,7 @@ class GPT2Baseline:
 
 class FLUXBenchmark:
     """
-    Benchmark FLUXLarge model on standard and FLUX-specific tasks.
+    Benchmark FLUXModel (Phase 8) on standard and FLUX-specific tasks.
     """
 
     def __init__(self, model: FLUXLarge, device: str = 'cpu'):
@@ -298,7 +298,7 @@ def run_full_benchmark(
     Run the complete benchmark suite: FLUX vs GPT-2.
 
     Args:
-        model: FLUXLarge model to benchmark
+        model: FLUXModel (Phase 8) to benchmark
         device: Compute device
         log: PhaseLogger instance
 
@@ -442,11 +442,11 @@ if __name__ == '__main__':
     device = get_device()
     log = PhaseLogger(phase=8)
 
-    # Load FLUXLarge
+    # Load FLUXModel
     if checkpoint_exists(8):
         model = FLUXLarge.from_phase8_checkpoint(device=device)
     else:
         model = FLUXLarge(device=device)
-        print("  ⚠ No Phase 8 checkpoint — using untrained FLUXLarge")
+        print("  ⚠ No Phase 8 checkpoint — using untrained FLUXModel")
 
     suite = run_full_benchmark(model, device=device, log=log)

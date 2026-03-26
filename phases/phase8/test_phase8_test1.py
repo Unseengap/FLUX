@@ -1,7 +1,7 @@
 """
 Phase 8 — Test 1: Perplexity on Penn Treebank
 
-Measures FLUXLarge byte-level perplexity on Penn Treebank test set.
+Measures FLUXModel (Phase 8) byte-level perplexity on Penn Treebank test set.
 
 Pass Criteria:
   - Perplexity is finite (model produces valid predictions)

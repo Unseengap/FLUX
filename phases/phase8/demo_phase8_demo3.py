@@ -56,7 +56,7 @@ def main():
         model = FLUXLarge.from_phase8_checkpoint(device=device)
     else:
         model = FLUXLarge(device=device)
-        print("  ⚠ Using untrained FLUXLarge")
+        print("  ⚠ Using untrained FLUXModel")
 
     # ═══════════════════════════════════════════
     # Speed Scaling Test
