@@ -72,9 +72,9 @@ PHASE2_5_CONFIG = {
     'field_dim': FIELD_DIM,          # 512
     'energy_cap': 50.0,
     'residual_scale': 0.3,
-    'wave_mse_weight': 1.0,
-    'cosine_weight': 0.5,
-    'decode_weight': 0.3,
+    'wave_mse_weight': 0.1,         # Regularizer only — MSE was drowning decode
+    'cosine_weight': 1.0,           # Direction matters more than magnitude
+    'decode_weight': 5.0,           # TEXT fidelity is the ACTUAL objective
     'min_prefix_len': 1,            # Minimum prefix length for context
     'gate_avg_threshold': 0.60,     # Relaxed: generation, not reconstruction
     'gate_min_threshold': 0.30,
@@ -238,12 +238,15 @@ def sample_batch(
         rec = random.choice(records)
         n = random.randint(1, rec['length'] - 1)
 
-        # Prefix context: mean of first n chunk_waves → project to field space
+        # Prefix context: exponential-decay weighted mean of first n chunks.
+        # Recent words matter more for predicting the next word.
         prefix = rec['chunk_waves'][:n].to(device)       # [n, 432]
-        prefix_mean = prefix.mean(dim=0)                  # [432]
+        weights = torch.exp(torch.linspace(-2.0, 0.0, n, device=device))  # decay
+        weights = weights / weights.sum()                  # normalize
+        prefix_weighted = (prefix * weights.unsqueeze(-1)).sum(dim=0)  # [432]
 
         with torch.no_grad():
-            ctx = w2f(prefix_mean)                        # [512]
+            ctx = w2f(prefix_weighted)                    # [512]
 
         contexts.append(ctx)
         target_waves.append(rec['chunk_waves'][n].to(device))  # [432]
@@ -336,10 +339,14 @@ def run_phase2_5_decode_gate(
             # Split at midpoint
             n = max(1, len(pairs) // 2)
             prefix = chunk_waves[:n]
-            prefix_mean = prefix.mean(dim=0)
+
+            # Exponential-decay weighted mean (matches training)
+            weights = torch.exp(torch.linspace(-2.0, 0.0, n, device=prefix.device))
+            weights = weights / weights.sum()
+            prefix_weighted = (prefix * weights.unsqueeze(-1)).sum(dim=0)
 
             # Predict next wave
-            ctx = w2f(prefix_mean).unsqueeze(0)               # [1, 512]
+            ctx = w2f(prefix_weighted).unsqueeze(0)               # [1, 512]
             predicted_wave, _ = wru(ctx)                       # [1, 432]
 
             # Decode predicted wave
@@ -538,10 +545,10 @@ def train_wru(
     lr: float = 5e-4,
     log_every: int = 500,
     save_every: int = 5_000,
-    gate_check_every: int = 5_000,
-    wave_mse_weight: float = 1.0,
-    cosine_weight: float = 0.5,
-    decode_weight: float = 0.3,
+    gate_check_every: int = 2_500,
+    wave_mse_weight: float = 0.1,
+    cosine_weight: float = 1.0,
+    decode_weight: float = 5.0,
     upload_hf: bool = False,
     hf_token: str = '',
 ) -> WaveRecurrentUnit:
@@ -804,6 +811,9 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='auto')
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--upload-hf', action='store_true')
+    parser.add_argument('--wave-mse-weight', type=float, default=0.1)
+    parser.add_argument('--cosine-weight', type=float, default=1.0)
+    parser.add_argument('--decode-weight', type=float, default=5.0)
     args = parser.parse_args()
 
     hf_token = os.environ.get('HF_TOKEN', '')
@@ -814,4 +824,7 @@ if __name__ == '__main__':
         lr=args.lr,
         upload_hf=args.upload_hf,
         hf_token=hf_token,
+        wave_mse_weight=args.wave_mse_weight,
+        cosine_weight=args.cosine_weight,
+        decode_weight=args.decode_weight,
     )

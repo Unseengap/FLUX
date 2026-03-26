@@ -13,7 +13,8 @@
 |-------|-----------|-----------|----------------------|
 | 1 | Wave Codec (CSE + Chunker + WTT) | ✅ **COMPLETE** | `phases/phase1/` + `phases/phase9/` + `phases/phase9_1/` |
 | 2 | Resonance Field + decode bridges | ✅ **COMPLETE** | `phases/phase2/` |
-| 3 | Wave Generation (GRU next-wave) | 🔲 **NEXT** | `phases/phase9_5/wave_generator_v3.py` |
+| 2.5 | WRU — single-step next-wave prediction | 🔲 **NEXT** | NEW — FLUX-native recurrent unit |
+| 3 | Deliberation + autoregressive generation | ⬜ after 2.5 | Builds on WRU from Phase 2.5 |
 | 4 | Gravitational Relevance (O(log n)) | ⬜ not started | `phases/phase3/gravity.py` |
 | 5 | Thermodynamic Learning | ⬜ not started | `phases/phase4/thermodynamic.py` |
 | 6 | Causal Geometry Nodes | ⬜ not started | `phases/phase5/cgn.py` |
@@ -79,7 +80,7 @@ Not everything needs rewriting. Some components are solid:
 | Decode gate utility | (new in v2) | ✅ Built — `v2/phase1/decode_gate.py` |
 | ResonanceField (sparse 64³) | `phases/phase2/field.py` | ✅ Ported + bridges retrained — `v2/phase2/field.py` |
 | WaveToField / FieldToWave | (was random init in legacy) | ✅ **FIXED** — trained with decode loss in `v2/phase2/` |
-| WaveGeneratorV3 (GRU) | `phases/phase9_5/wave_generator_v3.py` | 🔲 **NEXT** — port to `v2/phase3/` |
+| WaveRecurrentUnit (WRU) | NEW — FLUX-native | 🔲 **NEXT** — `v2/phase2_5/wave_recurrent_unit.py` |
 | GravitationalRelevance | `phases/phase3/gravity.py` | ⬜ Port to `v2/phase4/` with decode gate |
 | ThermodynamicLearner | `phases/phase4/thermodynamic.py` | ⬜ Port to `v2/phase5/` with decode gate |
 | CausalGeometryNodes | `phases/phase5/cgn.py` | ⬜ Port to `v2/phase6/` with decode gate |
@@ -95,15 +96,16 @@ The code exists. The rebuild is about **re-ordering + adding decode gates**, not
 ## Phase Overview (Wave-First)
 
 ```
-Phase 1  ──► Wave Codec: CSE + WaveChunker + WaveToText     ✅ COMPLETE
-Phase 2  ──► Resonance Field + decode bridges               ✅ COMPLETE
-Phase 3  ──► Wave Generation (predict next wave → text)     🔲 NEXT
-Phase 4  ──► Gravitational Relevance (O(log n) retrieval)   ⬜ not started
-Phase 5  ──► Thermodynamic Learning (local energy settling) ⬜ not started
-Phase 6  ──► Causal Geometry Nodes (causal reasoning)       ⬜ not started
-Phase 7  ──► Three-Tier Memory (no forgetting)              ⬜ not started
-Phase 8  ──► Full FLUX Integration                          ⬜ not started
-Phase 9  ──► Scale & GPT-2 Benchmark                        ⬜ not started
+Phase 1    ──► Wave Codec: CSE + WaveChunker + WaveToText     ✅ COMPLETE
+Phase 2    ──► Resonance Field + decode bridges               ✅ COMPLETE
+Phase 2.5  ──► WRU: single-step next-wave prediction          🔲 NEXT
+Phase 3    ──► Deliberation + autoregressive generation       ⬜ after 2.5
+Phase 4    ──► Gravitational Relevance (O(log n) retrieval)   ⬜ not started
+Phase 5    ──► Thermodynamic Learning (local energy settling) ⬜ not started
+Phase 6    ──► Causal Geometry Nodes (causal reasoning)       ⬜ not started
+Phase 7    ──► Three-Tier Memory (no forgetting)              ⬜ not started
+Phase 8    ──► Full FLUX Integration                          ⬜ not started
+Phase 9    ──► Scale & GPT-2 Benchmark                        ⬜ not started
 ```
 
 Every phase proves: input → waves → [component] → waves → text still works.
@@ -251,64 +253,182 @@ loss from step 1. Result: 99.76% cosine fidelity vs the original's ~random proje
 
 ---
 
-## 🔲 Phase 3: Wave Generation (Think in Waves, Speak in Text) — NEXT
+## 🔲 Phase 2.5: Wave Recurrent Unit (Single-Step Next-Wave) — NEXT
 
-> **Status:** Not started
-> **Legacy source:** `phases/phase9_5/wave_generator_v3.py` — GRU-based next-wave predictor
-> **What changes for v2:** Port imports to v2 checkpoint chain, add decode loss to every training step
+> **Status:** Ready to train
+> **Source:** NEW — `v2/phase2_5/wave_recurrent_unit.py` (FLUX-native, no GRU)
+> **Notebook:** `v2/V2_NOTEBOOKS/phase2_5_v2.ipynb`
 
 ### Goal
-Predict the NEXT wave given context, then immediately decode it to text.
+Predict the NEXT wave given a prefix context, using FLUX-native physics.
+Proves the next-wave prediction objective works before adding autoregressive complexity.
 This is the first phase that produces **novel output** — FLUX becomes a language model.
 
+### What's Novel: The Wave Recurrent Unit (WRU)
+
+The WRU replaces the GRU with physics-native operations:
+
+| GRU | WRU |
+|-----|-----|
+| Hidden state: opaque vector | Hidden state: **valid 432-dim wave** (decodable at every step) |
+| Gates: sigmoid(Wx + Uh) | Gates: **cosine interference** (constructive = keep, destructive = forget) |
+| Gate scope: all dims at once | Gate scope: **per sub-band** (phonetic, syntactic, semantic, temporal, intensity) |
+| Stability: gradient clipping | Stability: **energy conservation** (thermodynamic bound) |
+| Interpretability: none | Each band independently inspectable |
+
+### Architecture (~200K params)
+```
+field_context [512]
+  → context_proj (LayerNorm → Linear → GELU → Linear) → ctx_wave [432]
+  → 5 per-band interference gates (cosine similarity in [-1, 1])
+      constructive (cos > 0)  → keep state band
+      destructive  (cos < 0)  → replace via learned transform
+  → 5 BandTransforms (small MLPs per sub-band)
+  → energy-constrained superposition (can't grow unboundedly)
+  → output_norm + output_proj (Tanh bounded)
+  → predicted_wave [432]  ← directly decodable by WTT
+```
+
+### Training Objective — Next-Wave Prediction
+```python
+# Random split position n from each text:
+prefix   = chunk_waves[:n]              # first n word-level waves
+context  = w2f(prefix.mean(dim=0))      # [512] field context
+target   = chunk_waves[n]               # [432] ground-truth next wave
+gt_bytes = chunk_bytes[n]               # bytes to decode
+
+predicted = wru(context)                # [432] predicted next wave
+
+loss = mse(predicted, target)           # Wave reconstruction
+     + (1 - cos_sim(predicted, target)) # Direction fidelity
+     + wtt.decode_loss(predicted, gt_bytes)  # TEXT fidelity
+```
+
 ### Prerequisites
-- Phase 1 checkpoint `phase1_v2.phase.pt` ✓
-- Phase 2 checkpoint `phase2_v2.phase.pt` ✓
+- Phase 1 checkpoint `phase1_v2.phase.pt` ✓ (CSE, Chunker, WTT frozen)
+- Phase 2 checkpoint `phase2_v2.phase.pt` ✓ (WaveToField, FieldToWave frozen)
+
+### What Gets Built
+```
+v2/phase2_5/
+├── wave_recurrent_unit.py    ← WRU: FLUX-native recurrent cell (per-band interference)
+├── train_wru.py              ← Training with next-wave prediction + decode loss
+├── test_phase2_5_test1.py    ← Test: Predicted waves decode to readable text
+├── test_phase2_5_test2.py    ← Test: Different contexts → different predictions
+├── test_phase2_5_test3.py    ← Test: WRU output is always a valid wave
+├── demo_phase2_5_demo1.py    ← Demo: Prompt → predict next word at each prefix length
+├── demo_phase2_5_demo2.py    ← Demo: Per-band interference analysis
+└── RESULTS_PHASE_2_5.md
+```
+
+### Acceptance Criteria
+- [ ] WRU predicts next wave from prefix context (single step)
+- [ ] Predicted waves decode to readable text (avg byte accuracy ≥ 60%)
+- [ ] Different contexts → different predictions (avg pairwise cosine < 0.90)
+- [ ] Output is always a valid wave (bounded energy, non-degenerate sub-bands)
+- [ ] Hidden state is a valid wave at all times (decodable by WTT)
+- [ ] **Decode gate:** avg byte accuracy ≥ 60%, min ≥ 30%
+- [ ] Checkpoint saved to `checkpoints/phase2_5_v2.phase.pt`
+
+### Why 2.5 Not 3
+Phase 2.5 isolates the question: "Can FLUX predict the next wave at all?"
+from: "Can it chain predictions autoregressively?" If single-step fails,
+we know the problem is in the prediction head — not in the chaining logic.
+This is the lesson from the Phase 9 legacy failure: never add complexity
+before proving the base case works.
+
+---
+
+## ⬜ Phase 3: Deliberation + Autoregressive Wave Generation — AFTER 2.5
+
+> **Status:** Not started (requires Phase 2.5 checkpoint)
+> **Source:** Extends `v2/phase2_5/wave_recurrent_unit.py` with deliberation loop + chaining
+> **Notebook:** `v2/V2_NOTEBOOKS/phase3_v2.ipynb`
+
+### Goal
+Chain WRU predictions autoregressively AND add deliberation cycles.
+Phase 3 makes FLUX **think before it speaks** — like a human.
+
+### What's Novel: Deliberation Cycles
+
+Instead of one step → emit, run multiple internal WRU steps where the
+output feeds back as input. Emit only when the wave **settles** (energy stabilizes):
+
+```
+Step 1:  context → WRU → wave₁  (candidate — don't emit yet)
+Step 2:  wave₁ interferes with context → WRU → wave₂  (refined)
+Step 3:  wave₂ interferes with context → WRU → wave₃  (more refined)
+...
+Step K:  energy(waveₖ) ≈ energy(waveₖ₋₁) → SETTLED → emit waveₖ
+```
+
+Key properties:
+- **The model decides WHEN to speak** — emit when energy stabilizes, not after fixed K
+- **Harder queries → more cycles** — "what is 2+2" settles fast; "explain quantum mechanics" takes longer
+- **Sub-bands settle independently** — semantics may settle in 2 steps, syntax in 5
+- **No new parameters** — same WRU, just run multiple times before emitting
+- **Energy at emission = confidence** — low energy = certain; high energy = uncertain
+
+This maps directly to SPECIFICATION.md:
+> *"Energy minimization — settling to minimum energy IS both inference and learning"*
+
+### Architecture
+```
+deliberate(context, max_cycles=10, settle_threshold=0.01):
+    state = wru.initial_state
+    for k in 1..max_cycles:
+        predicted, state = wru.step(context, state)
+        energy = ||predicted||²
+        if |energy - prev_energy| < settle_threshold:
+            return predicted  # SETTLED — emit this wave
+    return predicted  # max cycles reached — emit best effort
+
+autoregressive_generate(prefix_waves, num_words=10):
+    for i in 1..num_words:
+        context = w2f(prefix_waves.mean(dim=0))  # running context
+        next_wave = deliberate(context)           # think, then speak
+        prefix_waves = cat(prefix_waves, next_wave)
+    return prefix_waves  # decode entire sequence via WTT
+```
+
+### Training
+- **Supervised:** Teacher-forced single-step (same as Phase 2.5 but with chaining)
+- **REINFORCE:** Autoregressive rollout with byte-accuracy reward (aligns train with inference)
+- **Deliberation reward:** Bonus for settling in fewer cycles (efficiency pressure)
+
+### Prerequisites
+- Phase 2.5 checkpoint `phase2_5_v2.phase.pt` ✓ (WRU single-step proven)
+- Phase 1 + Phase 2 checkpoints (frozen)
 
 ### What Gets Built
 ```
 v2/phase3/
 ├── PHASE_3_SPEC.md
-├── wave_generator.py        ← Port of phases/phase9_5/wave_generator_v3.py
-│                              (WaveGeneratorV3: GRU hidden=512, batch_first=True)
-├── train_generator.py       ← Batched training with decode loss from step 1
-├── demo_phase3_demo1.py     ← Demo: Prompt → wave generation → text
-├── demo_phase3_demo2.py     ← Demo: Context-dependent generation
-├── test_phase3_test1.py     ← Test: Generated waves decode to real words
-├── test_phase3_test2.py     ← Test: Different contexts → different outputs
-├── test_phase3_test3.py     ← Test: Valid word rate > 50%
+├── deliberator.py            ← Deliberation loop + energy-based settling
+├── train_generator.py        ← Autoregressive chaining + REINFORCE + deliberation
+├── demo_phase3_demo1.py      ← Demo: Prompt → deliberation → text generation
+├── demo_phase3_demo2.py      ← Demo: Deliberation cycle count by query difficulty
+├── test_phase3_test1.py      ← Test: Generated sequences decode to real words
+├── test_phase3_test2.py      ← Test: Different prompts → different continuations
+├── test_phase3_test3.py      ← Test: Deliberation settles (energy decreases)
 └── RESULTS_PHASE_3.md
 ```
 
 ### Acceptance Criteria
-- [ ] Generator predicts next waves from field context
+- [ ] Autoregressive chaining produces multi-word output
 - [ ] Generated waves decode to readable text (valid word rate > 50%)
 - [ ] Different prompts produce different continuations (cosine < 0.85)
-- [ ] Teacher-forced cosine accuracy > 0.5
-- [ ] Training speed > 100 steps/s with batch_size=128
-- [ ] **Decode gate:** avg byte accuracy of generated output > 90%
+- [ ] Deliberation reduces energy monotonically per cycle
+- [ ] Harder prompts → more deliberation cycles (measurable correlation)
+- [ ] **Decode gate:** avg byte accuracy of generated output > 70%
 - [ ] Checkpoint saved to `checkpoints/phase3_v2.phase.pt`
 
-### What Changes vs Legacy Phase 9.5
-Legacy `WaveGeneratorV3` trained on wave prediction only — no decode loss. Context
-bias (all contexts collapsing to similar vectors) was discovered only when trying
-to generate at Phase 9. v2 adds `decode_loss(wtt(predicted_wave), gt_bytes)` to
-every training step, forcing the generator to produce waves that are decodable
-from the very first training iteration.
-
-### Training Loss
-```python
-# Multi-objective loss from day 1
-loss = mse_loss(predicted_wave, target_wave)           # Wave fidelity
-     + (1 - cosine_sim(predicted_wave, target_wave))   # Direction fidelity
-     + contrastive_loss(wave_0_across_contexts)         # Context sensitivity
-     + decode_loss(wtt(predicted_wave), gt_bytes)       # TEXT fidelity ← KEY FIX
-```
-
-### Context Collapse Fix (Learned from Legacy Phase 9 Failure)
-The legacy WaveGeneratorV3 used `LayerNorm + projection` on context to prevent
-collapse. Keep this. Additionally, the training corpus must include diverse text
-(not just English sentences) — same diversity as Phase 1's 17K corpus.
+### What Changed vs Legacy Phase 9.5 + Original Phase 3 Plan
+1. **No GRU** — WRU with physics-native interference gates replaces GRU entirely
+2. **Deliberation** — multiple internal cycles before emitting (humans think before speaking)
+3. **Energy-based stopping** — model decides when to speak, not a fixed step count
+4. **Builds on proven Phase 2.5** — single-step prediction verified before adding chaining
+5. **REINFORCE for alignment** — bridges the train/inference gap (lesson from failed Phase 9 runs)
 
 ---
 
@@ -580,7 +700,8 @@ The existing Phase 1–9 legacy code doesn't get deleted — it gets **re-sequen
 | phases/phase9/ | WaveChunker | v2/phase1/ | ✅ Done | Moved forward — part of the codec |
 | phases/phase9_1/ | WaveToText / ContextWTT | v2/phase1/ | ✅ Done | Moved forward — decode from day 1 |
 | phases/phase2/ | ResonanceField | v2/phase2/ | ✅ Done | Retrained bridges with decode loss — **root cause of legacy failure fixed** |
-| phases/phase9_5/ | WaveGeneratorV3 | v2/phase3/ | 🔲 Next | Move forward — generation Phase 3 not 9 |
+| (NEW) | WaveRecurrentUnit | v2/phase2_5/ | 🔲 Next | FLUX-native recurrent cell — no GRU |
+| v2/phase2_5/ | Deliberation + chaining | v2/phase3/ | ⬜ | Autoregressive generation with settling |
 | phases/phase3/ | GravitationalRelevance | v2/phase4/ | ⬜ | Add decode gate to tests |
 | phases/phase4/ | ThermodynamicLearner | v2/phase5/ | ⬜ | Add decode gate to tests |
 | phases/phase5/ | CausalGeometryNodes | v2/phase6/ | ⬜ | Add decode gate to tests |
@@ -591,7 +712,8 @@ The existing Phase 1–9 legacy code doesn't get deleted — it gets **re-sequen
 ### Rewrite scope per phase
 - ✅ Phase 1 v2: ~40% new code — joint training loop was entirely new
 - ✅ Phase 2 v2: ~20% new code — decode loss on projections was the key fix
-- 🔲 Phase 3 v2: ~10% new code — `wave_generator_v3.py` exists, just needs v2 imports + decode loss
+- 🔲 Phase 2.5 v2: ~100% new code — WRU is a novel FLUX-native architecture
+- ⬜ Phase 3 v2: ~60% new code — deliberation loop + autoregressive chaining on WRU
 - ⬜ Phases 4–7 v2: ~5% each — add decode gate check to tests, update imports
 - ⬜ Phases 8–9 v2: ~0% — same code, renumbered, v2 checkpoints wired in
 
@@ -645,18 +767,20 @@ init would have failed the decode gate immediately.
 ## Checkpoint Chain (Wave-First)
 
 ```
-phase1_v2.phase.pt  → CSE + WaveChunker + WaveToText (full codec)              ✅ EXISTS
-phase2_v2.phase.pt  → codec + ResonanceField + trained projections              ✅ EXISTS
-phase3_v2.phase.pt  → all above + WaveGeneratorV3 (generation works)           🔲 NEXT
-phase4_v2.phase.pt  → all above + GravitationalRelevance                        ⬜
-phase5_v2.phase.pt  → all above + ThermodynamicLearner                          ⬜
-phase6_v2.phase.pt  → all above + CausalGeometryNodes                           ⬜
-phase7_v2.phase.pt  → all above + Three-Tier Memory                             ⬜
-phase8_v2.phase.pt  → Full FLUX integrated model                                 ⬜
-phase9_v2.phase.pt  → Scaled FLUX trained on OpenWebText                         ⬜
+phase1_v2.phase.pt    → CSE + WaveChunker + WaveToText (full codec)              ✅ EXISTS
+phase2_v2.phase.pt    → codec + ResonanceField + trained projections              ✅ EXISTS
+phase2_5_v2.phase.pt  → all above + WRU (single-step next-wave)                  🔲 NEXT
+phase3_v2.phase.pt    → all above + deliberation + autoregressive chaining        ⬜
+phase4_v2.phase.pt    → all above + GravitationalRelevance                        ⬜
+phase5_v2.phase.pt    → all above + ThermodynamicLearner                          ⬜
+phase6_v2.phase.pt    → all above + CausalGeometryNodes                           ⬜
+phase7_v2.phase.pt    → all above + Three-Tier Memory                             ⬜
+phase8_v2.phase.pt    → Full FLUX integrated model                                 ⬜
+phase9_v2.phase.pt    → Scaled FLUX trained on OpenWebText                         ⬜
 ```
 
-Every checkpoint from Phase 3 onward can **generate text**.
+Every checkpoint from Phase 2.5 onward can **predict next waves**.
+Every checkpoint from Phase 3 onward can **generate multi-word text**.
 From Phase 1 onward, FLUX can encode, chunk, decode, and verify.
 
 > Note: Checkpoints use `_v2` suffix to distinguish from legacy `phase1.phase.pt`
@@ -668,7 +792,7 @@ From Phase 1 onward, FLUX can encode, chunk, decode, and verify.
 
 **Minimum:** Round-trip byte accuracy > 95% at Phase 1, never drops below 90%.
 
-**Target:** Generation quality improves monotonically from Phase 3 → Phase 9,
+**Target:** Generation quality improves monotonically from Phase 2.5 → Phase 9,
 with no mode collapse, no context collapse, no silent failures.
 
 **Stretch:** Beat GPT-2 small on perplexity + zero catastrophic forgetting +
@@ -693,7 +817,8 @@ itself — because a wave that can't be observed isn't physical.
                     ────────                    ──────────
 Step 1:             Create waves                Create waves + observation
 Step 2:             Build field                 Put waves in field + observe
-Step 3:             Add forces                  Generate waves + observe
+Step 2.5:           —                           Single next-wave prediction (WRU)
+Step 3:             Add forces                  Deliberation + generation
 Step 4-7:           More forces + memory        Add forces + memory + observe
 Step 8:             Integrate                   Integrate (already works)
 Step 9:             Try to observe → FAIL       Scale (everything decodes)
