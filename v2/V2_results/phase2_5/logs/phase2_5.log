@@ -453,6 +453,3 @@
 [14:21:02] 
 ▶ CELL: Cell 13 — Save Results (Phase 2.5)
 [14:21:02]   Started: 2026-03-26 14:21:02
-[14:21:02]   ✓ Log copied → /content/FLUX/v2/V2_results/phase2_5/logs/phase2_5.log
-[14:21:02]   ✓ RESULTS_PHASE_2_5.md generated
-[14:21:02]   ✓ Logs uploaded to HuggingFace

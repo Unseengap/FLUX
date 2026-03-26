@@ -1,0 +1,15 @@
+{
+  "phase": 2.5,
+  "version": "v2",
+  "checks": {
+    "Checkpoint exists on disk": "PASS",
+    "Checkpoint loads without error": "PASS",
+    "state_dict contains 'wru' key": "PASS",
+    "Gate metric present and finite": "PASS",
+    "WRU forward pass OK": "PASS",
+    "Output not degenerate (std > 0.01)": "PASS",
+    "Energy bounded (< 50.0)": "PASS"
+  },
+  "gate_avg": 0.14583333333333331,
+  "gate_min": 0.0
+}
