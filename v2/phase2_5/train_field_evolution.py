@@ -1,33 +1,39 @@
 """
-train_wru.py — Phase 2.5 v2: Wave Recurrent Unit — Single-Step Next-Wave Prediction
+train_field_evolution.py — Phase 2.5 v2: Field Evolution Generator
 
-Trains:
-  - WaveRecurrentUnit (WRU): field_context [512] → predicted_wave [432]
-    Using FLUX-native physics: per-band interference gates, energy conservation,
-    wave superposition — no GRU, no sigmoid gates.
+Trains the FieldEvolutionGenerator for next-wave prediction through field physics.
+
+Instead of a single-step MLP/GRU (WRU), generation happens through the field:
+  1. SEED: Place prefix waves into a compact local field
+  2. EVOLVE: Run learned energy-settling steps (differentiable diffusion)
+  3. READ: Extract the settled state at position n+1 → decode to wave
+
+This matches the SPECIFICATION's core design:
+  "Input → Perturbation → Field Settles → Output extracted from settled state"
 
 Frozen (from Phase 1 + Phase 2 checkpoints):
   - ContinuousSemanticEncoder (Phase 1)
   - WaveChunker (Phase 1)
   - WaveToText (Phase 1)
-  - WaveToField (Phase 2, bridge_wtf)
-  - FieldToWave (Phase 2, bridge_ftw)
+  - WaveToField (Phase 2, bridge_wtf) — optionally used for field_contexts
+  - FieldToWave (Phase 2, bridge_ftw) — NOT used in training; wave_proj is learned
 
 Training objective — NEXT-WAVE PREDICTION:
-  Given chunk_waves[:n] (a prefix of word-level waves), predict chunk_waves[n].
-  Context = WaveToField(chunk_waves[:n].mean(dim=0))  →  field_context [512]
-  Target = chunk_waves[n]  →  ground-truth next wave [432]
+  Given chunk_waves[:n] (prefix), predict chunk_waves[n].
+  Context = ALL prefix waves placed into the field (no mean-pooling!)
+  Target = chunk_waves[n] → the ground-truth next wave [432]
 
 Losses:
-  wave_mse    — MSE(predicted, target) — raw reconstruction
   cosine_loss — 1 - cos_sim(predicted, target) — direction fidelity
   decode_loss — WTT(predicted) cross-entropy vs target_bytes — TEXT fidelity
+  energy_loss — encourage energy to actually decrease during settling
 
 Decode gate (Phase 2.5):
-  text → CSE → chunk → prefix[:n] → mean → WTF → WRU → predicted_wave → WTT → bytes
-  Must achieve: avg byte accuracy ≥ 60%, min ≥ 30%  (relaxed vs Phase 2 — this is generation)
+  text → CSE → chunker → chunk_waves
+  prefix_waves[:n] → FieldEvolutionGenerator → predicted_wave → WTT → bytes
+  Must achieve: avg byte accuracy ≥ 60%, min ≥ 30%
 
-Run: python train_wru.py [--steps N] [--device cpu/cuda/mps]
+Run: python train_field_evolution.py [--steps N] [--device cpu/cuda/mps]
 """
 
 import sys
@@ -56,7 +62,7 @@ from field_to_wave import FieldToWave
 
 # v2/phase2_5 imports
 sys.path.insert(0, str(Path(__file__).parent))
-from wave_recurrent_unit import WaveRecurrentUnit, FIELD_DIM
+from field_evolution_generator import FieldEvolutionGenerator, FIELD_DIM
 
 # Root imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -68,21 +74,21 @@ from flux_utils import PhaseLogger, PhaseResults, get_device, save_checkpoint, u
 # ─────────────────────────────────────────────
 
 PHASE2_5_CONFIG = {
-    'wave_dim': TOTAL_WAVE_DIM,     # 432
-    'field_dim': FIELD_DIM,          # 512
-    'energy_cap': 50.0,
-    'residual_scale': 1.0,
-    'wave_mse_weight': 0.0,         # DISABLED — MSE conflicts with decode loss
-    'cosine_weight': 1.0,           # Direction alignment
-    'decode_weight': 5.0,           # TEXT fidelity is the ACTUAL objective
-    'min_prefix_len': 1,            # Minimum prefix length for context
-    'gate_avg_threshold': 0.60,     # Relaxed: generation, not reconstruction
+    'wave_dim': TOTAL_WAVE_DIM,          # 432
+    'field_dim': FIELD_DIM,               # 512
+    'max_slots': 64,                      # Max sequence positions in local field
+    'settle_steps': 4,                    # Energy-settling iterations
+    'kernel_size': 5,                     # Local interaction kernel
+    'cosine_weight': 1.0,                 # Direction alignment
+    'decode_weight': 5.0,                 # TEXT fidelity
+    'energy_weight': 0.1,                 # Encourage energy decrease
+    'gate_avg_threshold': 0.60,           # Generation, not reconstruction
     'gate_min_threshold': 0.30,
 }
 
 
 # ─────────────────────────────────────────────
-# Corpus: same rich sources as Phase 1 + 2
+# Corpus: reuse Phase 1 pipeline
 # ─────────────────────────────────────────────
 
 _FALLBACK_TEXTS: List[str] = [
@@ -136,8 +142,7 @@ def precompute_corpus(
     """
     Precompute chunk_waves and chunk_bytes for each text.
 
-    Each record stores the raw chunk sequence — NOT a mean-pooled summary.
-    This is critical: we need per-position targets for next-wave prediction.
+    Each record stores the raw chunk sequence for next-wave prediction.
 
     Args:
         texts: Training corpus strings
@@ -173,16 +178,16 @@ def precompute_corpus(
             except Exception:
                 continue
 
-            if len(pairs) < 2:
-                # Need at least 2 chunks for prefix+target
+            if len(pairs) < 3:
+                # Need at least 3 chunks: ≥2 for prefix, 1 for target
                 continue
 
             chunk_waves = torch.stack([p[0] for p in pairs]).cpu()  # [N, 432]
             chunk_bytes = [p[1] for p in pairs]                     # List[bytes]
 
             records.append({
-                'chunk_waves': chunk_waves,   # [N, 432] — raw sequence
-                'chunk_bytes': chunk_bytes,    # List[bytes] — per-chunk bytes
+                'chunk_waves': chunk_waves,   # [N, 432]
+                'chunk_bytes': chunk_bytes,    # List[bytes]
                 'length': len(pairs),
             })
 
@@ -203,59 +208,62 @@ def precompute_corpus(
 
 
 # ─────────────────────────────────────────────
-# Batch Sampling — per-position next-wave targets
+# Batch Sampling — FULL PREFIX (no mean-pooling!)
 # ─────────────────────────────────────────────
 
 def sample_batch(
     records: List[Dict],
-    w2f: WaveToField,
     batch_size: int,
     device: str,
-) -> Tuple[torch.Tensor, torch.Tensor, List[bytes]]:
+    max_prefix_len: int = 32,
+) -> Tuple[torch.Tensor, torch.Tensor, List[bytes], List[int]]:
     """
     Sample a training batch for next-wave prediction.
 
+    CRITICAL DIFFERENCE from WRU: prefix is kept as a SEQUENCE, not mean-pooled.
+    The full prefix goes into the field as separate positions.
+
     For each sample:
       1. Pick a random record
-      2. Pick a random split position n ∈ [1, length-1]
-      3. Context = w2f(chunk_waves[:n].mean(dim=0))  → [512]
-      4. Target = chunk_waves[n]                     → [432]
-      5. Target bytes = chunk_bytes[n]               → bytes
+      2. Pick a random split position n ∈ [2, min(length-1, max_prefix_len)]
+      3. Prefix = chunk_waves[:n]  → [n, 432] (padded to max_prefix in batch)
+      4. Target = chunk_waves[n]   → [432]
+      5. Target bytes = chunk_bytes[n]
 
     Args:
         records: Precomputed corpus records
-        w2f: Frozen WaveToField projection
         batch_size: Number of samples
         device: Device string
+        max_prefix_len: Maximum prefix length to use
     Returns:
-        (contexts [B, 512], target_waves [B, 432], target_bytes List[bytes])
+        (prefix_waves [B, max_n, 432], target_waves [B, 432],
+         target_bytes List[bytes], prefix_lengths List[int])
     """
-    contexts = []
+    prefix_list = []
     target_waves = []
     target_bytes = []
+    prefix_lengths = []
 
     for _ in range(batch_size):
         rec = random.choice(records)
-        n = random.randint(1, rec['length'] - 1)
+        max_n = min(rec['length'] - 1, max_prefix_len)
+        n = random.randint(2, max_n) if max_n >= 2 else max_n
 
-        # Prefix context: exponential-decay weighted mean of first n chunks.
-        # Recent words matter more for predicting the next word.
-        prefix = rec['chunk_waves'][:n].to(device)       # [n, 432]
-        weights = torch.exp(torch.linspace(-2.0, 0.0, n, device=device))  # decay
-        weights = weights / weights.sum()                  # normalize
-        prefix_weighted = (prefix * weights.unsqueeze(-1)).sum(dim=0)  # [432]
-
-        with torch.no_grad():
-            ctx = w2f(prefix_weighted)                    # [512]
-
-        contexts.append(ctx)
+        prefix = rec['chunk_waves'][:n].to(device)        # [n, 432]
+        prefix_list.append(prefix)
+        prefix_lengths.append(n)
         target_waves.append(rec['chunk_waves'][n].to(device))  # [432]
         target_bytes.append(rec['chunk_bytes'][n])              # bytes
 
-    contexts = torch.stack(contexts)          # [B, 512]
+    # Pad prefixes to same length
+    max_n = max(prefix_lengths)
+    padded_prefixes = torch.zeros(batch_size, max_n, TOTAL_WAVE_DIM, device=device)
+    for i, (prefix, length) in enumerate(zip(prefix_list, prefix_lengths)):
+        padded_prefixes[i, :length, :] = prefix
+
     target_waves = torch.stack(target_waves)  # [B, 432]
 
-    return contexts, target_waves, target_bytes
+    return padded_prefixes, target_waves, target_bytes, prefix_lengths
 
 
 # ─────────────────────────────────────────────
@@ -278,30 +286,27 @@ DECODE_GATE_TEXTS = [
 def run_phase2_5_decode_gate(
     cse,
     chunker,
-    w2f: WaveToField,
-    wru: WaveRecurrentUnit,
+    generator: FieldEvolutionGenerator,
     wtt,
     phase: float = 2.5,
     verbose: bool = True,
     temperature: float = 0.5,
 ) -> Tuple[bool, float, float]:
     """
-    Phase 2.5 decode gate: predict next wave from prefix, decode it.
+    Phase 2.5 decode gate: predict next wave from prefix via field evolution, decode it.
 
     Pipeline:
       text → CSE → chunker → chunk_waves
-      prefix = chunk_waves[:n] → mean → WTF → field_context
-      WRU(field_context) → predicted_wave
+      prefix = chunk_waves[:n] → FieldEvolutionGenerator → predicted_wave
       WTT(predicted_wave) → decoded_bytes
       Compare decoded_bytes to chunk_bytes[n]
 
-    We use n = length//2 (midpoint) as the split to test genuine prediction.
+    We use n = length//2 (midpoint) as the split for genuine prediction.
 
     Args:
         cse: Frozen CSE
         chunker: Frozen WaveChunker
-        w2f: Frozen WaveToField
-        wru: Trained WaveRecurrentUnit
+        generator: Trained FieldEvolutionGenerator
         wtt: Frozen WaveToText
     Returns:
         (passed, avg_accuracy, min_accuracy)
@@ -310,14 +315,15 @@ def run_phase2_5_decode_gate(
 
     cse.eval()
     chunker.eval()
-    wru.eval()
+    generator.eval()
     wtt.eval()
 
+    device = next(generator.parameters()).device
     results = []
 
     if verbose:
         print(f"\n  {'─'*60}")
-        print(f"  Phase 2.5 v2 Decode Gate (WRU next-wave prediction)")
+        print(f"  Phase 2.5 v2 Decode Gate (Field Evolution)")
         print(f"  {'─'*60}")
 
     for text in DECODE_GATE_TEXTS:
@@ -326,28 +332,21 @@ def run_phase2_5_decode_gate(
             wave = cse.encode(text)
             pairs = chunker.chunk_with_bytes(wave.full, byte_data)
 
-            if len(pairs) < 2:
-                # Too short — skip but count as 0
+            if len(pairs) < 3:
                 results.append(0.0)
                 if verbose:
                     print(f"  ⚠ [{0.0:.1%}] '{text[:45]}' — too few chunks ({len(pairs)})")
                 continue
 
-            chunk_waves = torch.stack([p[0] for p in pairs]).to(next(wru.parameters()).device)
+            chunk_waves = torch.stack([p[0] for p in pairs]).to(device)
             chunk_bytes = [p[1] for p in pairs]
 
             # Split at midpoint
-            n = max(1, len(pairs) // 2)
-            prefix = chunk_waves[:n]
+            n = max(2, len(pairs) // 2)
+            prefix = chunk_waves[:n].unsqueeze(0)  # [1, n, 432]
 
-            # Exponential-decay weighted mean (matches training)
-            weights = torch.exp(torch.linspace(-2.0, 0.0, n, device=prefix.device))
-            weights = weights / weights.sum()
-            prefix_weighted = (prefix * weights.unsqueeze(-1)).sum(dim=0)
-
-            # Predict next wave
-            ctx = w2f(prefix_weighted).unsqueeze(0)               # [1, 512]
-            predicted_wave, _ = wru(ctx)                       # [1, 432]
+            # Predict next wave via field evolution
+            predicted_wave, info = generator(prefix)  # [1, 432]
 
             # Decode predicted wave
             decoded_bytes_raw = wtt.decode(predicted_wave.squeeze(0), temperature=temperature)
@@ -359,15 +358,18 @@ def run_phase2_5_decode_gate(
 
             acc = byte_accuracy(gt_text, decoded_text)
 
+            energy_drop = info['energy_drop'].item()
+
         except Exception as e:
             acc = 0.0
             decoded_text = f"<ERROR: {e}>"
             gt_text = "?"
+            energy_drop = 0.0
 
         results.append(acc)
         if verbose:
             status = '✓' if acc >= 0.30 else '✗'
-            print(f"  {status} [{acc:.1%}] '{text[:35]}' → gt='{gt_text[:15]}' pred='{decoded_text[:15]}'")
+            print(f"  {status} [{acc:.1%}] '{text[:35]}' → gt='{gt_text[:15]}' pred='{decoded_text[:15]}' ΔE={energy_drop:.2f}")
 
     avg_acc = sum(results) / max(len(results), 1)
     min_acc = min(results) if results else 0.0
@@ -418,7 +420,6 @@ def load_phase1_and_phase2(
     ckpt_dir = Path(__file__).parent.parent.parent / 'checkpoints'
     p2_path = ckpt_dir / 'phase2_v2.phase.pt'
 
-    # Try local, then HuggingFace
     if not p2_path.exists():
         try:
             from huggingface_hub import hf_hub_download
@@ -471,18 +472,18 @@ def load_phase1_and_phase2(
 # ─────────────────────────────────────────────
 
 def save_phase2_5_checkpoint(
-    wru: WaveRecurrentUnit,
+    generator: FieldEvolutionGenerator,
     metrics: Dict[str, Any],
     config: Dict[str, Any],
     path: str,
 ) -> str:
-    """Save Phase 2.5 checkpoint with WRU state dict."""
+    """Save Phase 2.5 checkpoint with FieldEvolutionGenerator state dict."""
     state = {
         'phase': 2.5,
         'timestamp': datetime.now().isoformat(),
         'config': config,
         'state_dict': {
-            'wru': wru.state_dict(),
+            'field_evolution_generator': generator.state_dict(),
         },
         'metrics': metrics,
     }
@@ -496,8 +497,8 @@ def save_phase2_5_checkpoint(
 def load_phase2_5_checkpoint(
     device: str = 'cpu',
     hf_token: str = '',
-) -> WaveRecurrentUnit:
-    """Load Phase 2.5 WRU from checkpoint."""
+) -> FieldEvolutionGenerator:
+    """Load Phase 2.5 FieldEvolutionGenerator from checkpoint."""
     ckpt_dir = Path(__file__).parent.parent.parent / 'checkpoints'
     path = ckpt_dir / 'phase2_5_v2.phase.pt'
 
@@ -524,55 +525,65 @@ def load_phase2_5_checkpoint(
     state = torch.load(str(path), map_location='cpu', weights_only=False)
     config = state.get('config', PHASE2_5_CONFIG)
 
-    wru = WaveRecurrentUnit(
+    generator = FieldEvolutionGenerator(
         wave_dim=config.get('wave_dim', TOTAL_WAVE_DIM),
         field_dim=config.get('field_dim', FIELD_DIM),
-        energy_cap=config.get('energy_cap', 50.0),
-        residual_scale=config.get('residual_scale', 0.3),
+        max_slots=config.get('max_slots', 64),
+        settle_steps=config.get('settle_steps', 4),
+        kernel_size=config.get('kernel_size', 5),
     ).to(device)
-    wru.load_state_dict(state['state_dict']['wru'])
-    return wru
+    generator.load_state_dict(state['state_dict']['field_evolution_generator'])
+    return generator
 
 
 # ─────────────────────────────────────────────
 # Training Loop
 # ─────────────────────────────────────────────
 
-def train_wru(
+def train_field_evolution(
     steps: int = 30_000,
-    batch_size: int = 64,
+    batch_size: int = 32,
     device: str = 'auto',
-    lr: float = 5e-4,
+    lr: float = 3e-4,
     log_every: int = 500,
     save_every: int = 5_000,
     gate_check_every: int = 2_500,
-    wave_mse_weight: float = 0.0,
     cosine_weight: float = 1.0,
     decode_weight: float = 5.0,
+    energy_weight: float = 0.1,
+    settle_steps: int = 4,
+    max_prefix_len: int = 32,
     upload_hf: bool = False,
     hf_token: str = '',
-) -> WaveRecurrentUnit:
+) -> FieldEvolutionGenerator:
     """
-    Train the Phase 2.5 Wave Recurrent Unit for single-step next-wave prediction.
+    Train the Phase 2.5 FieldEvolutionGenerator for next-wave prediction.
 
     Phase 1 (CSE, Chunker, WTT) and Phase 2 (WaveToField, FieldToWave) are FROZEN.
-    Only the WRU is trained.
+    Only the FieldEvolutionGenerator is trained.
+
+    The key difference from WRU training:
+    - No mean-pooling — the FULL PREFIX SEQUENCE enters the field
+    - No MSE loss — cosine + decode + energy
+    - Energy loss encourages the field to actually settle (energy decrease)
 
     Args:
         steps: Training steps
-        batch_size: Batch size
+        batch_size: Batch size (32 default — field is bigger than WRU)
         device: Device string ('auto' → best available)
         lr: Learning rate
         log_every: Print metrics every N steps
         save_every: Save checkpoint every N steps
         gate_check_every: Run decode gate every N steps
-        wave_mse_weight: Weight for MSE(predicted, target) loss
         cosine_weight: Weight for (1 - cosine_sim) loss
         decode_weight: Weight for WTT decode cross-entropy loss
+        energy_weight: Weight for energy-decrease loss
+        settle_steps: Number of settling iterations in the evolver
+        max_prefix_len: Maximum prefix length for batching
         upload_hf: Upload checkpoint to HF after training
         hf_token: HuggingFace token
     Returns:
-        Trained WaveRecurrentUnit
+        Trained FieldEvolutionGenerator
     """
     if device == 'auto':
         device = get_device()
@@ -581,10 +592,11 @@ def train_wru(
         hf_token = hf_token.strip()
 
     log = PhaseLogger(phase=2)  # Logs to phase2.log (2.5 shares)
-    log.separator("Phase 2.5 v2 — Wave Recurrent Unit (Next-Wave Prediction)")
+    log.separator("Phase 2.5 v2 — Field Evolution Generator (Next-Wave Prediction)")
     log.info(f"Device: {device}")
     log.info(f"Steps: {steps:,}  Batch size: {batch_size}")
-    log.info(f"LR: {lr}  wave_mse={wave_mse_weight}  cosine={cosine_weight}  decode={decode_weight}")
+    log.info(f"LR: {lr}  cosine={cosine_weight}  decode={decode_weight}  energy={energy_weight}")
+    log.info(f"Settle steps: {settle_steps}  Max prefix: {max_prefix_len}")
 
     # ── Load frozen components ────────────────────────────────────────
     log.info("Loading Phase 1 + Phase 2 checkpoints (will be FROZEN)...")
@@ -612,136 +624,151 @@ def train_wru(
 
     log.info(f"Corpus: {len(records):,} usable records")
 
-    # ── Build WRU ─────────────────────────────────────────────────────
-    wru = WaveRecurrentUnit(
+    # ── Build FieldEvolutionGenerator ─────────────────────────────────
+    config = dict(PHASE2_5_CONFIG)
+    config['settle_steps'] = settle_steps
+    config['cosine_weight'] = cosine_weight
+    config['decode_weight'] = decode_weight
+    config['energy_weight'] = energy_weight
+
+    generator = FieldEvolutionGenerator(
         wave_dim=TOTAL_WAVE_DIM,
         field_dim=FIELD_DIM,
-        energy_cap=PHASE2_5_CONFIG['energy_cap'],
-        residual_scale=PHASE2_5_CONFIG['residual_scale'],
+        max_slots=config['max_slots'],
+        settle_steps=settle_steps,
+        kernel_size=config['kernel_size'],
     ).to(device)
 
-    n_params = wru.count_parameters()
-    log.info(f"WRU parameters: {n_params:,}")
+    n_params = generator.count_parameters()
+    log.info(f"FieldEvolutionGenerator parameters: {n_params:,}")
 
-    param_summary = wru.parameter_summary()
+    param_summary = generator.parameter_summary()
     for component, count in param_summary.items():
         if component != 'total':
             log.info(f"  {component}: {count:,}")
 
     # ── Optimizer ─────────────────────────────────────────────────────
-    optimizer = AdamW(wru.parameters(), lr=lr, weight_decay=1e-4)
+    optimizer = AdamW(generator.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=steps, eta_min=lr * 0.01)
 
     # ── Checkpoint path ───────────────────────────────────────────────
     ckpt_path = str(ckpt_dir / 'phase2_5_v2.phase.pt')
 
     # ── Training metrics ──────────────────────────────────────────────
-    running_mse = 0.0
     running_cos = 0.0
     running_dec = 0.0
+    running_eng = 0.0
     running_total = 0.0
+    running_edrop = 0.0
     best_gate_avg = 0.0
     gate_passed = False
 
     # ── Training loop ─────────────────────────────────────────────────
-    wru.train()
+    generator.train()
     log.separator("Training started")
 
     for step in range(1, steps + 1):
         optimizer.zero_grad()
 
         # ── Sample batch ──────────────────────────────────────────────
-        contexts, target_waves, target_bytes_list = sample_batch(
-            records, w2f, batch_size, device,
+        prefix_waves, target_waves, target_bytes_list, prefix_lengths = sample_batch(
+            records, batch_size, device, max_prefix_len,
         )
+        # prefix_waves: [B, max_n, 432], target_waves: [B, 432]
 
-        # ── Forward: WRU single-step prediction ──────────────────────
-        predicted_waves, _ = wru(contexts)  # [B, 432]
+        # ── Forward: Field Evolution ──────────────────────────────────
+        predicted_waves, info = generator(prefix_waves)  # [B, 432]
 
-        # ── Loss 1: Wave MSE ─────────────────────────────────────────
-        mse_loss = F.mse_loss(predicted_waves, target_waves)
-
-        # ── Loss 2: Cosine direction loss ─────────────────────────────
+        # ── Loss 1: Cosine direction loss ─────────────────────────────
         cos_sim = F.cosine_similarity(predicted_waves, target_waves, dim=-1)
         cosine_loss = (1.0 - cos_sim).mean()
 
-        # ── Loss 3: Decode loss (WTT cross-entropy) ──────────────────
-        # Feed predicted waves through WTT in teacher-forced mode
+        # ── Loss 2: Decode loss (WTT cross-entropy) ──────────────────
         decode_targets = [
             torch.tensor(list(b), dtype=torch.long, device=device)
             for b in target_bytes_list
         ]
-        # Disable cuDNN for GRU backward (known compatibility issue)
         with torch.backends.cudnn.flags(enabled=False):
             decode_loss = wtt.forward_batch(predicted_waves, decode_targets)
 
+        # ── Loss 3: Energy decrease loss ──────────────────────────────
+        # Encourage the field to actually settle (energy should decrease)
+        # energy_trace: [B, settle_steps+1]
+        energy_trace = info['energy_trace']
+        # Penalize if energy doesn't decrease: max(0, E_final - E_initial)
+        energy_decrease = energy_trace[:, -1] - energy_trace[:, 0]  # negative = good
+        energy_loss = F.relu(energy_decrease).mean()  # penalize only increases
+
         # ── Total loss ────────────────────────────────────────────────
         total_loss = (
-            wave_mse_weight * mse_loss +
             cosine_weight * cosine_loss +
-            decode_weight * decode_loss
+            decode_weight * decode_loss +
+            energy_weight * energy_loss
         )
 
         # ── Backward + update ─────────────────────────────────────────
         total_loss.backward()
-        torch.nn.utils.clip_grad_norm_(wru.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(generator.parameters(), max_norm=1.0)
         optimizer.step()
         scheduler.step()
 
         # ── Accumulate metrics ────────────────────────────────────────
-        running_mse += mse_loss.item()
         running_cos += cosine_loss.item()
         running_dec += decode_loss.item()
+        running_eng += energy_loss.item()
         running_total += total_loss.item()
+        running_edrop += info['energy_drop'].mean().item()
 
         # ── Log ───────────────────────────────────────────────────────
         if step % log_every == 0:
             n = log_every
-            avg_mse = running_mse / n
             avg_cos = running_cos / n
             avg_dec = running_dec / n
+            avg_eng = running_eng / n
             avg_tot = running_total / n
             avg_cosim = 1.0 - avg_cos  # higher is better
+            avg_edrop = running_edrop / n
             current_lr = scheduler.get_last_lr()[0]
 
             log.info(
                 f"Step {step:>6,}/{steps:,}  "
-                f"loss={avg_tot:.4f}  mse={avg_mse:.4f}  "
+                f"loss={avg_tot:.4f}  "
                 f"cos_sim={avg_cosim:.4f}  decode={avg_dec:.4f}  "
+                f"energy={avg_eng:.4f}  ΔE={avg_edrop:.2f}  "
                 f"lr={current_lr:.2e}"
             )
 
-            running_mse = 0.0
             running_cos = 0.0
             running_dec = 0.0
+            running_eng = 0.0
             running_total = 0.0
+            running_edrop = 0.0
 
         # ── Save checkpoint ───────────────────────────────────────────
         if step % save_every == 0:
             metrics = {
                 'step': step,
                 'total_loss': total_loss.item(),
-                'mse_loss': mse_loss.item(),
                 'cosine_loss': cosine_loss.item(),
                 'decode_loss': decode_loss.item(),
+                'energy_loss': energy_loss.item(),
                 'best_gate_avg': best_gate_avg,
             }
-            save_phase2_5_checkpoint(wru, metrics, PHASE2_5_CONFIG, ckpt_path)
+            save_phase2_5_checkpoint(generator, metrics, config, ckpt_path)
 
         # ── Decode gate check ─────────────────────────────────────────
         if step % gate_check_every == 0:
-            wru.eval()
+            generator.eval()
             passed, avg_acc, min_acc = run_phase2_5_decode_gate(
-                cse, chunker, w2f, wru, wtt,
+                cse, chunker, generator, wtt,
                 phase=2.5,
                 verbose=True,
                 temperature=0.5,
             )
-            wru.train()
+            generator.train()
 
             if avg_acc > best_gate_avg:
                 best_gate_avg = avg_acc
-                # Save best checkpoint
                 metrics = {
                     'step': step,
                     'total_loss': total_loss.item(),
@@ -749,7 +776,7 @@ def train_wru(
                     'gate_min': min_acc,
                     'gate_passed': passed,
                 }
-                save_phase2_5_checkpoint(wru, metrics, PHASE2_5_CONFIG, ckpt_path)
+                save_phase2_5_checkpoint(generator, metrics, config, ckpt_path)
                 log.success(f"New best gate avg: {avg_acc:.1%}")
 
             if passed and not gate_passed:
@@ -758,10 +785,10 @@ def train_wru(
                 log.success(f"  avg={avg_acc:.1%}  min={min_acc:.1%}")
 
     # ── Final gate check ──────────────────────────────────────────────
-    wru.eval()
+    generator.eval()
     log.separator("Final Decode Gate Check")
     passed, avg_acc, min_acc = run_phase2_5_decode_gate(
-        cse, chunker, w2f, wru, wtt,
+        cse, chunker, generator, wtt,
         phase=2.5,
         verbose=True,
         temperature=0.5,
@@ -775,7 +802,7 @@ def train_wru(
         'gate_passed': passed,
         'best_gate_avg': best_gate_avg,
     }
-    save_phase2_5_checkpoint(wru, metrics, PHASE2_5_CONFIG, ckpt_path)
+    save_phase2_5_checkpoint(generator, metrics, config, ckpt_path)
 
     # ── Upload to HuggingFace ─────────────────────────────────────────
     if upload_hf and hf_token:
@@ -795,9 +822,9 @@ def train_wru(
     log.separator("Phase 2.5 training complete")
     log.metric("Final gate avg", f"{avg_acc:.1%}")
     log.metric("Best gate avg", f"{best_gate_avg:.1%}")
-    log.metric("WRU params", f"{n_params:,}")
+    log.metric("Generator params", f"{n_params:,}")
 
-    return wru
+    return generator
 
 
 # ─────────────────────────────────────────────
@@ -805,26 +832,30 @@ def train_wru(
 # ─────────────────────────────────────────────
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Phase 2.5 v2: WRU Training')
+    parser = argparse.ArgumentParser(description='Phase 2.5 v2: Field Evolution Training')
     parser.add_argument('--steps', type=int, default=30_000)
-    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--device', type=str, default='auto')
-    parser.add_argument('--lr', type=float, default=5e-4)
-    parser.add_argument('--upload-hf', action='store_true')
-    parser.add_argument('--wave-mse-weight', type=float, default=0.0)
+    parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--cosine-weight', type=float, default=1.0)
     parser.add_argument('--decode-weight', type=float, default=5.0)
+    parser.add_argument('--energy-weight', type=float, default=0.1)
+    parser.add_argument('--settle-steps', type=int, default=4)
+    parser.add_argument('--max-prefix-len', type=int, default=32)
+    parser.add_argument('--upload-hf', action='store_true')
     args = parser.parse_args()
 
     hf_token = os.environ.get('HF_TOKEN', '')
-    train_wru(
+    train_field_evolution(
         steps=args.steps,
         batch_size=args.batch_size,
         device=args.device,
         lr=args.lr,
-        upload_hf=args.upload_hf,
-        hf_token=hf_token,
-        wave_mse_weight=args.wave_mse_weight,
         cosine_weight=args.cosine_weight,
         decode_weight=args.decode_weight,
+        energy_weight=args.energy_weight,
+        settle_steps=args.settle_steps,
+        max_prefix_len=args.max_prefix_len,
+        upload_hf=args.upload_hf,
+        hf_token=hf_token,
     )

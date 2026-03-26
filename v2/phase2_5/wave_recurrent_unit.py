@@ -58,22 +58,24 @@ FIELD_DIM = 512
 
 class BandTransform(nn.Module):
     """
-    Small MLP that transforms a sub-band given interference context.
+    MLP that transforms a sub-band given interference context.
 
     Each sub-band gets its own BandTransform so the model can
     independently update phonetics without touching semantics, etc.
 
     Args:
         band_dim: Dimension of this sub-band (e.g. 64 for phonetic)
-        hidden_mult: Hidden layer multiplier (2× the band dim by default)
+        hidden_mult: Hidden layer multiplier (4× the band dim by default)
     """
 
-    def __init__(self, band_dim: int, hidden_mult: int = 2):
+    def __init__(self, band_dim: int, hidden_mult: int = 4):
         super().__init__()
         hidden = band_dim * hidden_mult
         # Input: concat of (state_band, ctx_band) → 2 * band_dim
         self.net = nn.Sequential(
             nn.Linear(band_dim * 2, hidden),
+            nn.GELU(),
+            nn.Linear(hidden, hidden),
             nn.GELU(),
             nn.Linear(hidden, band_dim),
         )
@@ -81,8 +83,10 @@ class BandTransform(nn.Module):
         # (state passes through, transform adds a small correction)
         nn.init.xavier_uniform_(self.net[0].weight, gain=0.3)
         nn.init.zeros_(self.net[0].bias)
-        nn.init.xavier_uniform_(self.net[2].weight, gain=0.1)
+        nn.init.xavier_uniform_(self.net[2].weight, gain=0.3)
         nn.init.zeros_(self.net[2].bias)
+        nn.init.xavier_uniform_(self.net[4].weight, gain=0.1)
+        nn.init.zeros_(self.net[4].bias)
 
     def forward(self, state_band: Tensor, ctx_band: Tensor) -> Tensor:
         """
@@ -125,7 +129,7 @@ class WaveRecurrentUnit(nn.Module):
         wave_dim: int = TOTAL_WAVE_DIM,
         field_dim: int = FIELD_DIM,
         energy_cap: float = 50.0,
-        residual_scale: float = 0.3,
+        residual_scale: float = 1.0,
     ):
         super().__init__()
         self.wave_dim = wave_dim
@@ -135,18 +139,24 @@ class WaveRecurrentUnit(nn.Module):
 
         # ── Context projection: field [512] → wave [432] ──────────────────
         # This is NOT FieldToWave (which is frozen from Phase 2).
-        # This is a separate learned projection that adapts field context
-        # for the WRU's internal use.
+        # This is a deeper learned projection that maps field context
+        # to the WRU's wave space. Needs capacity to learn
+        # "given this topic, the next word's wave looks like X."
+        ctx_hidden = max(field_dim, wave_dim) + 256  # 768
         self.context_proj = nn.Sequential(
             nn.LayerNorm(field_dim),
-            nn.Linear(field_dim, wave_dim),
+            nn.Linear(field_dim, ctx_hidden),
             nn.GELU(),
-            nn.Linear(wave_dim, wave_dim),
+            nn.Linear(ctx_hidden, ctx_hidden),
+            nn.GELU(),
+            nn.Linear(ctx_hidden, wave_dim),
         )
         nn.init.xavier_uniform_(self.context_proj[1].weight, gain=0.5)
         nn.init.zeros_(self.context_proj[1].bias)
         nn.init.xavier_uniform_(self.context_proj[3].weight, gain=0.5)
         nn.init.zeros_(self.context_proj[3].bias)
+        nn.init.xavier_uniform_(self.context_proj[5].weight, gain=0.5)
+        nn.init.zeros_(self.context_proj[5].bias)
 
         # ── Per-band transforms ───────────────────────────────────────────
         self.band_transforms = nn.ModuleDict({
@@ -163,16 +173,23 @@ class WaveRecurrentUnit(nn.Module):
         })
 
         # ── Output projection (refine after superposition) ────────────────
-        self.output_norm = nn.LayerNorm(wave_dim)
+        # Takes merged interference + ctx_wave skip (2 * wave_dim → wave_dim)
+        # Deeper than before — needs to reconcile interference + context.
+        out_hidden = wave_dim + 128  # 560
+        self.output_norm = nn.LayerNorm(wave_dim * 2)
         self.output_proj = nn.Sequential(
-            nn.Linear(wave_dim, wave_dim),
+            nn.Linear(wave_dim * 2, out_hidden),
+            nn.GELU(),
+            nn.Linear(out_hidden, wave_dim),
             nn.Tanh(),  # Keep output bounded — waves are tanh-bounded in CSE
         )
         nn.init.xavier_uniform_(self.output_proj[0].weight, gain=0.5)
         nn.init.zeros_(self.output_proj[0].bias)
+        nn.init.xavier_uniform_(self.output_proj[2].weight, gain=0.5)
+        nn.init.zeros_(self.output_proj[2].bias)
 
         # ── Initial wave state (learnable "blank") ────────────────────────
-        self.initial_state = nn.Parameter(torch.randn(wave_dim) * 0.01)
+        self.initial_state = nn.Parameter(torch.randn(wave_dim) * 0.1)
 
     def get_initial_state(self, batch_size: int = 1) -> Tensor:
         """
@@ -280,8 +297,12 @@ class WaveRecurrentUnit(nn.Module):
         # ── 4. Merge bands back ──────────────────────────────────────────
         merged = self._merge_bands(new_bands)  # [B, 432]
 
-        # ── 5. Output refinement ──────────────────────────────────────────
-        refined = self.output_norm(merged)
+        # ── 5. Output refinement with ctx_wave skip connection ────────────
+        # Skip connection: context has a direct path to output,
+        # bypassing the interference bottleneck. This is critical
+        # for single-step prediction where state starts near-zero.
+        combined = torch.cat([merged, ctx_wave], dim=-1)  # [B, 864]
+        refined = self.output_norm(combined)
         predicted = self.output_proj(refined)  # [B, 432]
 
         # ── 6. Energy constraint ──────────────────────────────────────────
@@ -323,6 +344,7 @@ class WaveRecurrentUnit(nn.Module):
         summary['interference_scale'] = sum(p.numel() for p in self.interference_scale.values())
         summary['output'] = sum(p.numel() for p in self.output_norm.parameters()) + \
                            sum(p.numel() for p in self.output_proj.parameters())
+        summary['skip_params'] = 0  # Skip connection is concat, no extra params
         summary['initial_state'] = self.initial_state.numel()
         summary['total'] = sum(summary.values())
         return summary
