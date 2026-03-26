@@ -13,8 +13,8 @@
 |-------|-----------|-----------|----------------------|
 | 1 | Wave Codec (CSE + Chunker + WTT) | ✅ **COMPLETE** | `phases/phase1/` + `phases/phase9/` + `phases/phase9_1/` |
 | 2 | Resonance Field + decode bridges | ✅ **COMPLETE** | `phases/phase2/` |
-| 2.5 | WRU — single-step next-wave prediction | 🔲 **NEXT** | NEW — FLUX-native recurrent unit |
-| 3 | Deliberation + autoregressive generation | ⬜ after 2.5 | Builds on WRU from Phase 2.5 |
+| 2.5 | Field Evolution Generator — single-step next-wave prediction | 🔲 **NEXT** | FLUX-native field physics |
+| 3 | Deliberation + autoregressive generation | ⬜ after 2.5 | Builds on Field Evolution from Phase 2.5 |
 | 4 | Gravitational Relevance (O(log n)) | ⬜ not started | `phases/phase3/gravity.py` |
 | 5 | Thermodynamic Learning | ⬜ not started | `phases/phase4/thermodynamic.py` |
 | 6 | Causal Geometry Nodes | ⬜ not started | `phases/phase5/cgn.py` |
@@ -80,7 +80,7 @@ Not everything needs rewriting. Some components are solid:
 | Decode gate utility | (new in v2) | ✅ Built — `v2/phase1/decode_gate.py` |
 | ResonanceField (sparse 64³) | `phases/phase2/field.py` | ✅ Ported + bridges retrained — `v2/phase2/field.py` |
 | WaveToField / FieldToWave | (was random init in legacy) | ✅ **FIXED** — trained with decode loss in `v2/phase2/` |
-| WaveRecurrentUnit (WRU) | NEW — FLUX-native | 🔲 **NEXT** — `v2/phase2_5/wave_recurrent_unit.py` |
+| FieldEvolutionGenerator | NEW — FLUX-native field physics | 🔲 **NEXT** — `v2/phase2_5/field_evolution_generator.py` |
 | GravitationalRelevance | `phases/phase3/gravity.py` | ⬜ Port to `v2/phase4/` with decode gate |
 | ThermodynamicLearner | `phases/phase4/thermodynamic.py` | ⬜ Port to `v2/phase5/` with decode gate |
 | CausalGeometryNodes | `phases/phase5/cgn.py` | ⬜ Port to `v2/phase6/` with decode gate |
@@ -98,7 +98,7 @@ The code exists. The rebuild is about **re-ordering + adding decode gates**, not
 ```
 Phase 1    ──► Wave Codec: CSE + WaveChunker + WaveToText     ✅ COMPLETE
 Phase 2    ──► Resonance Field + decode bridges               ✅ COMPLETE
-Phase 2.5  ──► WRU: single-step next-wave prediction          🔲 NEXT
+Phase 2.5  ──► Field Evolution: single-step next-wave prediction  🔲 NEXT
 Phase 3    ──► Deliberation + autoregressive generation       ⬜ after 2.5
 Phase 4    ──► Gravitational Relevance (O(log n) retrieval)   ⬜ not started
 Phase 5    ──► Thermodynamic Learning (local energy settling) ⬜ not started
@@ -253,55 +253,71 @@ loss from step 1. Result: 99.76% cosine fidelity vs the original's ~random proje
 
 ---
 
-## 🔲 Phase 2.5: Wave Recurrent Unit (Single-Step Next-Wave) — NEXT
+## 🔲 Phase 2.5: Field Evolution Generator (Single-Step Next-Wave) — NEXT
 
 > **Status:** Ready to train
-> **Source:** NEW — `v2/phase2_5/wave_recurrent_unit.py` (FLUX-native, no GRU)
-> **Notebook:** `v2/V2_NOTEBOOKS/phase2_5_v2.ipynb`
+> **Source:** `v2/phase2_5/field_evolution_generator.py` (FLUX-native field physics)
+> **Notebook:** `v2/V2_NOTEBOOKS/phase2_5_field_evolution.ipynb`
 
 ### Goal
-Predict the NEXT wave given a prefix context, using FLUX-native physics.
-Proves the next-wave prediction objective works before adding autoregressive complexity.
+Predict the NEXT wave given a prefix context, using FLUX-native **field physics**.
+Generation happens through the field itself — not a separate prediction head.
 This is the first phase that produces **novel output** — FLUX becomes a language model.
 
-### What's Novel: The Wave Recurrent Unit (WRU)
+### Why Field Evolution (Not WRU)
 
-The WRU replaces the GRU with physics-native operations:
+The WRU approach (single-step MLP from mean-pooled context → wave) was tried and
+failed across 3+ training runs (0-12.5% decode gate). Root causes:
 
-| GRU | WRU |
-|-----|-----|
-| Hidden state: opaque vector | Hidden state: **valid 432-dim wave** (decodable at every step) |
-| Gates: sigmoid(Wx + Uh) | Gates: **cosine interference** (constructive = keep, destructive = forget) |
-| Gate scope: all dims at once | Gate scope: **per sub-band** (phonetic, syntactic, semantic, temporal, intensity) |
-| Stability: gradient clipping | Stability: **energy conservation** (thermodynamic bound) |
-| Interpretability: none | Each band independently inspectable |
+1. **Mean-pooling bottleneck:** Compressing an entire prefix into a single 512-dim vector
+   destroys the positional/sequential information needed to disambiguate next words
+2. **Wrong abstraction level:** A single-step MLP is a transformer-shaped problem forced
+   through a single-vector bottleneck — no amount of parameter scaling fixes this
+3. **Not FLUX-native:** The WRU was still a "predict output from features" approach,
+   not the SPECIFICATION's design: "Input → Perturbation → Field Settles → Output"
 
-### Architecture (~200K params)
+### What's Novel: Field Evolution
+
+The FieldEvolutionGenerator makes the field physics do the work:
+
+| Traditional (WRU/GRU/MLP) | Field Evolution |
+|---------------------------|-----------------|
+| Input: mean-pooled vector | Input: **full prefix sequence** (no information loss) |
+| Computation: MLP/RNN forward | Computation: **energy settling** (the physics IS the computation) |
+| Model: separate weights | Model: **field state** (orders of magnitude more capacity) |
+| Output: direct prediction | Output: **settled field state at next position** |
+| Training: backprop through all | Training: backprop through differentiable settle |
+| Interpretability: none | Energy trace visible, per-slot analysis |
+
+### Architecture (~3-4M params)
 ```
-field_context [512]
-  → context_proj (LayerNorm → Linear → GELU → Linear) → ctx_wave [432]
-  → 5 per-band interference gates (cosine similarity in [-1, 1])
-      constructive (cos > 0)  → keep state band
-      destructive  (cos < 0)  → replace via learned transform
-  → 5 BandTransforms (small MLPs per sub-band)
-  → energy-constrained superposition (can't grow unboundedly)
-  → output_norm + output_proj (Tanh bounded)
-  → predicted_wave [432]  ← directly decodable by WTT
+prefix_waves [B, N, 432]   ← FULL prefix sequence, no mean-pooling
+  → FieldSeeder:
+      wave_proj + position_embed → field_state [B, max_slots, 512]
+      energy prior: seeded slots LOW, empty slots HIGH
+  → FieldEvolver (K settle steps):
+      1. Local interaction (depthwise-separable 1D conv, kernel=5)
+      2. Energy-gated update (high energy = fluid, low = stable)
+      3. Post-normalize
+      4. Energy update (monotonically non-increasing)
+  → FieldReader:
+      contextual attention at position n+1 (local window ±8)
+      wave_proj (512 → 640 → 640 → 432, Tanh bounded)
+  → predicted_wave [B, 432]  ← directly decodable by WTT
 ```
 
 ### Training Objective — Next-Wave Prediction
 ```python
 # Random split position n from each text:
-prefix   = chunk_waves[:n]              # first n word-level waves
-context  = w2f(prefix.mean(dim=0))      # [512] field context
-target   = chunk_waves[n]               # [432] ground-truth next wave
-gt_bytes = chunk_bytes[n]               # bytes to decode
+prefix = chunk_waves[:n]              # [n, 432] — FULL sequence in field
+target = chunk_waves[n]               # [432] ground-truth next wave
+gt_bytes = chunk_bytes[n]             # bytes to decode
 
-predicted = wru(context)                # [432] predicted next wave
+predicted, info = generator(prefix)   # Field evolution → predicted wave
 
-loss = mse(predicted, target)           # Wave reconstruction
-     + (1 - cos_sim(predicted, target)) # Direction fidelity
-     + wtt.decode_loss(predicted, gt_bytes)  # TEXT fidelity
+loss = (1 - cos_sim(predicted, target))           # Direction fidelity
+     + 5.0 * wtt.decode_loss(predicted, gt_bytes) # TEXT fidelity
+     + 0.1 * relu(E_final - E_initial)            # Energy must decrease
 ```
 
 ### Prerequisites
@@ -311,22 +327,22 @@ loss = mse(predicted, target)           # Wave reconstruction
 ### What Gets Built
 ```
 v2/phase2_5/
-├── wave_recurrent_unit.py    ← WRU: FLUX-native recurrent cell (per-band interference)
-├── train_wru.py              ← Training with next-wave prediction + decode loss
-├── test_phase2_5_test1.py    ← Test: Predicted waves decode to readable text
-├── test_phase2_5_test2.py    ← Test: Different contexts → different predictions
-├── test_phase2_5_test3.py    ← Test: WRU output is always a valid wave
-├── demo_phase2_5_demo1.py    ← Demo: Prompt → predict next word at each prefix length
-├── demo_phase2_5_demo2.py    ← Demo: Per-band interference analysis
+├── field_evolution_generator.py  ← FieldSeeder + FieldEvolver + FieldReader
+├── train_field_evolution.py      ← Training with cosine + decode + energy loss
+├── test_phase2_5_test1_fe.py     ← Test: Predicted waves decode to readable text
+├── test_phase2_5_test2_fe.py     ← Test: Different contexts → different predictions
+├── test_phase2_5_test3_fe.py     ← Test: Output is always a valid wave + energy decreases
+├── demo_phase2_5_demo1_fe.py     ← Demo: Prompt → field evolution → decoded text
+├── demo_phase2_5_demo2_fe.py     ← Demo: Energy landscape analysis
 └── RESULTS_PHASE_2_5.md
 ```
 
 ### Acceptance Criteria
-- [ ] WRU predicts next wave from prefix context (single step)
+- [ ] Field evolution predicts next wave from full prefix (single step)
 - [ ] Predicted waves decode to readable text (avg byte accuracy ≥ 60%)
 - [ ] Different contexts → different predictions (avg pairwise cosine < 0.90)
-- [ ] Output is always a valid wave (bounded energy, non-degenerate sub-bands)
-- [ ] Hidden state is a valid wave at all times (decodable by WTT)
+- [ ] Output is always a valid wave (bounded, non-degenerate sub-bands)
+- [ ] Energy monotonically decreases during settling
 - [ ] **Decode gate:** avg byte accuracy ≥ 60%, min ≥ 30%
 - [ ] Checkpoint saved to `checkpoints/phase2_5_v2.phase.pt`
 
@@ -337,57 +353,63 @@ we know the problem is in the prediction head — not in the chaining logic.
 This is the lesson from the Phase 9 legacy failure: never add complexity
 before proving the base case works.
 
+### Why This Will Work (vs WRU)
+1. **No information loss:** Full prefix enters the field — no mean-pooling
+2. **Massive capacity:** Field has S×512 floats of state vs 4M parameters
+3. **Proven physics:** ThermodynamicLearner.settle_once() works in legacy Phase 4
+4. **Matches spec:** "Input → Perturbation → Field Settles → Output extracted"
+5. **Differentiable:** Unlike legacy settle (no_grad), this settle is differentiable
+
 ---
 
 ## ⬜ Phase 3: Deliberation + Autoregressive Wave Generation — AFTER 2.5
 
 > **Status:** Not started (requires Phase 2.5 checkpoint)
-> **Source:** Extends `v2/phase2_5/wave_recurrent_unit.py` with deliberation loop + chaining
+> **Source:** Extends `v2/phase2_5/field_evolution_generator.py` with deliberation loop + chaining
 > **Notebook:** `v2/V2_NOTEBOOKS/phase3_v2.ipynb`
 
 ### Goal
-Chain WRU predictions autoregressively AND add deliberation cycles.
+Chain field evolution predictions autoregressively AND add deliberation cycles.
 Phase 3 makes FLUX **think before it speaks** — like a human.
 
-### What's Novel: Deliberation Cycles
+### What's Novel: Deliberation = Extended Settling
 
-Instead of one step → emit, run multiple internal WRU steps where the
-output feeds back as input. Emit only when the wave **settles** (energy stabilizes):
+Instead of one settle → emit, run additional settling iterations where the
+field evolves further. Emit only when **energy stabilizes** (field has settled):
 
 ```
-Step 1:  context → WRU → wave₁  (candidate — don't emit yet)
-Step 2:  wave₁ interferes with context → WRU → wave₂  (refined)
-Step 3:  wave₂ interferes with context → WRU → wave₃  (more refined)
+Step 1:  seed field with prefix → settle K steps → wave₁  (candidate — don't emit yet)
+Step 2:  reseed field with wave₁ at next position → settle → wave₂  (refined)
+Step 3:  reseed field with wave₂ → settle → wave₃  (more refined)
 ...
-Step K:  energy(waveₖ) ≈ energy(waveₖ₋₁) → SETTLED → emit waveₖ
+Step D:  energy(waveD) ≈ energy(waveD₋₁) → SETTLED → emit waveD
 ```
 
 Key properties:
-- **The model decides WHEN to speak** — emit when energy stabilizes, not after fixed K
-- **Harder queries → more cycles** — "what is 2+2" settles fast; "explain quantum mechanics" takes longer
-- **Sub-bands settle independently** — semantics may settle in 2 steps, syntax in 5
-- **No new parameters** — same WRU, just run multiple times before emitting
+- **The model decides WHEN to speak** — emit when energy stabilizes, not after fixed D
+- **Harder queries → more settling** — "what is 2+2" settles fast; "explain quantum mechanics" takes longer
+- **No new parameters** — same FieldEvolutionGenerator, just more settle steps before emitting
 - **Energy at emission = confidence** — low energy = certain; high energy = uncertain
+- **Deliberation IS additional field physics** — not a separate loop
 
 This maps directly to SPECIFICATION.md:
 > *"Energy minimization — settling to minimum energy IS both inference and learning"*
 
 ### Architecture
 ```
-deliberate(context, max_cycles=10, settle_threshold=0.01):
-    state = wru.initial_state
-    for k in 1..max_cycles:
-        predicted, state = wru.step(context, state)
-        energy = ||predicted||²
-        if |energy - prev_energy| < settle_threshold:
+deliberate(prefix_waves, max_cycles=10, settle_threshold=0.01):
+    for d in 1..max_cycles:
+        predicted, info = generator(prefix_waves, settle_steps=K)
+        if |info.energy_drop| < settle_threshold:
             return predicted  # SETTLED — emit this wave
+        # Reseed: append prediction as new evidence
+        prefix_waves = cat(prefix_waves, predicted.unsqueeze(1))
     return predicted  # max cycles reached — emit best effort
 
 autoregressive_generate(prefix_waves, num_words=10):
     for i in 1..num_words:
-        context = w2f(prefix_waves.mean(dim=0))  # running context
-        next_wave = deliberate(context)           # think, then speak
-        prefix_waves = cat(prefix_waves, next_wave)
+        next_wave = deliberate(prefix_waves)    # think, then speak
+        prefix_waves = cat(prefix_waves, next_wave.unsqueeze(1))
     return prefix_waves  # decode entire sequence via WTT
 ```
 
