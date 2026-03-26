@@ -453,3 +453,172 @@
 [14:21:02] 
 ▶ CELL: Cell 13 — Save Results (Phase 2.5)
 [14:21:02]   Started: 2026-03-26 14:21:02
+[14:21:02]   ✓ Log copied → /content/FLUX/v2/V2_results/phase2_5/logs/phase2_5.log
+[14:21:02]   ✓ RESULTS_PHASE_2_5.md generated
+[14:21:02]   ✓ Logs uploaded to HuggingFace
+[15:39:00] 
+▶ CELL: Cell 3 — Hardware & Credentials (Phase 2.5)
+[15:39:00]   Started: 2026-03-26 15:39:00
+[15:39:00]   ℹ Runtime   : colab
+[15:39:00]   ℹ WORK_DIR  : /content
+[15:39:00]   ℹ REPO_PATH : /content/FLUX
+[15:39:00]   ℹ Device    : cuda
+[15:39:00]   ✓ GPU: NVIDIA L4
+[15:39:00]   📊 Total VRAM: 23.7 GB
+[15:39:00]   📊 Free VRAM: 23.7 GB
+[15:39:00]   ℹ HF_TOKEN loaded from Colab secrets
+[15:39:01]   ℹ GITHUB_TOKEN loaded from Colab secrets
+[15:39:01]   ✓ HuggingFace authenticated as UnseenGAP
+[15:39:01]   ℹ Downloading Phase 1 checkpoint from HuggingFace...
+[15:39:03]   ✓ Phase 1 checkpoint downloaded (8.6 MB)
+[15:39:03]   ℹ Downloading Phase 2 checkpoint from HuggingFace...
+[15:39:06]   ✓ Phase 2 checkpoint downloaded (544.1 MB)
+[15:39:06]   ◼ CELL Cell 3 — Hardware & Credentials (Phase 2.5) — PASS
+[15:39:06] 
+▶ CELL: Cell 4 — Smoke Test (Phase 2.5)
+[15:39:06]   Started: 2026-03-26 15:39:06
+[15:39:07]   ✓ SMOKE TEST PASSED — all imports and shapes OK
+[15:39:07]   ◼ CELL Cell 4 — Smoke Test (Phase 2.5) — PASS
+[15:39:07] 
+▶ CELL: Cell 5 — Training (Phase 2.5)
+[15:39:07]   Started: 2026-03-26 15:39:07
+[15:39:07]   ℹ Steps            : 30,000
+[15:39:07]   ℹ Batch size       : 64
+[15:39:07]   ℹ Learning rate    : 0.0005
+[15:39:07]   ℹ Device           : cuda
+[15:39:07]   ℹ wave_mse_weight  : 0.0
+[15:39:07]   ℹ cosine_weight    : 1.0
+[15:39:07]   ℹ decode_weight    : 5.0
+[15:39:07]   ℹ Checkpoint out   : /content/FLUX/checkpoints/phase2_5_v2.phase.pt
+[15:39:07] 
+──────────────────── Starting Phase 2.5 WRU training... ────────────────────
+[15:39:07] 
+──────────────────── Phase 2.5 v2 — Wave Recurrent Unit (Next-Wave Prediction) ────────────────────
+[15:39:07]   ℹ Device: cuda
+[15:39:07]   ℹ Steps: 30,000  Batch size: 64
+[15:39:07]   ℹ LR: 0.0005  wave_mse=0.0  cosine=1.0  decode=5.0
+[15:39:07]   ℹ Loading Phase 1 + Phase 2 checkpoints (will be FROZEN)...
+[15:39:08]   ✓ Phase 1 + Phase 2 loaded and frozen
+[15:39:08]   ℹ Building training corpus...
+[15:40:01]   ℹ Corpus: 16,562 strings
+[15:43:21]   ℹ Corpus: 16,561 usable records
+[15:43:21]   ℹ WRU parameters: 1,049,397
+[15:43:21]   ℹ   context_proj: 409,696
+[15:43:21]   ℹ   band_transforms: 451,344
+[15:43:21]   ℹ   interference_scale: 5
+[15:43:21]   ℹ   output: 187,920
+[15:43:21]   ℹ   initial_state: 432
+[15:43:27] 
+──────────────────── Training started ────────────────────
+[15:43:48]   ℹ Step    500/30,000  loss=15.5830  mse=9.3841  cos_sim=0.4098  decode=2.9986  lr=5.00e-04
+[15:44:09]   ℹ Step  1,000/30,000  loss=15.3279  mse=9.3640  cos_sim=0.4232  decode=2.9502  lr=4.99e-04
+[15:44:29]   ℹ Step  1,500/30,000  loss=15.2152  mse=9.2843  cos_sim=0.4265  decode=2.9283  lr=4.97e-04
+[15:44:50]   ℹ Step  2,000/30,000  loss=15.1780  mse=9.3017  cos_sim=0.4312  decode=2.9218  lr=4.95e-04
+[15:45:11]   ℹ Step  2,500/30,000  loss=15.1339  mse=9.3542  cos_sim=0.4328  decode=2.9133  lr=4.92e-04
+[15:45:11]   ✓ New best gate avg: 10.4%
+[15:45:32]   ℹ Step  3,000/30,000  loss=15.1027  mse=9.2864  cos_sim=0.4347  decode=2.9075  lr=4.88e-04
+[15:45:52]   ℹ Step  3,500/30,000  loss=15.0506  mse=9.3077  cos_sim=0.4360  decode=2.8973  lr=4.84e-04
+[15:46:13]   ℹ Step  4,000/30,000  loss=15.0269  mse=9.3156  cos_sim=0.4380  decode=2.8930  lr=4.79e-04
+[15:46:33]   ℹ Step  4,500/30,000  loss=15.0060  mse=9.3453  cos_sim=0.4398  decode=2.8892  lr=4.73e-04
+[15:46:54]   ℹ Step  5,000/30,000  loss=14.9808  mse=9.3141  cos_sim=0.4400  decode=2.8842  lr=4.67e-04
+[15:47:14]   ℹ Step  5,500/30,000  loss=14.9380  mse=9.2927  cos_sim=0.4425  decode=2.8761  lr=4.60e-04
+[15:47:35]   ℹ Step  6,000/30,000  loss=14.9385  mse=9.3223  cos_sim=0.4421  decode=2.8761  lr=4.53e-04
+[15:47:55]   ℹ Step  6,500/30,000  loss=14.9493  mse=9.3361  cos_sim=0.4416  decode=2.8782  lr=4.45e-04
+[15:48:16]   ℹ Step  7,000/30,000  loss=14.9423  mse=9.3599  cos_sim=0.4436  decode=2.8772  lr=4.36e-04
+[15:48:36]   ℹ Step  7,500/30,000  loss=14.8837  mse=9.3475  cos_sim=0.4467  decode=2.8661  lr=4.28e-04
+[15:48:57]   ℹ Step  8,000/30,000  loss=14.8895  mse=9.2667  cos_sim=0.4436  decode=2.8666  lr=4.18e-04
+[15:49:17]   ℹ Step  8,500/30,000  loss=14.8251  mse=9.2877  cos_sim=0.4467  decode=2.8544  lr=4.08e-04
+[15:49:38]   ℹ Step  9,000/30,000  loss=14.8754  mse=9.3266  cos_sim=0.4471  decode=2.8645  lr=3.98e-04
+[15:49:58]   ℹ Step  9,500/30,000  loss=14.8435  mse=9.3109  cos_sim=0.4473  decode=2.8582  lr=3.87e-04
+[15:50:19]   ℹ Step 10,000/30,000  loss=14.8019  mse=9.3133  cos_sim=0.4496  decode=2.8503  lr=3.76e-04
+[15:50:40]   ℹ Step 10,500/30,000  loss=14.8320  mse=9.3420  cos_sim=0.4500  decode=2.8564  lr=3.65e-04
+[15:51:00]   ℹ Step 11,000/30,000  loss=14.8080  mse=9.2968  cos_sim=0.4499  decode=2.8516  lr=3.53e-04
+[15:51:21]   ℹ Step 11,500/30,000  loss=14.7771  mse=9.2985  cos_sim=0.4515  decode=2.8457  lr=3.41e-04
+[15:51:41]   ℹ Step 12,000/30,000  loss=14.7764  mse=9.3047  cos_sim=0.4515  decode=2.8456  lr=3.29e-04
+[15:52:02]   ℹ Step 12,500/30,000  loss=14.7679  mse=9.3238  cos_sim=0.4533  decode=2.8442  lr=3.17e-04
+[15:52:23]   ℹ Step 13,000/30,000  loss=14.7781  mse=9.3177  cos_sim=0.4521  decode=2.8460  lr=3.04e-04
+[15:52:44]   ℹ Step 13,500/30,000  loss=14.7174  mse=9.2542  cos_sim=0.4533  decode=2.8341  lr=2.91e-04
+[15:53:04]   ℹ Step 14,000/30,000  loss=14.7166  mse=9.3005  cos_sim=0.4539  decode=2.8341  lr=2.78e-04
+[15:53:24]   ℹ Step 14,500/30,000  loss=14.6566  mse=9.2860  cos_sim=0.4557  decode=2.8225  lr=2.65e-04
+[15:53:45]   ℹ Step 15,000/30,000  loss=14.7097  mse=9.2349  cos_sim=0.4528  decode=2.8325  lr=2.52e-04
+[15:54:06]   ℹ Step 15,500/30,000  loss=14.7338  mse=9.3174  cos_sim=0.4545  decode=2.8377  lr=2.40e-04
+[15:54:26]   ℹ Step 16,000/30,000  loss=14.7172  mse=9.2817  cos_sim=0.4546  decode=2.8344  lr=2.27e-04
+[15:54:47]   ℹ Step 16,500/30,000  loss=14.6920  mse=9.2898  cos_sim=0.4559  decode=2.8296  lr=2.14e-04
+[15:55:08]   ℹ Step 17,000/30,000  loss=14.6993  mse=9.2887  cos_sim=0.4553  decode=2.8309  lr=2.01e-04
+[15:55:28]   ℹ Step 17,500/30,000  loss=14.6405  mse=9.3005  cos_sim=0.4577  decode=2.8196  lr=1.88e-04
+[15:55:49]   ℹ Step 18,000/30,000  loss=14.6482  mse=9.2840  cos_sim=0.4578  decode=2.8212  lr=1.76e-04
+[15:56:09]   ℹ Step 18,500/30,000  loss=14.6661  mse=9.2554  cos_sim=0.4566  decode=2.8245  lr=1.64e-04
+[15:56:30]   ℹ Step 19,000/30,000  loss=14.6378  mse=9.2479  cos_sim=0.4586  decode=2.8193  lr=1.52e-04
+[15:56:50]   ℹ Step 19,500/30,000  loss=14.6617  mse=9.3045  cos_sim=0.4570  decode=2.8237  lr=1.40e-04
+[15:57:11]   ℹ Step 20,000/30,000  loss=14.6419  mse=9.3016  cos_sim=0.4586  decode=2.8201  lr=1.29e-04
+[15:57:31]   ℹ Step 20,500/30,000  loss=14.6410  mse=9.2499  cos_sim=0.4582  decode=2.8198  lr=1.18e-04
+[15:57:52]   ℹ Step 21,000/30,000  loss=14.5717  mse=9.2791  cos_sim=0.4606  decode=2.8065  lr=1.07e-04
+[15:58:12]   ℹ Step 21,500/30,000  loss=14.6020  mse=9.3284  cos_sim=0.4613  decode=2.8127  lr=9.67e-05
+[15:58:33]   ℹ Step 22,000/30,000  loss=14.5742  mse=9.2417  cos_sim=0.4597  decode=2.8068  lr=8.69e-05
+[15:58:53]   ℹ Step 22,500/30,000  loss=14.5877  mse=9.2257  cos_sim=0.4597  decode=2.8095  lr=7.75e-05
+[15:58:54]   ✓ New best gate avg: 12.5%
+[15:59:14]   ℹ Step 23,000/30,000  loss=14.6178  mse=9.2797  cos_sim=0.4600  decode=2.8156  lr=6.86e-05
+[15:59:35]   ℹ Step 23,500/30,000  loss=14.5892  mse=9.2825  cos_sim=0.4621  decode=2.8102  lr=6.02e-05
+[15:59:55]   ℹ Step 24,000/30,000  loss=14.5313  mse=9.2779  cos_sim=0.4624  decode=2.7987  lr=5.23e-05
+[16:00:16]   ℹ Step 24,500/30,000  loss=14.5606  mse=9.2821  cos_sim=0.4613  decode=2.8044  lr=4.49e-05
+[16:00:36]   ℹ Step 25,000/30,000  loss=14.5709  mse=9.2521  cos_sim=0.4610  decode=2.8064  lr=3.82e-05
+[16:00:57]   ℹ Step 25,500/30,000  loss=14.5613  mse=9.2561  cos_sim=0.4622  decode=2.8047  lr=3.20e-05
+[16:01:18]   ℹ Step 26,000/30,000  loss=14.4670  mse=9.2209  cos_sim=0.4644  decode=2.7863  lr=2.64e-05
+[16:01:38]   ℹ Step 26,500/30,000  loss=14.5543  mse=9.2387  cos_sim=0.4610  decode=2.8031  lr=2.14e-05
+[16:01:59]   ℹ Step 27,000/30,000  loss=14.5478  mse=9.2486  cos_sim=0.4624  decode=2.8020  lr=1.71e-05
+[16:02:19]   ℹ Step 27,500/30,000  loss=14.5286  mse=9.2677  cos_sim=0.4641  decode=2.7985  lr=1.34e-05
+[16:02:40]   ℹ Step 28,000/30,000  loss=14.5489  mse=9.2410  cos_sim=0.4619  decode=2.8022  lr=1.04e-05
+[16:03:00]   ℹ Step 28,500/30,000  loss=14.5301  mse=9.2747  cos_sim=0.4630  decode=2.7986  lr=8.05e-06
+[16:03:21]   ℹ Step 29,000/30,000  loss=14.5251  mse=9.2738  cos_sim=0.4634  decode=2.7977  lr=6.36e-06
+[16:03:41]   ℹ Step 29,500/30,000  loss=14.5020  mse=9.2279  cos_sim=0.4630  decode=2.7930  lr=5.34e-06
+[16:04:02]   ℹ Step 30,000/30,000  loss=14.5503  mse=9.2537  cos_sim=0.4621  decode=2.8025  lr=5.00e-06
+[16:04:02] 
+──────────────────── Final Decode Gate Check ────────────────────
+[16:04:02] 
+──────────────────── Phase 2.5 training complete ────────────────────
+[16:04:02]   📊 Final gate avg: 10.4%
+[16:04:02]   📊 Best gate avg: 12.5%
+[16:04:02]   📊 WRU params: 1,049,397
+[16:04:02]   ✓ Training complete
+[16:04:02]   📊 Checkpoint: /content/FLUX/checkpoints/phase2_5_v2.phase.pt
+[16:04:02]   ◼ CELL Cell 5 — Training (Phase 2.5) — PASS
+[16:04:02] 
+▶ CELL: Cell 6 — Training Diagnostics (Phase 2.5)
+[16:04:02]   Started: 2026-03-26 16:04:02
+[16:04:02]   ✓ ALL DIAGNOSTICS PASSED — safe to upload
+[16:04:02]   ◼ CELL Cell 6 — Training Diagnostics (Phase 2.5) — PASS
+[16:04:02] 
+▶ CELL: Cell 7 — Upload to HuggingFace (Phase 2.5)
+[16:04:02]   Started: 2026-03-26 16:04:02
+[16:04:02]   ✓ HF_TOKEN resolved (len=37)
+[16:04:03]   ℹ Repo confirmed: https://huggingface.co/UnseenGAP/FLUX
+[16:04:03]   ℹ Uploading 4.2 MB → UnseenGAP/FLUX/v2/phase2_5_v2.phase.pt
+[16:04:08]   ✓ Upload complete
+[16:04:08]   📊 HF URL: https://huggingface.co/UnseenGAP/FLUX/blob/main/v2/phase2_5_v2.phase.pt
+[16:04:08]   ◼ CELL Cell 7 — Upload to HuggingFace (Phase 2.5) — PASS
+[16:04:08] 
+▶ CELL: Cell 8 — Test 1: Decode Gate (Phase 2.5)
+[16:04:08]   Started: 2026-03-26 16:04:08
+[16:04:12]   ✗ TEST 1 FAILED — avg=4.2%  min=0.0%
+[16:04:12]   ◼ CELL Cell 8 — Test 1: Decode Gate (Phase 2.5) — FAIL
+[16:04:13] 
+▶ CELL: Cell 9 — Test 2: Context Diversity (Phase 2.5)
+[16:04:13]   Started: 2026-03-26 16:04:13
+[16:04:13]   ✓ TEST 2 PASSED — avg_cos=0.8644
+[16:04:13]   ◼ CELL Cell 9 — Test 2 — PASS
+[16:04:13] 
+▶ CELL: Cell 10 — Test 3: Wave Validity (Phase 2.5)
+[16:04:13]   Started: 2026-03-26 16:04:13
+[16:04:13]   ✓ TEST 3 PASSED — all wave validity checks OK
+[16:04:13]   ◼ CELL Cell 10 — Test 3 — PASS
+[16:04:13] 
+▶ CELL: Cell 11 — Demo 1: Next-Wave Prediction (Phase 2.5)
+[16:04:13]   Started: 2026-03-26 16:04:13
+[16:04:14]   ◼ CELL Cell 11 — Demo 1 (Phase 2.5) — PASS
+[16:04:14] 
+▶ CELL: Cell 12 — Demo 2: Sub-Band Analysis (Phase 2.5)
+[16:04:14]   Started: 2026-03-26 16:04:14
+[16:04:15]   ◼ CELL Cell 12 — Demo 2 (Phase 2.5) — PASS
+[16:04:15] 
+▶ CELL: Cell 13 — Save Results (Phase 2.5)
+[16:04:15]   Started: 2026-03-26 16:04:15

@@ -1,9 +1,9 @@
 {
-  "test1_gate_avg": 0.1875,
+  "test1_gate_avg": 0.0417,
   "test1_gate_min": 0.0,
   "test1_passed": false,
-  "test2_avg_cosine": 0.8232,
-  "test2_max_cosine": 0.9735,
+  "test2_avg_cosine": 0.8644,
+  "test2_max_cosine": 0.985,
   "test2_diversity_pass": true,
   "test3_wave_valid": true,
   "test3_batch_ok": true
