@@ -56,10 +56,10 @@ class WaveDecoder(nn.Module):
         self,
         wave_dim: int = 432,
         field_features: int = 512,
-        embed_dim: int = 128,
-        hidden_dim: int = 512,
-        num_layers: int = 2,
-        num_heads: int = 8,
+        embed_dim: int = 256,
+        hidden_dim: int = 1024,
+        num_layers: int = 4,
+        num_heads: int = 16,
         vocab_size: int = 256,
         dropout: float = 0.1,
     ):
@@ -311,7 +311,7 @@ if __name__ == '__main__':
 
     # Dummy inputs — wave_sequence is [src_seq, 432], NOT collapsed
     wave_seq = torch.randn(10, 432)  # 10-position wave sequence
-    field_feat = torch.randn(768)
+    field_feat = torch.randn(512)
     target = torch.randint(0, 256, (50,))
 
     # Teacher-forced forward

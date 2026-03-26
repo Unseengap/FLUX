@@ -135,7 +135,7 @@ class OpenWebTextTrainer:
             dtype=torch.long, device=device,
         )
 
-    def train_step(self, text: str) -> TrainStepResult:
+    def train_step(self, text: str, freeze_field: bool = False) -> TrainStepResult:
         """
         Single training step on a text document.
 
@@ -149,6 +149,7 @@ class OpenWebTextTrainer:
 
         Args:
             text: Raw text document
+            freeze_field: If True, do not update the field (for multi-epoch training)
 
         Returns:
             TrainStepResult with metrics
@@ -164,16 +165,23 @@ class OpenWebTextTrainer:
 
         # Thermodynamic settle (field learning — no backprop)
         with torch.no_grad():
-            settle_result = self.model.tl.settle_once(wave_vec)
-            self.model._learning_steps += 1
-
-            # NOTE: Episodic memory writes are SKIPPED during training.
-            # Training data should NOT flood episodic memory — it drowns
-            # out explicit facts stored later via learn_fact().
-            # The field learns through thermodynamic settling above.
-            # Episodic memory is reserved for deliberate fact storage.
-
-            self.model.working_memory.add_perturbation(wave_vec)
+            if freeze_field:
+                from thermodynamic import SettleResult
+                settle_result = SettleResult(
+                    iterations=0, start_energy=0.0, final_energy=0.0, 
+                    energy_delta=0.0, temperature=0.0, stable=True
+                )
+            else:
+                settle_result = self.model.tl.settle_once(wave_vec)
+                self.model._learning_steps += 1
+    
+                # NOTE: Episodic memory writes are SKIPPED during training.
+                # Training data should NOT flood episodic memory — it drowns
+                # out explicit facts stored later via learn_fact().
+                # The field learns through thermodynamic settling above.
+                # Episodic memory is reserved for deliberate fact storage.
+    
+                self.model.working_memory.add_perturbation(wave_vec)
 
         # ── Get FLUX context (no grad through field/CGN) ──
         field_features, sims, locs = self.model.field.query(wave_vec.detach(), k=4)
@@ -263,28 +271,31 @@ class OpenWebTextTrainer:
         max_steps: Optional[int] = None,
         verbose: bool = True,
         log_interval: int = 50,
+        epochs: int = 1,
     ) -> TrainRunResult:
         """
-        Train on a list/iterable of text documents (single pass).
+        Train on a list/iterable of text documents.
 
         Args:
             texts: Iterable of text documents
-            max_steps: Maximum steps (None = all)
+            max_steps: Maximum steps per epoch (None = all)
             verbose: Print progress
             log_interval: Print every N steps
+            epochs: Number of passes over the dataset
 
         Returns:
             TrainRunResult with training metrics
         """
         t0 = time.time()
-        steps_to_run = min(len(texts), max_steps) if max_steps else len(texts)
+        steps_per_epoch = min(len(texts), max_steps) if max_steps else len(texts)
+        total_steps_to_run = steps_per_epoch * epochs
 
         # Warmup + cosine decay scheduler
-        warmup_steps = min(100, steps_to_run // 10)
+        warmup_steps = min(100, total_steps_to_run // 10)
         def lr_lambda(step):
             if step < warmup_steps:
                 return max(0.01, step / max(warmup_steps, 1))
-            progress = (step - warmup_steps) / max(steps_to_run - warmup_steps, 1)
+            progress = (step - warmup_steps) / max(total_steps_to_run - warmup_steps, 1)
             return max(0.1, 0.5 * (1 + math.cos(math.pi * progress)))
 
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -295,36 +306,43 @@ class OpenWebTextTrainer:
         perplexities = []
         history = []
 
-        for i, text in enumerate(texts):
-            if i >= steps_to_run:
-                break
+        for epoch in range(epochs):
+            if verbose and epochs > 1:
+                print(f"\n  --- Epoch {epoch+1}/{epochs} ---")
+                
+            for i, text in enumerate(texts):
+                if max_steps and i >= max_steps:
+                    break
 
-            if not text or len(text.strip()) < 10:
-                continue
+                if not text or len(text.strip()) < 10:
+                    continue
 
-            result = self.train_step(text)
-            losses.append(result.loss)
-            perplexities.append(result.perplexity)
-            history.append(result)
+                # Freeze field after first epoch so we don't over-accumulate mass
+                result = self.train_step(text, freeze_field=(epoch > 0))
+                losses.append(result.loss)
+                perplexities.append(result.perplexity)
+                history.append(result)
 
-            if verbose and (i + 1) % log_interval == 0:
-                avg_loss = sum(losses[-log_interval:]) / min(len(losses), log_interval)
-                avg_ppl = sum(perplexities[-log_interval:]) / min(len(perplexities), log_interval)
-                lr_now = self.optimizer.param_groups[0]['lr']
-                print(
-                    f"  Step {i+1:>6}/{steps_to_run}  "
-                    f"loss={avg_loss:.4f}  ppl={avg_ppl:.1f}  "
-                    f"lr={lr_now:.6f}  "
-                    f"tokens={self._tokens_seen:,}  "
-                    f"latency={result.latency_ms:.0f}ms"
-                )
+                if verbose and (i + 1) % log_interval == 0:
+                    avg_loss = sum(losses[-log_interval:]) / min(len(losses), log_interval)
+                    avg_ppl = sum(perplexities[-log_interval:]) / min(len(perplexities), log_interval)
+                    lr_now = self.optimizer.param_groups[0]['lr']
+                    global_step = epoch * steps_per_epoch + (i + 1)
+                    print(
+                        f"  Step {global_step:>6}/{total_steps_to_run}  "
+                        f"loss={avg_loss:.4f}  ppl={avg_ppl:.1f}  "
+                        f"lr={lr_now:.6f}  "
+                        f"tokens={self._tokens_seen:,}  "
+                        f"latency={result.latency_ms:.0f}ms"
+                    )
 
-                if self.log:
-                    self.log.metric(f"step_{i+1}_loss", f"{avg_loss:.4f}")
+                    if self.log:
+                        self.log.metric(f"step_{global_step}_loss", f"{avg_loss:.4f}")
 
-            # Checkpoint interval
-            if self.checkpoint_interval > 0 and (i + 1) % self.checkpoint_interval == 0:
-                self._save_training_checkpoint(i + 1, losses)
+                # Checkpoint interval
+                global_step_for_ckpt = epoch * steps_per_epoch + (i + 1)
+                if self.checkpoint_interval > 0 and global_step_for_ckpt % self.checkpoint_interval == 0:
+                    self._save_training_checkpoint(global_step_for_ckpt, losses)
 
         elapsed = time.time() - t0
 
