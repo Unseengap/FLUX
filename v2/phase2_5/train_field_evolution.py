@@ -420,20 +420,42 @@ def load_phase1_and_phase2(
     ckpt_dir = Path(__file__).parent.parent.parent / 'checkpoints'
     p2_path = ckpt_dir / 'phase2_v2.phase.pt'
 
+    # hf_hub_download mirrors subfolder structure → also check mirrored path
+    _mirrored_p2 = ckpt_dir / 'v2' / 'phase2_v2.phase.pt'
+    if not p2_path.exists() and _mirrored_p2.exists():
+        import shutil as _sh
+        _sh.copy2(str(_mirrored_p2), str(p2_path))
+        print(f"  ✓ Phase 2 checkpoint found at mirrored path, copied to {p2_path}")
+
     if not p2_path.exists():
+        # ── Token resolution: explicit → env var → HF cached login ───
+        _token = hf_token or os.environ.get('HF_TOKEN', '')
+        if not _token:
+            try:
+                import huggingface_hub as _hfh
+                _token = _hfh.get_token() or ''
+            except Exception:
+                pass
+        if not _token:
+            raise FileNotFoundError(
+                f"Phase 2 checkpoint not found at {p2_path} and no HuggingFace token available.\n"
+                f"Either run Phase 2 first or set HF_TOKEN."
+            )
         try:
             from huggingface_hub import hf_hub_download
             print(f"  Downloading Phase 2 checkpoint from HuggingFace...", flush=True)
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
             dl = hf_hub_download(
                 repo_id='UnseenGAP/FLUX',
                 filename='v2/phase2_v2.phase.pt',
-                token=hf_token,
+                token=_token,
                 local_dir=str(ckpt_dir),
             )
             import shutil
             dl_real = os.path.realpath(dl)
             if dl_real != str(p2_path):
                 shutil.copy2(dl_real, str(p2_path))
+            print(f"  ✓ Phase 2 checkpoint downloaded → {p2_path}")
         except Exception as e:
             raise FileNotFoundError(
                 f"Phase 2 checkpoint not found at {p2_path}\n"
