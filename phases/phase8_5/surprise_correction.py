@@ -206,7 +206,9 @@ class SurpriseCorrector:
         self._surprise_history.append(surprise)
         self._total_corrections += 1
         
-        # Note: detailed Q/A logging done in curriculum_school.py
+        if self.verbose:
+            print(f"    Surprise: {surprise:.3f} (FLUX conf={flux_confidence:.2f}, "
+                  f"teacher={feedback.score:.1f})")
         
         # Step 2: Get field state before learning
         energy_before = self.model.field.total_energy()
@@ -398,7 +400,10 @@ class SurpriseCorrector:
                 target=target_features,
                 iterations=adaptive_iters,
             )
-            # Field settling details logged via curriculum progress
+            
+            if self.verbose:
+                print(f"      Field settled: energy {result.initial_energy:.2f} → "
+                      f"{result.final_energy:.2f}, iters={result.iterations_used}")
     
     def _store_in_episodic(
         self,

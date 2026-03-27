@@ -298,18 +298,12 @@ class CurriculumSchool:
                 feedback=feedback,
             )
             
-            # Progress logging — show actual Q/A every 25 iterations
-            if self.verbose and (attempt + 1) % 25 == 0:
-                recent = scores[-25:] if len(scores) >= 25 else scores
+            # Progress logging
+            if self.verbose and (attempt + 1) % 50 == 0:
+                recent = scores[-50:] if len(scores) >= 50 else scores
                 avg = sum(recent) / len(recent)
-                print(f"\n      [{attempt+1:3d}/{subject.max_attempts}] avg={avg:.2f} surprise={result.surprise:.3f}")
-                print(f"      📝 Prompt: \"{prompt[:40]}{'...' if len(prompt) > 40 else ''}\"")
-                print(f"      🤖 FLUX:   \"{continuation[:50]}{'...' if len(continuation) > 50 else ''}\"")
-                print(f"      👩‍🏫 Teacher: score={feedback.score:.1f}")
-                if feedback.corrected_text and feedback.corrected_text != continuation:
-                    corrected_preview = feedback.corrected_text[:50]
-                    print(f"      ✏️  Correct: \"{corrected_preview}{'...' if len(feedback.corrected_text) > 50 else ''}\"")
-                print()
+                print(f"      [{attempt+1:3d}/{subject.max_attempts}] "
+                      f"avg_score={avg:.2f} surprise={result.surprise:.3f}")
             
             # Early exit if consistently passing
             if len(scores) >= 20:
@@ -337,25 +331,19 @@ class CurriculumSchool:
         if subject.name == 'spelling':
             # Test word spelling
             words = get_spelling_test_words(subject.test_count)
-            for i, word in enumerate(words):
+            for word in words:
                 flux_output = self.model.generate(word[:2], max_length=len(word) + 5)
                 passed, score, _ = self.teacher.grade_spelling(word, flux_output)
                 scores.append(score)
-                if self.verbose and i < 3:  # Show first 3 tests
-                    status = "✓" if passed else "✗"
-                    print(f"        {status} '{word[:2]}...' → FLUX: '{flux_output}' (score={score:.1f})")
         
         elif subject.name == 'grammar':
             # Test grammar with sentence prompts
             prompts = get_sentence_test_prompts()[:subject.test_count]
-            for i, prompt in enumerate(prompts):
+            for prompt in prompts:
                 flux_output = self.model.generate(prompt, max_length=60)
                 continuation = flux_output[len(prompt):]
                 passed, score, _ = self.teacher.grade_grammar(prompt + continuation)
                 scores.append(score)
-                if self.verbose and i < 2:  # Show first 2 tests
-                    status = "✓" if passed else "✗"
-                    print(f"        {status} '{prompt[:25]}...' → '{continuation[:30]}...' (score={score:.1f})")
         
         elif subject.name == 'coherence':
             # Test coherence with open prompts
@@ -372,17 +360,15 @@ class CurriculumSchool:
                 "According to experts,",
             ][:subject.test_count]
             
-            for i, prompt in enumerate(test_prompts):
+            for prompt in test_prompts:
                 flux_output = self.model.generate(prompt, max_length=80)
                 continuation = flux_output[len(prompt):]
                 passed, score, _ = self.teacher.grade_coherence(prompt + continuation)
                 scores.append(score)
-                if self.verbose and i < 2:  # Show first 2 tests
-                    status = "✓" if passed else "✗"
-                    print(f"        {status} '{prompt}' → '{continuation[:40]}...' (score={score:.1f})")
         
         elif subject.name == 'knowledge':
             # Test fact recall from episodic memory
+            # These are facts that should have been stored during training
             test_facts = [
                 ("The capital of France is", "Paris"),
                 ("Water freezes at", "zero degrees"),
@@ -391,16 +377,13 @@ class CurriculumSchool:
                 ("The speed of light is", "300000"),
             ][:min(subject.test_count, 5)]
             
-            for i, (question, expected) in enumerate(test_facts):
+            for question, expected in test_facts:
                 flux_output = self.model.generate(question, max_length=40)
                 continuation = flux_output[len(question):]
                 passed, score, _ = self.teacher.grade_knowledge(
                     question, expected, continuation
                 )
                 scores.append(score)
-                if self.verbose:  # Show all knowledge tests
-                    status = "✓" if passed else "✗"
-                    print(f"        {status} Q: '{question}' → FLUX: '{continuation[:30]}' (expect: {expected})")
             
             # Also test episodic recall
             episodic_count = min(self.model.episodic_memory.size, subject.test_count - 5)
