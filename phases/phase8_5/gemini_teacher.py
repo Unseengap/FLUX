@@ -101,7 +101,7 @@ class GeminiTeacher:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model_name: str = "gemini-1.5-flash",
+        model_name: str = "gemini-2.0-flash",
         rate_limit_delay: float = 1.0,
         verbose: bool = False,
     ):
@@ -131,9 +131,27 @@ class GeminiTeacher:
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
-            self._model = genai.GenerativeModel(self.model_name)
-            if self.verbose:
-                print(f"  ✓ Gemini teacher initialized ({self.model_name})")
+            
+            # Try models in order of preference
+            models_to_try = [self.model_name, 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+            
+            for model in models_to_try:
+                try:
+                    self._model = genai.GenerativeModel(model)
+                    # Quick test to verify model works
+                    _ = self._model.generate_content("test", generation_config={'max_output_tokens': 5})
+                    self.model_name = model
+                    if self.verbose:
+                        print(f"  ✓ Gemini teacher initialized ({model})")
+                    return
+                except Exception as e:
+                    if self.verbose:
+                        print(f"  ⚠ Model {model} failed: {e}")
+                    continue
+            
+            print("  ⚠ No Gemini models available")
+            self._model = None
+            
         except ImportError:
             print("  ⚠ google-generativeai not installed")
             print("    Run: pip install google-generativeai")

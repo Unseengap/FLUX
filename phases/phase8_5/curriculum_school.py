@@ -20,7 +20,7 @@ import math
 import torch
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 _PHASES_DIR = Path(__file__).parent.parent
@@ -80,64 +80,64 @@ KNOWLEDGE = SubjectConfig('knowledge', pass_threshold=4.0, max_attempts=150, tes
 GRADE_CONFIGS = {
     0: GradeConfig(
         grade=0, name='Kindergarten (Bytes)',
-        subjects=[SPELLING._replace(pass_threshold=7.0, test_count=30)],
+        subjects=[replace(SPELLING, pass_threshold=7.0, test_count=30)],
         material_stage=1, max_seq_len=16, lr=1e-3,
     ),
     1: GradeConfig(
         grade=1, name='Grade 1 (Bigrams)',
         subjects=[
-            SPELLING._replace(pass_threshold=6.5, test_count=25),
-            GRAMMAR._replace(pass_threshold=4.0, test_count=10),
+            replace(SPELLING, pass_threshold=6.5, test_count=25),
+            replace(GRAMMAR, pass_threshold=4.0, test_count=10),
         ],
         material_stage=2, max_seq_len=32, lr=8e-4,
     ),
     2: GradeConfig(
         grade=2, name='Grade 2 (Words)',
         subjects=[
-            SPELLING._replace(pass_threshold=6.0, test_count=30),
-            GRAMMAR._replace(pass_threshold=5.0, test_count=15),
-            COHERENCE._replace(pass_threshold=4.0, test_count=10),
-            KNOWLEDGE._replace(pass_threshold=3.0, test_count=5),
+            replace(SPELLING, pass_threshold=6.0, test_count=30),
+            replace(GRAMMAR, pass_threshold=5.0, test_count=15),
+            replace(COHERENCE, pass_threshold=4.0, test_count=10),
+            replace(KNOWLEDGE, pass_threshold=3.0, test_count=5),
         ],
         material_stage=3, max_seq_len=64, lr=5e-4,
     ),
     3: GradeConfig(
         grade=3, name='Grade 3 (Phrases)',
         subjects=[
-            SPELLING._replace(pass_threshold=5.5, test_count=25),
-            GRAMMAR._replace(pass_threshold=5.5, test_count=15),
-            COHERENCE._replace(pass_threshold=5.0, test_count=12),
-            KNOWLEDGE._replace(pass_threshold=4.0, test_count=15),
+            replace(SPELLING, pass_threshold=5.5, test_count=25),
+            replace(GRAMMAR, pass_threshold=5.5, test_count=15),
+            replace(COHERENCE, pass_threshold=5.0, test_count=12),
+            replace(KNOWLEDGE, pass_threshold=4.0, test_count=15),
         ],
         material_stage=4, max_seq_len=128, lr=3e-4,
     ),
     4: GradeConfig(
         grade=4, name='Grade 4 (Sentences)',
         subjects=[
-            SPELLING._replace(pass_threshold=5.0, test_count=20),
-            GRAMMAR._replace(pass_threshold=6.0, test_count=15),
-            COHERENCE._replace(pass_threshold=5.5, test_count=15),
-            KNOWLEDGE._replace(pass_threshold=5.0, test_count=25),
+            replace(SPELLING, pass_threshold=5.0, test_count=20),
+            replace(GRAMMAR, pass_threshold=6.0, test_count=15),
+            replace(COHERENCE, pass_threshold=5.5, test_count=15),
+            replace(KNOWLEDGE, pass_threshold=5.0, test_count=25),
         ],
         material_stage=5, max_seq_len=256, lr=2e-4,
     ),
     5: GradeConfig(
         grade=5, name='Grade 5 (Paragraphs)',
         subjects=[
-            SPELLING._replace(pass_threshold=4.5, test_count=20),
-            GRAMMAR._replace(pass_threshold=6.0, test_count=15),
-            COHERENCE._replace(pass_threshold=6.0, test_count=15),
-            KNOWLEDGE._replace(pass_threshold=5.5, test_count=40),
+            replace(SPELLING, pass_threshold=4.5, test_count=20),
+            replace(GRAMMAR, pass_threshold=6.0, test_count=15),
+            replace(COHERENCE, pass_threshold=6.0, test_count=15),
+            replace(KNOWLEDGE, pass_threshold=5.5, test_count=40),
         ],
         material_stage=5, max_seq_len=384, lr=1.5e-4,
     ),
     6: GradeConfig(
         grade=6, name='Grade 6 (Real Text)',
         subjects=[
-            SPELLING._replace(pass_threshold=4.0, test_count=15),
-            GRAMMAR._replace(pass_threshold=5.5, test_count=15),
-            COHERENCE._replace(pass_threshold=6.0, test_count=20),
-            KNOWLEDGE._replace(pass_threshold=6.0, test_count=50),
+            replace(SPELLING, pass_threshold=4.0, test_count=15),
+            replace(GRAMMAR, pass_threshold=5.5, test_count=15),
+            replace(COHERENCE, pass_threshold=6.0, test_count=20),
+            replace(KNOWLEDGE, pass_threshold=6.0, test_count=50),
         ],
         material_stage=6, max_seq_len=512, lr=1e-4,
     ),

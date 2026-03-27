@@ -211,7 +211,7 @@ class SurpriseCorrector:
                   f"teacher={feedback.score:.1f})")
         
         # Step 2: Get field state before learning
-        energy_before = self.model.field.get_energy()
+        energy_before = self.model.field.total_energy()
         temp_before = self.model.tl.temp_manager.temperature
         
         # Step 3: Decoder learning (if surprise is high enough)
@@ -232,7 +232,7 @@ class SurpriseCorrector:
             )
         
         # Step 5: Get field state after learning
-        energy_after = self.model.field.get_energy()
+        energy_after = self.model.field.total_energy()
         temp_after = self.model.tl.temp_manager.temperature
         
         # Step 6: Episodic memory — ONE-SHOT LEARNING
