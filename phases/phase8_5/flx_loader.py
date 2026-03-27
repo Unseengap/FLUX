@@ -80,6 +80,13 @@ def download_flx_from_hf(
                 token = UserSecretsClient().get_secret("HF_TOKEN")
             except:
                 pass
+        # Try Colab secrets
+        if token is None:
+            try:
+                from google.colab import userdata
+                token = userdata.get("HF_TOKEN")
+            except:
+                pass
     
     try:
         from huggingface_hub import hf_hub_download
