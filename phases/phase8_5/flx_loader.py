@@ -19,6 +19,13 @@ from typing import Dict, Any, Optional, Tuple
 _PHASES_DIR = Path(__file__).parent.parent
 _PROJECT_ROOT = _PHASES_DIR.parent
 
+# ─────────────────────────────────────────────
+# HuggingFace Config
+# ─────────────────────────────────────────────
+
+HF_REPO_ID = "UnseenGAP/FLUX"
+HF_FLX_PATH = "checkpoints/Flux-beta.flx"  # Path within HF repo
+
 for _p in ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6', 'phase7', 'phase8']:
     _pp = str(_PHASES_DIR / _p)
     if _pp not in sys.path:
@@ -37,28 +44,109 @@ DEFAULT_FLX_PATH = Path('checkpoints/Flux-beta.flx')
 
 
 # ─────────────────────────────────────────────
+# HuggingFace Download
+# ─────────────────────────────────────────────
+
+def download_flx_from_hf(
+    dest_path: Path = DEFAULT_FLX_PATH,
+    hf_token: Optional[str] = None,
+    repo_id: str = HF_REPO_ID,
+    verbose: bool = True,
+) -> bool:
+    """
+    Download Flux-beta.flx from HuggingFace Hub.
+    
+    Args:
+        dest_path: Local destination path
+        hf_token: HuggingFace API token (optional, uses env HF_TOKEN if not provided)
+        repo_id: HuggingFace repo ID
+        verbose: Print progress messages
+    
+    Returns:
+        True if download succeeded
+    """
+    dest_path = Path(dest_path)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Resolve token
+    token = hf_token
+    if token is None:
+        import os
+        token = os.environ.get('HF_TOKEN')
+        # Try Kaggle secrets
+        if token is None:
+            try:
+                from kaggle_secrets import UserSecretsClient
+                token = UserSecretsClient().get_secret("HF_TOKEN")
+            except:
+                pass
+    
+    try:
+        from huggingface_hub import hf_hub_download
+        
+        if verbose:
+            print(f"  ↓ Downloading {HF_FLX_PATH} from {repo_id}...")
+        
+        downloaded_path = hf_hub_download(
+            repo_id=repo_id,
+            filename=HF_FLX_PATH,
+            local_dir=str(_PROJECT_ROOT),
+            token=token,
+        )
+        
+        if verbose:
+            size_mb = Path(downloaded_path).stat().st_size / 1e6
+            print(f"  ✓ Downloaded Flux-beta.flx ({size_mb:.1f} MB)")
+        
+        return True
+        
+    except ImportError:
+        if verbose:
+            print("  ⚠ huggingface_hub not installed — run: pip install huggingface_hub")
+        return False
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ Download failed: {e}")
+        return False
+
+
+# ─────────────────────────────────────────────
 # FLX Loader Functions
 # ─────────────────────────────────────────────
 
-def load_flx(path: Path, device: str = 'cpu') -> Dict[str, Any]:
+def load_flx(path: Path, device: str = 'cpu', auto_download: bool = True) -> Dict[str, Any]:
     """
     Load raw .flx archive contents.
+    
+    If file doesn't exist locally and auto_download is True,
+    attempts to download from HuggingFace Hub first.
     
     Args:
         path: Path to .flx file
         device: Target device for tensors
+        auto_download: Auto-download from HF if missing
     
     Returns:
         Dict with all .flx sections
     
     Raises:
-        FileNotFoundError: If file doesn't exist
+        FileNotFoundError: If file doesn't exist and download fails
         ValueError: If format is invalid
     """
     path = Path(path)
     
     if not path.exists():
-        raise FileNotFoundError(f".flx file not found: {path}")
+        if auto_download:
+            print(f"  ℹ {path.name} not found locally, checking HuggingFace Hub...")
+            if download_flx_from_hf(path):
+                pass  # Download succeeded, continue loading
+            else:
+                raise FileNotFoundError(
+                    f".flx file not found: {path}\n"
+                    f"    Download from: https://huggingface.co/{HF_REPO_ID}/tree/main/checkpoints"
+                )
+        else:
+            raise FileNotFoundError(f".flx file not found: {path}")
     
     flx = torch.load(str(path), map_location=device)
     
@@ -104,6 +192,7 @@ def load_flux_from_flx(
     path: Path = DEFAULT_FLX_PATH,
     device: str = 'cpu',
     verbose: bool = True,
+    auto_download: bool = True,
 ) -> 'FLUXLarge':
     """
     Load complete FLUXLarge model from .flx archive.
@@ -111,10 +200,13 @@ def load_flux_from_flx(
     This reconstructs the full model with all trained weights,
     thermodynamic state, and memory contents.
     
+    If .flx file doesn't exist locally, auto-downloads from HuggingFace Hub.
+    
     Args:
         path: Path to .flx file
         device: Target device
         verbose: Print loading progress
+        auto_download: Download from HF Hub if missing
     
     Returns:
         FLUXLarge instance ready for inference/continued training
@@ -125,8 +217,8 @@ def load_flux_from_flx(
     if verbose:
         print(f"\n  Loading from {path.name}...")
     
-    # Load raw archive
-    flx = load_flx(path, device='cpu')
+    # Load raw archive (auto-downloads if missing)
+    flx = load_flx(path, device='cpu', auto_download=auto_download)
     version = flx.get('version', '1.0-beta')
     
     if verbose:
