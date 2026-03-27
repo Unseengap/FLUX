@@ -158,6 +158,13 @@ class EpisodicMemory:
 
         k = min(k, len(self._metadata))
 
+        # Guard: backing store may be empty after a dim-mismatch rebuild
+        # (metadata preserved but vectors discarded — nothing to search yet)
+        if self.index is not None and self.index.ntotal == 0:
+            return []
+        if self.index is None and not self._vectors:
+            return []
+
         if self.index is not None:
             scores, indices = self.index.search(q, k)
             results = []
