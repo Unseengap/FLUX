@@ -1,111 +1,295 @@
-# Phase 8.5: Curriculum Learning — ABC School for FLUX
+# Phase 8.5: Teacher-Guided ABC School for FLUX
 
 ## Overview
 
-Phase 8.5 takes the WaveDecoder (introduced in Phase 8) and trains it through a **staged curriculum** — teaching FLUX to generate text the way humans learn: alphabet → bigrams → words → phrases → sentences → paragraphs.
+Phase 8.5 takes the trained `Flux-beta.flx` model and teaches it to generate coherent text through a **teacher-guided curriculum** with **reinforcement learning via surprise correction**.
 
-Phase 8 proved FLUX can **understand** text (retrieval, memory, relevance all work). Phase 8.5 teaches it to **articulate** — spelling coherent bytes through progressively harder material.
+Unlike Phase 8 (raw training on OpenWebText), Phase 8.5 uses:
+1. **Gemini Teacher**: An external LLM that scores FLUX outputs and provides corrections
+2. **Surprise-Based Self-Correction**: FLUX's thermodynamic surprise signal drives RL-style updates
+3. **Grade-Based Subjects**: Model must PASS all subjects within a grade before advancing
+4. **Episodic Memory Growth**: Every correct answer → new episodic entry → better field attractors
 
-## Motivation
+**Source Model**: `Flux-beta.flx` (Phase 8, 69M params, ~74 episodic entries)
+**Target**: Coherent English generation + 500+ episodic entries + stable field attractors
 
-Phase 8 trained the WaveDecoder on raw OpenWebText. The problem: throwing 256-class byte prediction at a randomly-initialized GRU with no prior knowledge of English structure is like teaching a child calculus before they know numbers.
+---
 
-The curriculum approach:
-1. **Stage 1 — Bytes**: Learn the 95 printable ASCII bytes and their frequencies
-2. **Stage 2 — Bigrams/Trigrams**: Learn common 2-3 byte sequences (th, he, in, er, an...)
-3. **Stage 3 — Words**: Learn the 1000 most common English words
-4. **Stage 4 — Phrases**: Learn common 2-4 word collocations ("in the", "of the", "it is")
-5. **Stage 5 — Sentences**: Learn grammatically correct simple sentences
-6. **Stage 6 — Paragraphs**: Graduate to real OpenWebText text
+## The Core Insight: Learning Through Correction
 
-## Architecture
-
-No new neural components. Phase 8.5 reuses:
-- **FLUXLarge** from Phase 8 (loaded from checkpoint)
-- **WaveDecoder** from Phase 8 (the GRU decoder)
-- **CurriculumTrainer** (new) — orchestrates 6-stage training
-- **CurriculumData** (new) — generates training data for each stage
-
-### Energy-Based Grade Advancement
-
-FLUX's thermodynamic system provides a natural "readiness" signal. Each stage monitors:
-- **Decoder loss** on that stage's material (must drop below threshold)
-- **Field energy delta** (field must stabilize — knowledge is "settled")
-- **Generation accuracy** on stage-specific tests (e.g., can it spell top-100 words?)
-
-When all three criteria are met, the curriculum advances to the next stage.
-
-### Stage Thresholds
-
-| Stage | Material | Max Steps | Loss Threshold | Accuracy Test |
-|-------|----------|-----------|----------------|---------------|
-| 1 | Printable ASCII bytes | 200 | < 3.0 | 80% byte accuracy |
-| 2 | Common bigrams/trigrams | 500 | < 2.5 | 70% bigram accuracy |
-| 3 | Top-1000 English words | 2000 | < 2.0 | 60% word spelling |
-| 4 | Common phrases | 3000 | < 1.8 | 50% phrase completion |
-| 5 | Simple sentences | 3000 | < 1.5 | 40% sentence coherence |
-| 6 | Real OpenWebText | remainder | < 1.2 | Qualitative check |
-
-## Key Classes
-
-### `CurriculumData`
-Generates synthetic training data for stages 1-5. Stage 6 uses real OpenWebText.
-
-### `CurriculumTrainer`
-Wraps `OpenWebTextTrainer` from Phase 8 with stage management:
-- Monitors loss per stage
-- Runs advancement tests
-- Tracks stage history
-- Provides detailed progress output
-
-## Checkpoint Format
-
-```python
-{
-    'phase': 8.5,
-    'timestamp': str,
-    'config': dict,
-    'curriculum_state': {
-        'current_stage': int,
-        'stage_history': List[Dict],
-        'total_steps': int,
-        'stage_losses': Dict[int, List[float]],
-    },
-    # All Phase 8 component states...
-    'decoder_state_dict': OrderedDict,
-    'metrics': dict,
-}
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    FLUX ABC SCHOOL LOOP                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. FLUX generates text from prompt                              │
+│        ↓                                                         │
+│  2. Gemini Teacher scores (0-10) + provides correction           │
+│        ↓                                                         │
+│  3. FLUX computes SURPRISE = |expected - actual| score           │
+│        ↓                                                         │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  if surprise HIGH:                                          │ │
+│  │    → Train decoder on teacher's correction (learn mistake)  │ │
+│  │    → Field temperature rises (thermodynamic instability)    │ │
+│  │    → NO episodic memory write (don't memorize errors)       │ │
+│  │                                                             │ │
+│  │  if surprise LOW:                                           │ │
+│  │    → Store fact in episodic memory (reinforce knowledge)    │ │
+│  │    → Field temperature falls (settling toward attractor)    │ │
+│  │    → Write to semantic memory if repeated 3+ times          │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│        ↓                                                         │
+│  4. Subject test: Did FLUX pass this subject?                    │
+│        ↓                                                         │
+│  5. Grade advancement: All subjects passed → next grade          │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-## Files
+---
 
-| File | Purpose |
-|------|---------|
-| `PHASE_8_5_SPEC.md` | This spec |
-| `curriculum_data.py` | Stage 1-5 synthetic data generation |
-| `curriculum_trainer.py` | 6-stage curriculum orchestrator |
-| `train_curriculum.py` | Main training entry point |
-| `test_phase8_5_test1.py` | Word spelling accuracy test |
-| `test_phase8_5_test2.py` | Sentence coherence test |
-| `test_phase8_5_test3.py` | Generation quality vs Phase 8 |
-| `demo_phase8_5_demo1.py` | Stage-by-stage generation showcase |
-| `demo_phase8_5_demo2.py` | FLUX vs GPT-2 generation quality |
-| `RESULTS_PHASE_8_5.md` | Auto-generated results |
+## Grade Structure: 6 Grades × 4 Subjects Each
+
+### Subjects per Grade
+
+| Subject | Tests | What FLUX Learns |
+|---------|-------|------------------|
+| **Spelling** | Can spell words correctly | Byte-level accuracy |
+| **Grammar** | Correct verb/noun agreement | Syntactic structure |
+| **Coherence** | Sentences make logical sense | Semantic flow |
+| **Knowledge** | Can recall facts correctly | Episodic retrieval |
+
+### Grade Progression
+
+| Grade | Material | Spelling Test | Grammar Test | Coherence Test | Knowledge Test |
+|-------|----------|---------------|--------------|----------------|----------------|
+| K | Single letters & bytes | 80% ASCII | N/A | N/A | N/A |
+| 1 | Common bigrams/trigrams | 70% bigrams | Basic patterns | N/A | N/A |
+| 2 | Top-1000 words | 60% words | Subject-verb | Simple sentences | 5 facts |
+| 3 | Common phrases | 50% phrases | Full agreement | Multi-sentence | 20 facts |
+| 4 | Simple sentences | 40% sentences | Punctuation | Paragraph flow | 50 facts |
+| 5 | Paragraphs | 30% paragraphs | Complex grammar | Story coherence | 100 facts |
+| 6 | Real OpenWebText | 25% passages | All rules | Full coherence | 200 facts |
+
+**Advancement Rule**: Must pass ALL 4 subjects (or 3 for grades K-1) to advance.
+
+---
+
+## Key Components
+
+### 1. `GeminiTeacher` — The Scorer
+
+```python
+class GeminiTeacher:
+    """
+    External LLM teacher that scores FLUX outputs and provides corrections.
+    
+    Uses Gemini API (free tier: 60 calls/min) for:
+    - Scoring text quality (0-10)
+    - Providing corrected versions
+    - Grading subject-specific tests
+    """
+    
+    def score_generation(self, prompt: str, flux_output: str) -> TeacherFeedback:
+        """
+        Score FLUX's generation and provide correction.
+        
+        Returns:
+            TeacherFeedback with:
+            - score: 0-10 quality score
+            - corrected_text: What FLUX should have generated
+            - feedback: Brief explanation of issues
+            - subject_scores: Per-subject breakdown
+        """
+```
+
+### 2. `SurpriseCorrector` — The RL Bridge
+
+```python
+class SurpriseCorrector:
+    """
+    Connects Gemini feedback to FLUX's thermodynamic learning.
+    
+    Surprise = |teacher_score - flux_confidence|
+    
+    High surprise → Strong gradient signal → Learn from correction
+    Low surprise  → Weak gradient signal → Reinforce existing knowledge
+    """
+    
+    def compute_surprise(
+        self, 
+        flux_confidence: float,   # FLUX's own confidence (from field energy)
+        teacher_score: float,      # Gemini's quality rating
+    ) -> float:
+        """
+        Compute surprise signal for RL update.
+        
+        FLUX thought it was confident but teacher disagrees → HIGH surprise
+        FLUX was uncertain and teacher confirms → LOW surprise (good learning)
+        """
+    
+    def apply_correction(
+        self,
+        model: FLUXLarge,
+        flux_output: str,
+        teacher_correction: str,
+        surprise: float,
+    ) -> float:
+        """
+        Apply gradient update weighted by surprise.
+        
+        Returns:
+            loss value (higher surprise = stronger update)
+        """
+```
+
+### 3. `CurriculumSchool` — The Orchestrator
+
+```python
+class CurriculumSchool:
+    """
+    Manages the full grade/subject curriculum with teacher integration.
+    
+    Replaces simple CurriculumTrainer with:
+    - Subject-based testing
+    - Teacher-scored advancement
+    - Episodic memory growth tracking
+    - Grade report cards
+    """
+    
+    def run_school(self, start_grade: int = 0) -> SchoolResult:
+        """
+        Run full curriculum from kindergarten to graduation.
+        
+        Each grade:
+        1. For each subject: train until pass or max_attempts
+        2. Test all subjects
+        3. If all pass → advance; else → remedial training
+        """
+```
+
+---
+
+## .flx Loading
+
+Phase 8.5 loads EXCLUSIVELY from `Flux-beta.flx`:
+
+```python
+def load_from_flx(path: Path = Path('checkpoints/Flux-beta.flx')) -> FLUXLarge:
+    """
+    Load FLUXLarge from .flx archive.
+    
+    The .flx format preserves:
+    - All 14 trained components
+    - Thermodynamic state (field temperature/energy)
+    - Episodic memory (existing facts)
+    - Physics state (gravitational masses)
+    
+    This is the foundation — Phase 8.5 builds on it.
+    """
+    flx = torch.load(path, map_location='cpu')
+    
+    # Verify format
+    assert flx['format'] == 'FLUX', "Not a valid .flx file"
+    assert flx['version'].startswith('1.'), f"Unsupported version: {flx['version']}"
+    
+    # Build model shell
+    model = FLUXLarge(device='cpu')
+    
+    # Load all components
+    model.cse.load_state_dict(flx['cse']['state_dict'])
+    model.field.load_state_dict(flx['field']['state_dict'])
+    model.gr.load_state(flx['field']['gravity_state'])
+    model.tl.load_state(flx['field']['thermodynamic_state'])
+    # ... etc for all 14 components
+    
+    return model
+```
+
+---
+
+## Episodic Memory Growth Strategy
+
+The key to coherent generation is **episodic density**:
+
+| Phase | Episodic Entries | Generation Quality |
+|-------|------------------|-------------------|
+| Phase 8 (start) | 74 | Word fragments |
+| Grade 2 complete | ~200 | Broken words |
+| Grade 4 complete | ~500 | Short sentences |
+| Grade 6 complete | ~1000+ | Full coherence |
+
+**Every correct answer → episodic write:**
+```python
+def on_correct_answer(model: FLUXLarge, prompt: str, correct_text: str):
+    """Store correct Q→A pair in episodic memory."""
+    wave = model.cse.encode(prompt + " " + correct_text)
+    model.episodic_memory.store(
+        key=wave.full.mean(dim=0),
+        value=correct_text,
+        metadata={'grade': current_grade, 'subject': current_subject},
+    )
+```
+
+---
+
+## File Structure
+
+```
+phases/phase8_5/
+├── PHASE_8_5_SPEC.md         ← This spec
+├── gemini_teacher.py         ← GeminiTeacher class (API integration)
+├── surprise_correction.py    ← SurpriseCorrector (RL bridge)
+├── curriculum_school.py      ← CurriculumSchool (grade/subject orchestrator)
+├── curriculum_data.py        ← Training data generation (existing + extended)
+├── curriculum_trainer.py     ← Basic trainer (still used internally)
+├── flx_loader.py             ← .flx format loading utilities
+├── train_curriculum.py       ← CLI entry point
+├── test_phase8_5_test1.py    ← Test: Gemini teacher integration
+├── test_phase8_5_test2.py    ← Test: Surprise correction works
+├── test_phase8_5_test3.py    ← Test: Grade advancement
+├── test_phase8_5_test4.py    ← Test: Episodic growth
+├── demo_phase8_5_demo1.py    ← Demo: Teacher-corrected generation
+├── demo_phase8_5_demo2.py    ← Demo: Before/after comparison
+├── RESULTS_PHASE_8_5.md      ← Auto-generated results
+│
+└── notebooks/
+    └── phase8_5_school.ipynb ← Interactive Kaggle training notebook
+```
+
+---
 
 ## Acceptance Criteria
 
 | Criterion | Target | Method |
 |-----------|--------|--------|
-| All 6 stages complete | Stage 6 reached | Training log |
-| Word spelling accuracy | > 50% on top-100 words | Test 1 |
-| Sentence coherence | > 30% readable | Test 2 |
-| Generation vs Phase 8 | Measurably better | Test 3 |
-| Demo shows real words | Not gibberish | Demo 1 |
-| RESULTS_PHASE_8_5.md generated | File exists | Auto |
-| Checkpoint saved | phase8_5.phase.pt | Cell 6 |
+| Loads from Flux-beta.flx | ✓ All components | Smoke test |
+| Gemini teacher works | Scores + corrections | test1 |
+| Surprise correction active | RL updates observed | test2 |
+| Grade 4+ reached | Passes 4+ grades | Training log |
+| Episodic entries > 300 | Memory growth | Runtime check |
+| Spelling accuracy > 50% | Word spelling test | test3 |
+| Coherence score > 40% | Sentence test | test4 |
+| Checkpoint saved | phase8_5.phase.pt + .flx | Cell output |
+
+---
+
+## Environment Variables
+
+```bash
+# Required for Gemini teacher
+GEMINI_API_KEY=your_key_here   # Free tier: 60 req/min
+
+# Or in Kaggle secrets
+# Add "GEMINI_API_KEY" to Kaggle → Add-ons → Secrets
+```
+
+---
 
 ## Dependencies
 
-- Phase 8 checkpoint (phase8.phase.pt) with WaveDecoder
+- `Flux-beta.flx` (Phase 8 trained model) — **REQUIRED**
+- `google-generativeai` (Gemini API client)
 - All Phase 8 modules (flux_large.py, wave_decoder.py, etc.)
-- OpenWebText (HuggingFace datasets) for Stage 6
+- OpenWebText (HuggingFace datasets) for Grade 6

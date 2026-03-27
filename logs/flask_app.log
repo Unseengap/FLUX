@@ -467,3 +467,212 @@
 2026-03-27 13:44:22 │ INFO     │ flux_app │ main:74 │ URL: http://127.0.0.1:5000
 2026-03-27 13:44:22 │ INFO     │ flux_app │ main:75 │ Debug: True, Reload: True
 2026-03-27 13:44:22 │ INFO     │ flux_app │ main:76 │ ============================================================
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:83 │ ════════════════════════════════════════════════════════════
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:84 │ FLUX Chat Application Starting
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:85 │ Config: development
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:86 │ Model Path: /Users/admin/Desktop/flux/checkpoints/Flux-beta.flx
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:87 │ Device: auto
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:88 │ ════════════════════════════════════════════════════════════
+2026-03-27 16:20:53 │ INFO     │ flux_app │ create_app:175 │ Blueprints registered: chat, api, model
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:181 │ FluxService initialized
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:183 │ Application factory complete - ready to serve
+2026-03-27 16:20:56 │ INFO     │ flux_app │ main:72 │ ============================================================
+2026-03-27 16:20:56 │ INFO     │ flux_app │ main:73 │ Flask server starting
+2026-03-27 16:20:56 │ INFO     │ flux_app │ main:74 │ URL: http://127.0.0.1:5002
+2026-03-27 16:20:56 │ INFO     │ flux_app │ main:75 │ Debug: True, Reload: True
+2026-03-27 16:20:56 │ INFO     │ flux_app │ main:76 │ ============================================================
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:83 │ ════════════════════════════════════════════════════════════
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:84 │ FLUX Chat Application Starting
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:85 │ Config: development
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:86 │ Model Path: /Users/admin/Desktop/flux/checkpoints/Flux-beta.flx
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:87 │ Device: auto
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:88 │ ════════════════════════════════════════════════════════════
+2026-03-27 16:20:56 │ INFO     │ flux_app │ create_app:175 │ Blueprints registered: chat, api, model
+2026-03-27 16:20:57 │ INFO     │ flux_app │ create_app:181 │ FluxService initialized
+2026-03-27 16:20:57 │ INFO     │ flux_app │ create_app:183 │ Application factory complete - ready to serve
+2026-03-27 16:20:57 │ INFO     │ flux_app │ main:72 │ ============================================================
+2026-03-27 16:20:57 │ INFO     │ flux_app │ main:73 │ Flask server starting
+2026-03-27 16:20:57 │ INFO     │ flux_app │ main:74 │ URL: http://127.0.0.1:5002
+2026-03-27 16:20:57 │ INFO     │ flux_app │ main:75 │ Debug: True, Reload: True
+2026-03-27 16:20:57 │ INFO     │ flux_app │ main:76 │ ============================================================
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162100-5040] ─────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: GET
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:00 │ INFO     │ flux_app │ index:23 │ │ [CHAT] Serving main chat interface
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:145 │ │ Status: 200 ✓
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:146 │ │ Duration: 14.72ms
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:147 │ │ Size: 7778 bytes
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:148 │ └─ END [162100-5040] ─────────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162100-5040] ─────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: GET
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /static/css/main.css
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162100-5040] ─────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: GET
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /static/js/chat.js
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:145 │ │ Status: 200 ✓
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:146 │ │ Duration: 18.47ms
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:147 │ │ Size: 13140 bytes
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:148 │ └─ END [162100-5040] ─────────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:145 │ │ Status: 200 ✓
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:146 │ │ Duration: 28.82ms
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:147 │ │ Size: 20543 bytes
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:148 │ └─ END [162100-5040] ─────────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162100-5040] ─────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: GET
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /api/stats
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:00 │ DEBUG    │ flux_app │ stats:201 │ │ [STATS] Model not loaded
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:145 │ │ Status: 200 ✓
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:146 │ │ Duration: 7.00ms
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:147 │ │ Size: 22 bytes
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_end:148 │ └─ END [162100-5040] ─────────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162100-5040] ─────────────────────────────
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: GET
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /favicon.ico
+2026-03-27 16:21:00 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_exception:156 │ │ EXCEPTION [162100-5040]: NotFound
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_exception:157 │ │ Message: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_exception:158 │ │ Traceback:
+Traceback (most recent call last):
+  File "/Users/admin/Desktop/flux/.venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/admin/Desktop/flux/.venv/lib/python3.12/site-packages/flask/app.py", line 891, in dispatch_request
+    self.raise_routing_exception(req)
+  File "/Users/admin/Desktop/flux/.venv/lib/python3.12/site-packages/flask/app.py", line 500, in raise_routing_exception
+    raise request.routing_exception  # type: ignore[misc]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/admin/Desktop/flux/.venv/lib/python3.12/site-packages/flask/ctx.py", line 362, in match_request
+    result = self.url_adapter.match(return_rule=True)  # type: ignore
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/admin/Desktop/flux/.venv/lib/python3.12/site-packages/werkzeug/routing/map.py", line 629, in match
+    raise NotFound() from None
+werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_request_end:145 │ │ Status: 500 ✗
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_request_end:146 │ │ Duration: 12.65ms
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_request_end:147 │ │ Size: 175 bytes
+2026-03-27 16:21:00 │ ERROR    │ flux_app │ log_request_end:148 │ └─ END [162100-5040] ─────────────────────────────────
+2026-03-27 16:21:03 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162103-5040] ─────────────────────────────
+2026-03-27 16:21:03 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: POST
+2026-03-27 16:21:03 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /model/load
+2026-03-27 16:21:03 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:03 │ INFO     │ flux_app │ load_model:36 │ │ [MODEL] Loading FLUX model...
+2026-03-27 16:21:03 │ INFO     │ flux_app │ load_model:37 │ │ [MODEL] Model path: /Users/admin/Desktop/flux/checkpoints/Flux-beta.flx
+2026-03-27 16:21:03 │ INFO     │ flux_app │ load_model:38 │ │ [MODEL] Device: auto
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:45 │ │ [MODEL] ✓ Model loaded successfully in 22689.16ms
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:46 │ │ [MODEL] Stats:
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   total_params: 69,491,805
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   episodic_entries: 74
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   working_entries: 0
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   field_energy: 8847.4346
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   field_attractors: 18041
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   temperature: 0.637614
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   learning_steps: 4500
+2026-03-27 16:21:26 │ INFO     │ flux_app │ load_model:48 │ │   device: cpu
+2026-03-27 16:21:26 │ INFO     │ flux_app │ log_request_end:145 │ │ Status: 200 ✓
+2026-03-27 16:21:26 │ INFO     │ flux_app │ log_request_end:146 │ │ Duration: 22696.80ms
+2026-03-27 16:21:26 │ INFO     │ flux_app │ log_request_end:147 │ │ Size: 274 bytes
+2026-03-27 16:21:26 │ INFO     │ flux_app │ log_request_end:148 │ └─ END [162103-5040] ─────────────────────────────────
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_start:97 │ ┌─ REQUEST [162127-5040] ─────────────────────────────
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_start:98 │ │ Method: POST
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_start:99 │ │ Path: /api/generate
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_start:100 │ │ Remote: 127.0.0.1
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ log_request_start:116 │ │ JSON Body: {'prompt': 'hi', 'max_length': 150, 'temperature': 0.8, 'learn': False}
+2026-03-27 16:21:27 │ INFO     │ flux_app │ generate:49 │ │ [GENERATE] prompt_len=2, max_length=150, temp=0.8, learn=False
+2026-03-27 16:21:27 │ INFO     │ flux_app │ generate:61 │ │ [GENERATE] Starting SSE stream for: 'hi'
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_end:145 │ │ Status: 200 ✓
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_end:146 │ │ Duration: 2.07ms
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_end:147 │ │ Size: 0 bytes
+2026-03-27 16:21:27 │ INFO     │ flux_app │ log_request_end:148 │ └─ END [162127-5040] ─────────────────────────────────
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 1 (Continuous Semantic Encoder (CSE)): running
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   input_text: hi
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   raw_bytes: 68 69
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 1 (Continuous Semantic Encoder (CSE)): complete
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   input_bytes: 2
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   wave_shape: [2, 432]
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   band_energies: {'phonetic': '55.27', 'syntactic': '55.64', 'semantic': '203.16', 'temporal': '24.90', 'intensity': '16.06'}
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   dominant_band: semantic
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   wave_magnitude: 12.5883
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:87 │ │   latency_ms: 99.32
+2026-03-27 16:21:27 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 2 (Resonance Field (RFC)): running
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 2 (Resonance Field (RFC)): complete
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   field_dims: 96³ × 512
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   field_energy: 28.6670
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   total_attractors: 18041
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   retrieved_attractors: [{'rank': 1, 'similarity': '0.7640', 'location': '(79, 95, 0)', 'feature_norm': '0.0000'}, {'rank': 2, 'similarity': '0.7640', 'location': '(79, 94, 0)', 'feature_norm': '0.0000'}, {'rank': 3, 'similarity': '0.7640', 'location': '(79, 95, 1)', 'feature_norm': '0.0000'}, {'rank': 4, 'similarity': '0.7639', 'location': '(79, 94, 1)', 'feature_norm': '0.0000'}]
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   query_vector_norm: 7.9755
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   latency_ms: 4183.72
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 3 (Gravitational Relevance (GR)): running
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 3 (Gravitational Relevance (GR)): complete
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   complexity: O(log n)
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   tracked_concepts: 5
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   mean_mass: 1.0620
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   max_mass: 1.1100
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   negative_concepts: 0
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   top_concepts: [{'rank': 1, 'mass': '1.1100', 'query_similarity': '-0.0082', 'concept_id': 0}, {'rank': 2, 'mass': '1.1000', 'query_similarity': '-0.0168', 'concept_id': 2}, {'rank': 3, 'mass': '1.0900', 'query_similarity': '-0.0245', 'concept_id': 3}, {'rank': 4, 'mass': '1.0100', 'query_similarity': '-0.0255', 'concept_id': 1}, {'rank': 5, 'mass': '1.0000', 'query_similarity': '0.0007', 'concept_id': 4}]
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   relevance_magnitude: 2.9221
+2026-03-27 16:21:31 │ DEBUG    │ flux_app │ event_stream:87 │ │   latency_ms: 80.35
+2026-03-27 16:21:33 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 4 (Thermodynamic Learner (TL)): running
+2026-03-27 16:21:33 │ DEBUG    │ flux_app │ event_stream:87 │ │   energy_before: 28.6670
+2026-03-27 16:21:33 │ DEBUG    │ flux_app │ event_stream:87 │ │   temperature: 0.637614
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 4 (Thermodynamic Learner (TL)): complete
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   mode: INFERENCE (query-only)
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   temperature: 0.637614
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   energy_before: 28.6670
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   energy_after: 28.6670
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   energy_delta: +0.0000
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   energy_minimized: True
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   settle_result: None
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   uses_backprop: False
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   latency_ms: 2801.61
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 5 (Causal Geometry Nodes (CGN)): running
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 5 (Causal Geometry Nodes (CGN)): complete
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   fast_nodes: 32
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   medium_nodes: 16
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   slow_nodes: 8
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   fast_activation: 0.0113
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   medium_activation: 0.0186
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   slow_activation: 0.0092
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   active_traces: [{'node_id': 0, 'bending': '0.7369', 'influence': '0.1365', 'causal_arrows': 0}, {'node_id': 1, 'bending': '0.2246', 'influence': '0.1313', 'causal_arrows': 0}, {'node_id': 2, 'bending': '0.8015', 'influence': '0.1281', 'causal_arrows': 0}, {'node_id': 3, 'bending': '0.5344', 'influence': '0.1311', 'causal_arrows': 0}, {'node_id': 4, 'bending': '0.3204', 'influence': '0.1379', 'causal_arrows': 0}]
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   output_norm: 0.3675
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   causal_traceable: True
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   latency_ms: 213.37
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 6 (Three-Tier Memory System): running
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 6 (Three-Tier Memory System): complete
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   working_entries: 1
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   episodic_entries: 74
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   semantic_protected: 0
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   routing_decision: {'primary_tier': 'semantic', 'episodic_hits': 0, 'working_size': 1}
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   recalled_facts: []
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   forgetting_score: 0.0
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   latency_ms: 15.87
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 8 (WaveDecoder (Generation)): running
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   max_length: 150
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   temperature: 0.8
+2026-03-27 16:21:34 │ DEBUG    │ flux_app │ event_stream:87 │ │   context_from: field_attractor + cgn_output
+2026-03-27 16:21:36 │ DEBUG    │ flux_app │ event_stream:84 │ │ [GENERATE] Phase 8 (WaveDecoder (Generation)): complete
+2026-03-27 16:21:36 │ DEBUG    │ flux_app │ event_stream:87 │ │   bytes_generated: 150
+2026-03-27 16:21:36 │ DEBUG    │ flux_app │ event_stream:87 │ │   generated_text: rand made store in the recond movie as Molver Alona Netew of leave in the last weekend.
+
+The week for the Altheris plate sinter in Colorago, has relea
+2026-03-27 16:21:36 │ DEBUG    │ flux_app │ event_stream:87 │ │   generation_ms: 1471.02
+2026-03-27 16:21:36 │ DEBUG    │ flux_app │ event_stream:87 │ │   total_pipeline_ms: 8885.52
+2026-03-27 16:21:36 │ DEBUG    │ flux_app │ event_stream:87 │ │   bytes_per_second: 102.0
+2026-03-27 16:21:36 │ INFO     │ flux_app │ event_stream:96 │ │ [GENERATE] Stream complete: 150 chars, 165 events, 8901.61ms
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:83 │ ════════════════════════════════════════════════════════════
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:84 │ FLUX Chat Application Starting
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:85 │ Config: development
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:86 │ Model Path: /Users/admin/Desktop/flux/checkpoints/Flux-beta.flx
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:87 │ Device: auto
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:88 │ ════════════════════════════════════════════════════════════
+2026-03-27 16:22:13 │ INFO     │ flux_app │ create_app:175 │ Blueprints registered: chat, api, model
+2026-03-27 16:22:18 │ INFO     │ flux_app │ create_app:181 │ FluxService initialized
+2026-03-27 16:22:18 │ INFO     │ flux_app │ create_app:183 │ Application factory complete - ready to serve
+2026-03-27 16:22:18 │ INFO     │ flux_app │ main:72 │ ============================================================
+2026-03-27 16:22:18 │ INFO     │ flux_app │ main:73 │ Flask server starting
+2026-03-27 16:22:18 │ INFO     │ flux_app │ main:74 │ URL: http://127.0.0.1:5002
+2026-03-27 16:22:18 │ INFO     │ flux_app │ main:75 │ Debug: True, Reload: True
+2026-03-27 16:22:18 │ INFO     │ flux_app │ main:76 │ ============================================================

@@ -1,12 +1,15 @@
 # Phase 10 Specification: Hybrid Wave+Byte Universal Generation
 ## The Best of Both Worlds — Precision When Needed, Speed When Possible
 
-> Prerequisites: `Flux-beta.flx` must exist (contains all Phases 1-8 components).
-> Copilot: Open SPECIFICATION.md + PHASE_BETA_SPEC.md + flux-domanant-domains.md + this file.
+> Prerequisites: 
+> - `Flux-beta.flx` must exist (contains all Phases 1-8 components)
+> - Phase 8.8 WaveToX adapters (provides `WaveToImage_Universal`, etc.)
+> 
+> Copilot: Open SPECIFICATION.md + PHASE_8_5_SPEC.md + this file.
 >
 > **Phase 8 is NOT legacy.** It is the trained foundation in `Flux-beta.flx`.
-> Phase 10 EXTENDS the `.flx` model with Phase 9's wave-level generation,
-> creating a hybrid that can use BOTH generation paths based on the task.
+> **Phase 8.8 provides the I/O layer** — all XToWave/WaveToX adapters.
+> **Phase 10 adds the generation engine** — WaveGenerator + TaskRouter.
 
 ---
 
@@ -170,8 +173,8 @@ phases/phase10/
     },
     
     # ── Extension slots for multimodal ──
-    "wave_to_image": None,    # Future: WaveToImage weights
-    "wave_to_audio": None,    # Future: WaveToAudio weights  
+    "wave_to_image": None,    # WaveToImage_Universal from Phase 8.8
+    "wave_to_audio": None,    # WaveToAudio (stub in Phase 8.8)
     "wave_to_mol": None,      # Future: WaveToMol weights
 }
 ```
@@ -752,58 +755,103 @@ class WaveToText(WaveToX):
     ...  # Already implemented in Phase 9
 
 
-class WaveToImage(WaveToX):
+class WaveToImage_Universal(WaveToX):
     """
-    Wave → Image tensor.
+    Wave → Image tensor via multi-physics rendering.
     
-    Architecture: waves → latent grid → diffusion decoder → pixels
+    IMPORTANT: This is the full implementation from Phase 8.8.
+    See PHASE_8_5_SPEC.md for complete code.
     
-    Each wave maps to a region of the image. The wave's semantic
-    content determines what appears in that region.
+    Three rendering paths that blend:
+    - Gravity: Mass-based influence (realistic, structured)
+    - Interference: Wave physics (artistic, patterns)
+    - Thermodynamic: Energy settling (abstract, emergent)
+    
+    Style = blend weights. Same waves, different physics, different images.
+    
+    DO NOT use waves.mean(dim=0) — that destroys spatial semantics.
+    Each wave has position, mass, phase, and contributes individually.
     """
     
     def __init__(
         self,
         wave_dim: int = 432,
         image_size: int = 256,
-        latent_dim: int = 4,  # For diffusion latent space
+        device: str = 'cpu',
     ):
         super().__init__(wave_dim)
         self.image_size = image_size
+        self.device = device
         
-        # Project waves to latent patches
-        self.wave_to_latent = nn.Linear(wave_dim, latent_dim * 16 * 16)
+        # Shared: Wave → Spatial Properties
+        self.wave_to_position = nn.Linear(wave_dim, 2)
+        self.wave_to_color = nn.Linear(wave_dim, 3)
+        self.wave_to_scale = nn.Linear(wave_dim, 1)
         
-        # Simple decoder (placeholder — would use actual diffusion)
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(latent_dim, 128, 4, 2, 1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),
-            nn.Sigmoid(),
+        # Gravity Path (Realistic)
+        self.wave_to_mass = nn.Linear(wave_dim, 1)
+        self.wave_to_texture = nn.Linear(wave_dim, 64)
+        self.texture_decoder = nn.Sequential(
+            nn.Linear(64, 128), nn.ReLU(), nn.Linear(128, 8 * 8 * 3),
         )
+        
+        # Interference Path (Artistic)
+        self.wave_to_phase = nn.Linear(wave_dim, 1)
+        self.wave_to_frequency = nn.Linear(wave_dim, 3)
+        self.wave_to_amplitude = nn.Linear(wave_dim, 3)
+        
+        # Thermodynamic Path (Abstract)
+        self.wave_to_energy_target = nn.Linear(wave_dim, 16)
+        self.energy_to_rgb = nn.Linear(16, 3)
+        
+        # Style Router
+        self.wave_to_style = nn.Linear(wave_dim, 3)
+        
+        # Learnable style anchors [gravity, interference, thermo]
+        self.style_realistic = nn.Parameter(torch.tensor([0.7, 0.2, 0.1]))
+        self.style_artistic = nn.Parameter(torch.tensor([0.2, 0.7, 0.1]))
+        self.style_abstract = nn.Parameter(torch.tensor([0.1, 0.3, 0.6]))
+        self.style_photographic = nn.Parameter(torch.tensor([0.9, 0.05, 0.05]))
+        self.style_psychedelic = nn.Parameter(torch.tensor([0.1, 0.6, 0.3]))
     
-    def decode(self, waves: torch.Tensor) -> torch.Tensor:
+    def decode(
+        self,
+        waves: torch.Tensor,
+        style: str = 'auto',
+    ) -> torch.Tensor:
         """
-        Decode wave sequence to image.
+        Decode waves to image with style control.
         
         Args:
-            waves: [N, 432] semantic waves
+            waves: [N, 432] semantic waves (NOT averaged!)
+            style: 'auto', 'realistic', 'artistic', 'abstract',
+                   'photographic', 'psychedelic'
         
         Returns:
             [3, H, W] RGB image tensor
+        
+        Each wave contributes based on its:
+        - Position (where in image)
+        - Mass (influence strength)
+        - Phase/frequency (interference patterns)
+        - Energy target (thermodynamic settling)
+        
+        Style blends the three physics: gravity + interference + thermo
         """
-        # Average waves (or arrange spatially for larger images)
-        wave_avg = waves.mean(dim=0)
-        
-        # Project to latent
-        latent = self.wave_to_latent(wave_avg)
-        latent = latent.view(1, -1, 16, 16)
-        
-        # Decode to image
-        image = self.decoder(latent)
-        return image.squeeze(0)
+        # See PHASE_8_5_SPEC.md for full _render_gravity, _render_interference,
+        # _render_thermodynamic implementations
+        ...
+    
+    def decode_multi_style(self, waves: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Generate all styles at once for comparison."""
+        return {
+            'realistic': self.decode(waves, style='realistic'),
+            'artistic': self.decode(waves, style='artistic'),
+            'abstract': self.decode(waves, style='abstract'),
+            'photographic': self.decode(waves, style='photographic'),
+            'psychedelic': self.decode(waves, style='psychedelic'),
+            'auto': self.decode(waves, style='auto'),
+        }
 
 
 class WaveToAudio(WaveToX):
@@ -904,7 +952,7 @@ class WaveToAudio(WaveToX):
 | 6 | Saves to .flx v1.1-hybrid | ✓ File structure valid |
 | 7 | Reloads from v1.1-hybrid | ✓ Both modes work after reload |
 | 8 | Wave mode faster than byte mode | ≥2x speed improvement |
-| 9 | Extension points defined | WaveToImage/Audio placeholders exist |
+| 9 | WaveToImage_Universal integrated | 3 physics engines from Phase 8.8 |
 | 10 | All 4 tests pass | 4/4 |
 | 11 | All 3 demos produce output | 3/3 |
 
@@ -932,8 +980,8 @@ class WaveToAudio(WaveToX):
 │   ├── WaveToText: Last-mile spelling (FAST mode)           │
 │   └── TaskRouter: Auto mode selection                      │
 │                                                             │
-│   Future: Multimodal Last-Miles                            │
-│   ├── WaveToImage: Same waves → pixels                     │
+│   Multimodal Last-Miles (from Phase 8.8)                   │
+│   ├── WaveToImage_Universal: 3 physics → any style         │
 │   ├── WaveToAudio: Same waves → audio                      │
 │   └── WaveToMol: Same waves → molecules                    │
 │                                                             │
