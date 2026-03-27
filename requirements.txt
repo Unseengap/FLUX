@@ -11,3 +11,6 @@ pyyaml>=6.0
 rich>=13.0.0
 transformers>=4.30.0
 huggingface_hub>=0.19.0
+
+# Flask app
+flask>=3.0.0

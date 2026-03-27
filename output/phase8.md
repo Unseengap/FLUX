@@ -2536,3 +2536,288 @@ The model can generate English-ish text after one pass over 13MB of OpenWebText.
 3. **Larger decoder** — the WaveDecoder at `hidden=1024, layers=4` is ~32M. A 2× wider decoder would push generation quality significantly.
 4. **Longer sequences** — `max_seq_len=256` was halved for speed; 512 gives the decoder more context per step.
 5. **Curriculum scheduling** — start with short, clean sentences (Wikipedia intros), progress to complex paragraphs.
+
+
+
+
+
+
+
+
+
+
+
+final prototype model .flx created by the 
+flux_beta_colab.ipynb
+ notebook:
+
+
+ model guts:
+ "[12:30:02] 
+▶ CELL: Cell 5 — Inspect Raw Checkpoint
+[12:30:02]   Started: 2026-03-27 12:30:02
+Top-level keys in phase8.phase.pt:
+============================================================
+  causal_graph_state             dict with 4 entries
+  cgn_state                      dict with 3 entries
+  config                         dict with 27 entries
+  cse_state_dict                 dict with 22 entries
+  decoder_state_dict             dict with 33 entries
+  episodic_memory_state          dict with 4 entries
+  field_state_dict               dict with 17 entries
+  field_to_wave_state            dict with 2 entries
+  gr_state                       dict with 4 entries
+  learning_steps                 int = 4500
+  metrics                        dict with 10 entries
+  output_head_state              dict with 10 entries
+  phase                          int = 8
+  router_state                   dict with 2 entries
+  semantic_memory_state          dict with 4 entries
+  timestamp                      str = 2026-03-27T09:06:51.542557
+  tl_state                       dict with 7 entries
+  wave_to_field_state            dict with 2 entries
+  working_memory_state           dict with 2 entries
+
+  Decoder keys have _orig_mod. prefix (torch.compile): True
+  Decoder weight count: 33
+
+  Config:
+    byte_stride: 1
+    byte_window: 8
+    cgn_feature_dim: 512
+    cgn_n_fast: 32
+    cgn_n_medium: 16
+    cgn_n_slow: 8
+    consolidation_min_access: 3
+    consolidation_temperature: 0.05
+    episodic_dim: 512
+    feature_dim: 512
+    field_d: 96
+    field_features: 512
+    field_h: 96
+    field_w: 96
+    gr_base_mass: 1.0
+    gr_k_neighbors: 64
+    gr_mass_growth: 0.005
+    interference_radius: 6
+    max_gen_length: 500
+    output_vocab_size: 256
+    temperature: 0.8
+    tl_decay: 0.9999
+    tl_initial_temp: 1.0
+    tl_min_temp: 0.005
+    tl_settle_iterations: 15
+    wave_dim: 432
+    wm_window_size: 2048
+
+  Metrics:
+    avg_loss: 2.033766368150711
+    eval_loss: 1.6585085895061493
+    eval_perplexity: 5.251472899312711
+    final_loss: 1.7601773738861084
+    final_perplexity: 5.813468460450388
+    max_seq_len: 256
+    min_loss: 1.1942614316940308
+    total_steps: 4500
+    total_tokens: 13095692
+    training_time_seconds: 8114.60188293457
+[12:30:02]   ◼ CELL Cell 5 — Inspect Raw Checkpoint — PASS
+"
+
+
+[12:30:02] 
+▶ CELL: Cell 6 — Build Flux-beta.flx
+[12:30:02]   Started: 2026-03-27 12:30:02
+  ✓ Decoder: cleaned 33/33 keys (removed _orig_mod.)
+[12:30:37]   ✓ Flux-beta.flx created: 2090.0 MB
+  ✓ Saved to /content/FLUX/checkpoints/Flux-beta.flx
+
+  🌳 .flx Archive Structure:
+  ├── format: FLUX
+  ├── version: 1.0-beta
+  ├── metadata
+  │   ├── source_phase: 8
+  │   ├── learning_steps: 4500
+  │   └── metrics: 10 entries
+  ├── cse
+  │   ├── config: wave_dim=432
+  │   └── state_dict: 22 tensors
+  ├── field
+  │   ├── config: 96³ × 512
+  │   ├── state_dict: 17 tensors
+  │   ├── gravity_state: 4 entries
+  │   └── thermodynamic_state: 7 entries
+  ├── memory
+  │   ├── working: 2 entries
+  │   ├── episodic: 4 entries
+  │   └── semantic: 4 entries
+  ├── decoder
+  │   ├── config: hidden_dim=1024, layers=4
+  │   └── state_dict: 33 tensors (cleaned)
+  ├── causal
+  │   ├── cgn_state: 3 entries
+  │   └── graph_state: 4 entries
+  └── bridges
+      ├── wave_to_field: 2 tensors
+      ├── field_to_wave: 2 tensors
+      ├── router: 2 entries
+      └── output_head: 10 tensors
+[12:30:37]   ◼ CELL Cell 6 — Build Flux-beta.flx — PASS
+
+[12:30:37] 
+▶ CELL: Cell 7 — Smoke Test: Reload from .flx
+[12:30:37]   Started: 2026-03-27 12:30:37
+  ✓ Memory cleared — all checkpoint state destroyed
+  ✓ Loaded Flux-beta.flx (2090.0 MB)
+  ✓ Header: format=FLUX, version=1.0-beta
+  ✓ cse: all 2 sub-keys present
+  ✓ field: all 4 sub-keys present
+  ✓ memory: all 3 sub-keys present
+  ✓ decoder: all 2 sub-keys present
+  ✓ causal: all 3 sub-keys present
+  ✓ bridges: all 4 sub-keys present
+  ✓ Decoder keys clean (no _orig_mod. prefix)
+  ✓ Dimension invariants: wave_dim=432, field_features=512, decoder_hidden=1024
+  ✓ Metadata: source_phase=8, steps=4500, metrics=10 entries
+[12:30:38]   ✓ SMOKE TEST PASSED — .flx archive is self-contained and valid
+[12:30:38]   ◼ CELL Cell 7 — Smoke Test: Reload from .flx — PASS
+
+
+
+
+
+
+[12:30:46] 
+▶ CELL: Cell 8 — Reconstruct Model from .flx
+[12:30:46]   Started: 2026-03-27 12:30:46
+  ✓ Fresh model shell created on cuda
+  ✓ CSE loaded (wave_dim=432)
+  ✓ Field loaded (96³ × 512)
+  ✓ GravitationalRelevance loaded
+  ✓ ThermodynamicLearner loaded
+  ✓ CGN loaded
+  ✓ CausalGraph loaded
+  ✓ WorkingMemory loaded
+  ✓ EpisodicMemory loaded
+  ✓ SemanticMemory loaded
+  ✓ wave_to_field bridge loaded (432→512)
+  ✓ field_to_wave bridge loaded (512→432)
+  ✓ OutputHead loaded
+  ✓ MemoryRouter loaded
+  ✓ WaveDecoder loaded (cleaned, no _orig_mod.)
+
+  ═══ FLUXLarge reconstructed from .flx: 69,491,805 params ═══
+  Components loaded: 14/14
+  Learning steps: 4500
+  Episodic entries: 74
+  Field energy: 8847.4346
+[12:30:50]   ✓ Model reconstructed: 69,491,805 params, 14 components
+[12:30:50]   ◼ CELL Cell 8 — Reconstruct Model from .flx — PASS
+
+
+
+[12:30:54] 
+▶ CELL: Cell 9 — Demo A: Byte-level Encoding
+[12:30:54]   Started: 2026-03-27 12:30:54
+  Byte-level Encoding Test (No Tokenizer)
+  ========================================================
+  ✓ "Hello, World!"
+    → 13 UTF-8 bytes → wave [13, 432]
+  ✓ "🔥🌊⚡ FLUX is physics-inspired"
+    → 36 UTF-8 bytes → wave [36, 432]
+  ✓ "مرحبا بالعالم"
+    → 25 UTF-8 bytes → wave [25, 432]
+  ✓ "こんにちは世界"
+    → 21 UTF-8 bytes → wave [21, 432]
+  ✓ "Ths iz a misspeled sentance"
+    → 27 UTF-8 bytes → wave [27, 432]
+  ✓ "ÿþ binary bytes"
+    → 18 UTF-8 bytes → wave [18, 432]
+  ✓ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa..."
+    → 500 UTF-8 bytes → wave [500, 432]
+[12:30:55]   ✓ Demo A PASSED — CSE handles all inputs without dropping anything
+[12:30:55]   ◼ CELL Cell 9 — Demo A: Byte-level Encoding — PASS
+
+
+
+
+[12:32:04] 
+▶ CELL: Cell 11 — Demo C: Zero-Forgetting Continual Learning
+[12:32:04]   Started: 2026-03-27 12:32:04
+  Teaching Batch 1 (10 fictional facts)...
+  Testing recall of Batch 1...
+  Batch 1 recall BEFORE batch 2: 0% (0/10)
+
+  Teaching Batch 2 (10 MORE fictional facts)...
+  Testing recall of Batch 1 AFTER teaching Batch 2...
+
+  ═══ Continual Learning Results ═══
+  Batch 1 recall BEFORE batch 2: 0%
+  Batch 1 recall AFTER  batch 2: 0%
+  Forgetting score: 0.00 (0.0 = perfect)
+  Total episodic entries: 114
+[12:32:04]   ✓ Demo C PASSED — forgetting=0.00 (≤ 0.05 threshold)
+[12:32:04]   ◼ CELL Cell 11 — Demo C: Zero-Forgetting — PASS
+
+
+
+[12:32:25] 
+▶ CELL: Cell 12 — Demo D: Generative Autoregression
+[12:32:25]   Started: 2026-03-27 12:32:25
+  WaveDecoder Generation (Phase 8)
+  ========================================================
+
+  Prompt: "The meaning of life is"
+  Output: "ue all describe in the rack with the inquirehold of the bang military will get d"
+
+  Prompt: "In the beginning, there was"
+  Output: "ed with young most years and meeting, it head dads has a servection went of the "
+
+  Prompt: "Artificial intelligence will"
+  Output: " near made on the filt in EPRG coustry’s creation survealy since seet on the w"
+
+  Prompt: "The universe is made of"
+  Output: " signality and said of a million we known provisional started on the second on t"
+
+  Prompt: "Once upon a time in a land"
+  Output: "ational Portial Weiter, just doesn't at the GeP Our view Pars had been a side of"
+[12:32:26]   ✓ Demo D complete — WaveDecoder generated text for all prompts
+[12:32:26]   ◼ CELL Cell 12 — Demo D: Generative Autoregression — PASS
+
+
+
+
+[12:32:33] 
+▶ CELL: Cell 13 — Demo E: Motherboard Stress Test
+[12:32:33]   Started: 2026-03-27 12:32:33
+  Step 1: Teaching fact to episodic memory...
+  ✓ Fact stored in episodic memory
+
+  Step 2: Settling field on related query...
+  ✓ Full FLUX pipeline completed in 20.7ms
+
+  Step 3: Querying episodic memory...
+  ✓ Recalled 3 entries from episodic memory
+    [1] The Milky Way galaxy contains billions of stars
+    [2] Iron is a metal
+    [3] Resonance fields replace weight matrices
+
+  Step 4: Generating answer with WaveDecoder...
+  Query:  "What is the complexity of FLUX relevance?"
+  Answer: " is seeming a living since Wednesday boundgations to a speak of here:
+
+In the spect men suggested wi"
+
+  ═══ Motherboard Stress Test Summary ═══
+  ✓ CSE: encoded query (torch.Size([41, 432]))
+  ✓ Field + Gravity + TL: pipeline in 20.7ms
+  ✓ Memory: 115 episodic entries
+  ✓ CGN: causal processing active
+  ✓ WaveDecoder: generated continuation
+  ALL 6 FLUX components exercised in single pass!
+[12:32:33]   ✓ Demo E PASSED — Full motherboard stress test complete
+[12:32:33]   ◼ CELL Cell 13 — Demo E: Motherboard Stress Test — PASS
+
+
+
+
