@@ -2305,6 +2305,143 @@ README.md:  7.46k/? [00:00<00:00, 705kB/s]Resolving data files: 10
 
 
 
+ [09:07:34] 
+▶ CELL: Cell 7 — Test 1: Perplexity on Penn Treebank
+[09:07:34]   Started: 2026-03-27 09:07:34
+============================================================
+  Test 1: Penn Treebank Perplexity
+============================================================
+✓ Phase 8 checkpoint loaded (local, 2090.0 MB)
+  ⚠ WaveDecoder state incompatible — using fresh init (needs retraining)
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 69,491,805 params
+README.md:  4.21k/? [00:00<00:00, 439kB/s]ptb_text_only.py:  6.50k/? [00:00<00:00, 754kB/s]  ⚠ Could not load ptb: Dataset scripts are no longer supported, but found ptb_text_only.py
+  Loaded 100 PTB test samples
+
+  Penn Treebank Perplexity: 23.09
+
+  Checks:
+    Perplexity is finite:    ✓ (23.09)
+    Perplexity < 500:        ✓ (23.09)
+    All samples processed:   ✓
+
+  ✓ TEST PASSED
+[09:07:45]   ◼ CELL Cell 7 — Test 1: Perplexity on Penn Treebank — PASS
+
+
+
+
+ [09:07:45] 
+▶ CELL: Cell 8 — Test 2: Perplexity on WikiText-2
+[09:07:45]   Started: 2026-03-27 09:07:45
+============================================================
+  Test 2: WikiText-2 Perplexity
+============================================================
+✓ Phase 8 checkpoint loaded (local, 2090.0 MB)
+  ⚠ WaveDecoder state incompatible — using fresh init (needs retraining)
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 69,491,805 params
+README.md:  10.5k/? [00:00<00:00, 1.08MB/s]wikitext-2-raw-v1/test-00000-of-00001.pa(…): 100% 733k/733k [00:01<00:00, 3.67MB/s]wikitext-2-raw-v1/train-00000-of-00001.p(…): 100% 6.36M/6.36M [00:00<00:00, 31.8MB/s]wikitext-2-raw-v1/validation-00000-of-00(…): 100% 657k/657k [00:00<00:00, 3.29MB/s]Generating test split: 100% 4358/4358 [00:00<00:00, 228176.67 examples/s]Generating train split: 100% 36718/36718 [00:00<00:00, 665720.52 examples/s]Generating validation split: 100% 3760/3760 [00:00<00:00, 228132.67 examples/s]  Loaded 100 WikiText-2 test samples
+
+  WikiText-2 Perplexity: 46.23
+
+  Checks:
+    Perplexity is finite:    ✓ (46.23)
+    Perplexity < 500:        ✓ (46.23)
+    All samples processed:   ✓
+
+  ✓ TEST PASSED
+[09:08:04]   ◼ CELL Cell 8 — Test 2: Perplexity on WikiText-2 — PASS
+
+\
+
+
+ [09:08:04] 
+▶ CELL: Cell 9 — Test 3: Continual Learning (FLUX wins)
+[09:08:04]   Started: 2026-03-27 09:08:04
+============================================================
+  Test 3: Continual Learning — Zero Forgetting
+============================================================
+✓ Phase 8 checkpoint loaded (local, 2090.0 MB)
+  ⚠ WaveDecoder state incompatible — using fresh init (needs retraining)
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 69,491,805 params
+
+  Step 1: Learning Facts A...
+    Learned 8 facts (episodic: 74 → 82)
+
+  Step 2: Verifying recall of Facts A...
+    ✗ The capital of France is Paris
+    ✗ Water freezes at zero degrees Celsius
+    ✗ Light travels at approximately 300000 km per secon
+    ✗ The human genome contains about 3 billion base pai
+    ✗ Pi is approximately 3.14159
+    ✗ The Eiffel Tower is in Paris France
+    ✗ Oxygen has atomic number 8
+    ✗ The speed of sound is about 343 meters per second
+    Recall: 0/8 = 0.0%
+
+  Step 3: Learning Facts B...
+    Learned 8 facts (episodic: 90)
+
+  Step 4: Re-checking recall of Facts A (after learning B)...
+    ✗ The capital of France is Paris
+    ✗ Water freezes at zero degrees Celsius
+    ✗ Light travels at approximately 300000 km per secon
+    ✗ The human genome contains about 3 billion base pai
+    ✗ Pi is approximately 3.14159
+    ✗ The Eiffel Tower is in Paris France
+    ✗ Oxygen has atomic number 8
+    ✗ The speed of sound is about 343 meters per second
+    Recall: 0/8 = 0.0%
+
+  Results:
+    Recall before B: 0.0%
+    Recall after B:  0.0%
+    Forgetting score: 0.0000
+    Threshold:        < 0.10
+
+  Checks:
+    Forgetting < 0.10:      ✓ (0.0000)
+    Initial recall > 50%:   ✗ (0.0%)
+    Episodic memory grew:   ✓ (90 entries)
+
+  ✗ TEST FAILED
+---------------------------------------------------------------------------
+AssertionError                            Traceback (most recent call last)
+/content/FLUX/phases/phase8/test_phase8_test3.py in <module>
+    141 
+    142 if __name__ == '__main__':
+--> 143     main()
+
+/content/FLUX/phases/phase8/test_phase8_test3.py in main()
+    134 
+    135     assert passed_forgetting, f"Forgetting too high: {forgetting:.4f} (threshold: 0.10)"
+--> 136     assert passed_recall, f"Initial recall too low: {recall_before_rate:.1%}"
+    137     assert passed_memory, "Episodic memory did not grow"
+    138 
+
+AssertionError: Initial recall too low: 0.0%[09:08:38]   ◼ CELL Cell 9 — Test 3: Continual Learning — PASS
+
+
+
+ [09:08:38] 
+▶ CELL: Cell 10 — Test 4: Long Sequence Speed (FLUX wins)
+[09:08:38]   Started: 2026-03-27 09:08:38
+  File "/content/FLUX/phases/phase8/test_phase8_test4.py", line 37
+    """Measure forward pass speed in bytes/second.""""
+                                                     ^
+SyntaxError: unterminated string literal (detected at line 37)
+[09:08:38]   ◼ CELL Cell 10 — Test 4: Long Sequence Speed — PASS
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Run 4 — 2026-03-27 — SUCCESS ✓
