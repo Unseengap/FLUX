@@ -1261,3 +1261,653 @@ README.md:  7.46k/? [00:00<00:00, 697kB/s]Resolving data files: 10
 
 
 
+ [05:06:05] 
+▶ CELL: Test 1 — PTB Perplexity
+[05:06:05]   Started: 2026-03-27 05:06:05
+
+--- Running Test 1: Penn Treebank Perplexity ---
+============================================================
+  Test 1: Penn Treebank Perplexity
+============================================================
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)
+  ℹ No WaveDecoder in checkpoint — decoder needs training
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 36,962,909 params
+README.md:  4.21k/? [00:00<00:00, 376kB/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+ptb_text_only.py:  6.50k/? [00:00<00:00, 650kB/s]  ⚠ Could not load ptb: Dataset scripts are no longer supported, but found ptb_text_only.py
+  Loaded 100 PTB test samples
+
+  Penn Treebank Perplexity: 23.09
+
+  Checks:
+    Perplexity is finite:    ✓ (23.09)
+    Perplexity < 500:        ✓ (23.09)
+    All samples processed:   ✓
+
+  ✓ TEST PASSED
+[05:06:26]   ◼ CELL Test 1 — PTB Perplexity — PASS
+
+
+
+
+ [05:06:26] 
+▶ CELL: Test 2 — WikiText-2 Perplexity
+[05:06:26]   Started: 2026-03-27 05:06:26
+
+--- Running Test 2: WikiText-2 Perplexity ---
+============================================================
+  Test 2: WikiText-2 Perplexity
+============================================================
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)
+  ℹ No WaveDecoder in checkpoint — decoder needs training
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 36,962,909 params
+README.md:  10.5k/? [00:00<00:00, 840kB/s]wikitext-2-raw-v1/test-00000-of-00001.pa(…): 100% 733k/733k [00:00<00:00, 3.67MB/s]wikitext-2-raw-v1/train-00000-of-00001.p(…): 100% 6.36M/6.36M [00:00<00:00, 31.6MB/s]wikitext-2-raw-v1/validation-00000-of-00(…): 100% 657k/657k [00:00<00:00, 3.29MB/s]Generating test split: 100% 4358/4358 [00:00<00:00, 9029.64 examples/s]Generating train split: 100% 36718/36718 [00:00<00:00, 415324.44 examples/s]Generating validation split: 100% 3760/3760 [00:00<00:00, 111774.38 examples/s]  Loaded 100 WikiText-2 test samples
+
+  WikiText-2 Perplexity: 46.23
+
+  Checks:
+    Perplexity is finite:    ✓ (46.23)
+    Perplexity < 500:        ✓ (46.23)
+    All samples processed:   ✓
+
+  ✓ TEST PASSED
+[05:06:44]   ◼ CELL Test 2 — WikiText-2 Perplexity — PASS
+
+
+
+
+
+ [05:06:44] 
+▶ CELL: Test 3 — Continual Learning
+[05:06:44]   Started: 2026-03-27 05:06:44
+
+--- Running Test 3: Continual Learning Advantage ---
+============================================================
+  Test 3: Continual Learning — Zero Forgetting
+============================================================
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)
+  ℹ No WaveDecoder in checkpoint — decoder needs training
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 36,962,909 params
+
+  Step 1: Learning Facts A...
+    Learned 8 facts (episodic: 23 → 31)
+
+  Step 2: Verifying recall of Facts A...
+    ✗ The capital of France is Paris
+    ✗ Water freezes at zero degrees Celsius
+    ✗ Light travels at approximately 300000 km per secon
+    ✗ The human genome contains about 3 billion base pai
+    ✗ Pi is approximately 3.14159
+    ✗ The Eiffel Tower is in Paris France
+    ✗ Oxygen has atomic number 8
+    ✗ The speed of sound is about 343 meters per second
+    Recall: 0/8 = 0.0%
+
+  Step 3: Learning Facts B...
+    Learned 8 facts (episodic: 39)
+
+  Step 4: Re-checking recall of Facts A (after learning B)...
+    ✓ The capital of France is Paris
+    ✗ Water freezes at zero degrees Celsius
+    ✗ Light travels at approximately 300000 km per secon
+    ✗ The human genome contains about 3 billion base pai
+    ✗ Pi is approximately 3.14159
+    ✗ The Eiffel Tower is in Paris France
+    ✗ Oxygen has atomic number 8
+    ✓ The speed of sound is about 343 meters per second
+    Recall: 2/8 = 25.0%
+
+  Results:
+    Recall before B: 0.0%
+    Recall after B:  25.0%
+    Forgetting score: 0.0000
+    Threshold:        < 0.10
+
+  Checks:
+    Forgetting < 0.10:      ✓ (0.0000)
+    Initial recall > 50%:   ✗ (0.0%)
+    Episodic memory grew:   ✓ (39 entries)
+
+  ✗ TEST FAILED
+---------------------------------------------------------------------------
+AssertionError                            Traceback (most recent call last)
+/content/FLUX/phases/phase8/test_phase8_test3.py in <module>
+    141 
+    142 if __name__ == '__main__':
+--> 143     main()
+
+/content/FLUX/phases/phase8/test_phase8_test3.py in main()
+    134 
+    135     assert passed_forgetting, f"Forgetting too high: {forgetting:.4f} (threshold: 0.10)"
+--> 136     assert passed_recall, f"Initial recall too low: {recall_before_rate:.1%}"
+    137     assert passed_memory, "Episodic memory did not grow"
+    138 
+
+AssertionError: Initial recall too low: 0.0%[05:09:23]   ◼ CELL Test 3 — Continual Learning — PASS
+
+
+
+
+ [05:09:23] 
+▶ CELL: Test 4 — Long Sequence Speed
+[05:09:23]   Started: 2026-03-27 05:09:23
+
+--- Running Test 4: Long Sequence Speed Benchmark ---
+  File "/content/FLUX/phases/phase8/test_phase8_test4.py", line 37
+    """Measure forward pass speed in bytes/second.""""
+                                                     ^
+SyntaxError: unterminated string literal (detected at line 37)
+[05:09:23]   ◼ CELL Test 4 — Long Sequence Speed — PASS
+
+
+
+
+
+
+
+
+ [05:09:23] 
+▶ CELL: Demo 1 — Generation Quality
+[05:09:23]   Started: 2026-03-27 05:09:23
+
+--- Running Demo 1: FLUX vs GPT-2 Quality ---
+======================================================================
+  Demo 1: FLUX vs GPT-2 — Generation Quality Comparison
+======================================================================
+
+  Loading FLUXModel (Phase 8)...
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)
+  ℹ No WaveDecoder in checkpoint — decoder needs training
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 36,962,909 params
+  ✓ FLUXModel: 36,962,909 params
+
+  Loading GPT-2 small...
+tokenizer_config.json: 100% 26.0/26.0 [00:00<00:00, 2.52kB/s]vocab.json:  1.04M/? [00:00<00:00, 9.24MB/s]merges.txt:  456k/? [00:00<00:00, 3.20MB/s]tokenizer.json:  1.36M/? [00:00<00:00, 6.12MB/s]config.json: 100% 665/665 [00:00<00:00, 76.9kB/s]model.safetensors: 100% 548M/548M [00:02<00:00, 322MB/s]Loading weights: 100% 148/148 [00:00<00:00, 646.56it/s, Materializing param=transformer.wte.weight]GPT2LMHeadModel LOAD REPORT from: gpt2
+Key                  | Status     |  | 
+---------------------+------------+--+-
+h.{0...11}.attn.bias | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+generation_config.json: 100% 124/124 [00:00<00:00, 6.80kB/s]  ✓ GPT-2 small loaded: 124,439,808 parameters
+
+══════════════════════════════════════════════════════════════════════
+  Side-by-Side Generation
+══════════════════════════════════════════════════════════════════════
+
+  Prompt: "The future of artificial intelligence is"
+  ────────────────────────────────────────────────────────────
+The attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.
+  FLUX:  6�KJa�?V���xQn@�27�QA�H��4	��\����]�~Y[����L\��#�n
+         (623ms, 60 bytes)
+  GPT-2:  not so much a question of how and where to develop and develop it, but the fund
+         (865ms, 286 chars)
+
+  Prompt: "In a world where machines can think,"
+  ────────────────────────────────────────────────────────────
+  FLUX:  T�в!��,�Q�(�VU��f�xhl�f6)�f\���ԅ�7�^#�D��#�uh�
+         (206ms, 55 bytes)
+  GPT-2:  it's nice to see a new, better way of producing better products at lower prices
+         (702ms, 267 chars)
+
+  Prompt: "The discovery of gravitational waves proved that"
+  ────────────────────────────────────────────────────────────
+  FLUX:  ����&��L.��7�Ͷ�XLk�)��2jjI�V��h
+b��B�e<�r������.Ӏ#��
+         (210ms, 57 bytes)
+  GPT-2:  they could have an interesting impact on our lives, even in ways that were stil
+         (692ms, 309 chars)
+
+  Prompt: "Deep learning has revolutionized how we"
+  ────────────────────────────────────────────────────────────
+  FLUX:  �fQA�pfI�:���^���zƭ�H��<�ܝ�P�{b��z�c����{0du�ێz�
+         (211ms, 57 bytes)
+  GPT-2:  think about learning and how we know what to teach, but so far most of that res
+         (832ms, 303 chars)
+
+  Prompt: "The relationship between physics and computation"
+  ────────────────────────────────────────────────────────────
+c#�|�,�,���hMf�2�l��C:���):��r��*ެ(
+         (267ms, 58 bytes)
+  GPT-2: , he says, "is a long one."
+
+"When it comes down to the physics, we see nothing 
+         (926ms, 243 chars)
+
+══════════════════════════════════════════════════════════════════════
+  FLUX Unique Properties
+══════════════════════════════════════════════════════════════════════
+
+  1. Byte-Level (No Tokenizer):
+     Input:  "Hello 你好 مرحبا 🌍 → works without any vocabulary"
+     Wave shape: torch.Size([61, 432])
+     ✓ Any UTF-8 input — no OOV errors ever
+
+  2. Real-Time Learning:
+     Learned: "FLUXLarge has been benchmarked against GPT-2 in Phase 8"
+     Query:   "What was benchmarked in Phase 8?"
+     Result:  [0.994] FLUX Phase 8 smoke test — scaled model verification
+
+  3. Model Statistics:
+     Total params:     36,962,909
+     Learning steps:   4517
+     Episodic entries: 24
+     Field energy:     8847.4336
+
+══════════════════════════════════════════════════════════════════════
+  ✓ Demo 1 Complete
+══════════════════════════════════════════════════════════════════════
+[05:10:06]   ◼ CELL Demo 1 — Generation Quality — PASS
+
+
+
+
+
+
+
+[05:10:06] 
+▶ CELL: Demo 2 — Continual Learning
+[05:10:06]   Started: 2026-03-27 05:10:06
+
+--- Running Demo 2: FLUX Continual Learning ---
+======================================================================
+  Demo 2: FLUX Continual Learning Advantage
+======================================================================
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)
+  ℹ No WaveDecoder in checkpoint — decoder needs training
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 36,962,909 params
+
+══════════════════════════════════════════════════════════════════════
+  Stage A: One-Shot Fact Learning
+══════════════════════════════════════════════════════════════════════
+  GPT-2: ✗ Cannot learn without full retraining
+  FLUX:  ✓ Learns instantly via episodic memory + field perturbation
+
+  Learning 8 facts (one-shot)...
+
+  📝 [ 9531ms] The FLUX architecture was designed by UnseenGAP in 2025
+  📝 [ 9499ms] FLUX replaces attention with gravitational relevance at O(log n)
+  📝 [ 9480ms] Thermodynamic learning eliminates the need for backpropagation
+  📝 [ 9527ms] The resonance field stores knowledge as energy minima, not weight
+  📝 [ 9614ms] FLUX uses three-tier memory: working, episodic, and semantic
+  📝 [ 9642ms] Causal geometry nodes store both WHAT and WHY for every conclusio
+  📝 [ 9608ms] The continuous semantic encoder works on raw UTF-8 bytes
+  📝 [ 9602ms] Negative mass in FLUX means contradiction — wrong answers repel q
+
+  Episodic memory: 23 → 31
+  Learning steps:  4516 → 4524
+
+══════════════════════════════════════════════════════════════════════
+  Stage B: Immediate Recall (no retraining needed)
+══════════════════════════════════════════════════════════════════════
+  GPT-2: ✗ No recall mechanism for new facts
+  FLUX:  ✓ Episodic memory returns exact match
+
+  ✗ Q: "Who designed FLUX?"
+    → [0.955] FLUX uses gravitational relevance instead of attention
+  ✓ Q: "What replaces attention in FLUX?"
+    → [0.992] The future of AI is
+  ✗ Q: "What eliminates backpropagation?"
+    → [0.983] FLUX architecture uses
+  ✗ Q: "How does the field store knowledge?"
+    → [0.972] FLUX uses gravitational relevance instead of attention
+  ✗ Q: "What are the three memory tiers?"
+    → [0.958] FLUXModel Phase 8 uses field_features=512 for Phase 7 compat
+  ✗ Q: "What do causal geometry nodes store?"
+    → [0.990] The benchmark compares FLUX against GPT-2 small
+  ✗ Q: "What does the semantic encoder work on?"
+    → [0.986] FLUX uses gravitational relevance instead of attention
+  ✗ Q: "What does negative mass mean?"
+    → [0.969] Training on OpenWebText demonstrates scalability
+
+  Recall accuracy: 1/8 = 12%
+
+══════════════════════════════════════════════════════════════════════
+  Stage C: Zero Catastrophic Forgetting
+══════════════════════════════════════════════════════════════════════
+  GPT-2: ✗ Fine-tuning on new data destroys old knowledge
+  FLUX:  ✓ New attractors form without erasing existing ones
+
+  Learning 4 NEW facts...
+  📝 The Andromeda galaxy will collide with the Milky Way in 4 billion
+  📝 Black holes emit Hawking radiation due to quantum effects
+  📝 Entanglement allows particles to be correlated across any distanc
+  📝 The observable universe is about 93 billion light-years in diamet
+
+  Re-checking original facts...
+  ✗ "Who designed FLUX?"
+  ✓ "What replaces attention in FLUX?"
+  ✗ "What eliminates backpropagation?"
+  ✗ "How does the field store knowledge?"
+  ✗ "What are the three memory tiers?"
+  ✗ "What do causal geometry nodes store?"
+  ✗ "What does the semantic encoder work on?"
+  ✗ "What does negative mass mean?"
+
+  Original recall after new learning: 1/8 = 12%
+  Forgetting score: 0.0000 (target: < 0.10)
+  GPT-2 baseline:  ~0.50 (50% degradation after fine-tuning)
+
+══════════════════════════════════════════════════════════════════════
+  Summary: FLUX vs GPT-2 Continual Learning
+══════════════════════════════════════════════════════════════════════
+
+  Capability                     FLUX                      GPT-2                    
+  ────────────────────────────── ───────────────────────── ─────────────────────────
+  One-shot fact learning         ✓ Instant                 ✗ Impossible             
+  Immediate recall               ✓ Episodic memory         ✗ No mechanism           
+  Zero forgetting                ✓ Score=0.000             ✗ Score≈0.50             
+  Real-time adaptation           ✓ Field settling          ✗ Static weights         
+  Cross-session memory           ✓ Episodic store          ✗ Context window only    
+
+  Final Model State:
+    Episodic entries: 35
+    Learning steps:   4528
+    Total params:     36,962,909
+
+══════════════════════════════════════════════════════════════════════
+  ✓ Demo 2 Complete
+══════════════════════════════════════════════════════════════════════
+[05:12:10]   ◼ CELL Demo 2 — Continual Learning — PASS
+
+
+
+
+
+
+[05:12:10] 
+▶ CELL: Demo 3 — Speed Benchmark
+[05:12:10]   Started: 2026-03-27 05:12:10
+
+--- Running Demo 3: Speed at Long Sequences ---
+======================================================================
+  Demo 3: FLUX Speed at Long Sequences
+======================================================================
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)
+  ℹ No WaveDecoder in checkpoint — decoder needs training
+  ✓ FLUXModel (Phase 8) loaded from checkpoint: 36,962,909 params
+
+  Testing speed at different sequence lengths...
+  Device: cuda
+
+    Length    Latency (ms)   Speed (B/s)     Scaling
+  ────────  ──────────────  ────────────  ──────────
+       128            41.0          3119       1.00x
+       256            42.7          5999       1.92x
+       512            47.1         10863       3.48x
+      1024            45.6         22475       7.20x
+      2048            49.3         41538      13.32x
+      4096            54.5         75215      24.11x
+      8192            66.9        122494      39.27x
+     16384            78.4        208990      67.00x
+
+══════════════════════════════════════════════════════════════════════
+  Theoretical Complexity Comparison
+══════════════════════════════════════════════════════════════════════
+
+    Sequence    FLUX O(log n)      GPT-2 O(n²)     Speedup
+  ──────────  ───────────────  ───────────────  ──────────
+         512              9.0              262k          29x
+        1024             10.0             1049k         105x
+        4096             12.0            16777k        1398x
+       16384             14.0           268435k       19174x
+       65536             16.0          4294967k      268435x
+      262144             18.0         68719477k     3817749x
+
+  ✓ Speed chart saved: /content/FLUX/phases/phase8/speed_benchmark.png
+
+══════════════════════════════════════════════════════════════════════
+  Key Takeaways
+══════════════════════════════════════════════════════════════════════
+  • FLUX uses O(log n) gravitational relevance (spatial tree)
+  • GPT-2 uses O(n²) self-attention (all-pairs comparison)
+  • At 16k tokens: FLUX ~14 ops vs GPT-2 ~268M ops
+  • FLUX advantage grows with sequence length
+  • No quadratic memory scaling in FLUX
+
+  Measured:
+    Max sequence:  16,384 bytes
+    Peak speed:    208,990 bytes/sec
+    Min speed:     3,119 bytes/sec
+
+══════════════════════════════════════════════════════════════════════
+  ✓ Demo 3 Complete
+══════════════════════════════════════════════════════════════════════
+[05:12:23]   ◼ CELL Demo 3 — Speed Benchmark — PASS
+
+
+ ⚠ RESULTS_PHASE_8.md not found — generating from checkpoint metrics...
+✓ Phase 8 checkpoint loaded (local, 1959.9 MB)
+  ✓ PTB Perplexity: measurable (threshold: < 500, finite)
+  ✓ WikiText-2 Perplexity: measurable (threshold: < 500, finite)
+  ✓ Continual Learning: forgetting < 0.10 (threshold: < 0.10)
+  ✓ Long Sequence Speed: 16k processed (threshold: degradation < 5x)
+
+==================================================
+Phase 8 Results saved to: /content/FLUX/phases/phase8/RESULTS_PHASE_8.md
+All tests passed: True
+Ready for Phase 9: True
+==================================================
+Results: Phase 8 — Scale & GPT-2 Benchmark
+Generated: 2026-03-27 05:12:25
+Hardware: Tesla T4
+Duration: 0:00:00.000319
+Component Status
+Scale & GPT-2 Benchmark: ✓ BUILT
+Checkpoint: checkpoints/phase8.phase.pt ✓
+Test Results
+
+
+
+Test
+Status
+Score
+Threshold
+Pass?
+
+
+
+PTB Perplexity
+PASS
+measurable
+< 500, finite
+✓
+
+
+WikiText-2 Perplexity
+PASS
+measurable
+< 500, finite
+✓
+
+
+Continual Learning
+PASS
+forgetting < 0.10
+< 0.10
+✓
+
+
+Long Sequence Speed
+PASS
+16k processed
+degradation < 5x
+✓
+
+
+Demo Status
+
+
+
+Demo
+Ran?
+Quality
+
+
+
+FLUX vs GPT-2 Generation
+✓
+Side-by-side comparison
+
+
+Continual Learning Demo
+✓
+Zero forgetting verified
+
+
+Long Sequence Speed
+✓
+Speed chart generated
+
+
+Key Metrics
+
+total_steps: 4500
+final_loss: 1.6467
+final_perplexity: 5.19
+eval_loss: 1.6726
+eval_perplexity: 5.33
+total_tokens: 13,095,692
+
+Phase 8 → Phase 9 Readiness
+All tests passing: YES ✓
+Checkpoint saved: YES ✓
+Ready for Phase 9: YES ✓
+
+============================================================
+  FULL PHASE 8 EVALUATION LOG
+============================================================
+[13:23:40] ============================================================
+[13:23:40] FLUX Phase 8 Log
+[13:23:40] Started: 2026-03-26 13:23:40
+[13:23:40] ============================================================
+
+[05:06:00] 
+──────────────────── Phase 8: Evaluation & Benchmark Runner ────────────────────
+[05:06:05] 
+▶ CELL: Test 1 — PTB Perplexity
+[05:06:05]   Started: 2026-03-27 05:06:05
+[05:06:26]   ◼ CELL Test 1 — PTB Perplexity — PASS
+[05:06:26] 
+▶ CELL: Test 2 — WikiText-2 Perplexity
+[05:06:26]   Started: 2026-03-27 05:06:26
+[05:06:44]   ◼ CELL Test 2 — WikiText-2 Perplexity — PASS
+[05:06:44] 
+▶ CELL: Test 3 — Continual Learning
+[05:06:44]   Started: 2026-03-27 05:06:44
+[05:09:23]   ◼ CELL Test 3 — Continual Learning — PASS
+[05:09:23] 
+▶ CELL: Test 4 — Long Sequence Speed
+[05:09:23]   Started: 2026-03-27 05:09:23
+[05:09:23]   ◼ CELL Test 4 — Long Sequence Speed — PASS
+[05:09:23] 
+▶ CELL: Demo 1 — Generation Quality
+[05:09:23]   Started: 2026-03-27 05:09:23
+[05:10:06]   ◼ CELL Demo 1 — Generation Quality — PASS
+[05:10:06] 
+▶ CELL: Demo 2 — Continual Learning
+[05:10:06]   Started: 2026-03-27 05:10:06
+[05:12:10]   ◼ CELL Demo 2 — Continual Learning — PASS
+[05:12:10] 
+▶ CELL: Demo 3 — Speed Benchmark
+[05:12:10]   Started: 2026-03-27 05:12:10
+[05:12:23]   ◼ CELL Demo 3 — Speed Benchmark — PASS
+
+
+✓ Results saved: RESULTS_PHASE_8.md
+✓ Chart saved: speed_benchmark.png
+✓ Log saved: phase8.log
+✓ Checkpoint already on Drive: phase8.phase.pt
+
+  📁 All artifacts saved in /content/drive/MyDrive/FLUX/output/phase8_evaluation:
+    RESULTS_PHASE_8.md                            1.1 KB
+    phase8.log                                    1.5 KB
+    phase8.phase.pt                            1959.9 MB
+    speed_benchmark.png                          93.9 KB
+
+============================================================
+✓ PHASE 8 EVALUATION COMPLETE — all artifacts on Google Drive
+============================================================
+
+
+---
+
+# Issues Discovered from Phase 8 Logs
+
+## Run 1 (March 22, ~1,000 steps)
+- **Checkpoint size:** 3,022.9 MB — FLUXLarge intact (75,799,389 params)
+- **PTB Perplexity:** 22.08 ✓ — best perplexity of all runs
+- **WikiText-2 Perplexity:** 35.79 ✓
+- **Generation:** Pure gibberish (`"dv g rr orhsrtiurl..."`) — WaveDecoder undertrained after only ~900 steps
+- **Episodic entries:** ~910 — healthy
+- **Root cause:** Not enough training steps. Field settled but decoder never converged.
+
+---
+
+## Run 2 (March 22, 4,500 steps — best working model, now lost)
+- **Checkpoint size:** 3,080.4 MB — FLUXLarge intact
+- **PTB Perplexity:** 316.99 ✗ — heavily regressed from Run 1 (22 → 317)
+- **WikiText-2 Perplexity:** 298.48 ✗ — heavily regressed (35 → 298)
+- **Generation:** Broken English (`"the could spick to lake worke..."`) at 74ms — real words, fast
+- **All 4 tests passed**
+- **Episodic entries:** 4,001+ — healthy
+- **Peak speed:** 728,852 bytes/sec at 16k sequence
+- **Root cause of perplexity regression:** The WaveDecoder loss and the OutputHead perplexity objective compete — training the decoder pulled the output head away from clean byte scoring. The perplexity tests measure the output head, not the decoder. Generation quality actually improved while test numbers got worse.
+- **STATUS: Checkpoint lost** — overwritten by Run 3 on both Drive and HuggingFace Hub.
+
+---
+
+## Run 3 (March 26–27, 4,500 steps — failed)
+- **Checkpoint size:** 1,959.9 MB — **half the expected size (~37M params instead of 75M)**
+- **PTB Perplexity:** 23.09 ✓ — good numbers but misleading
+- **WikiText-2 Perplexity:** 46.23 ✓
+- **Generation:** Binary garbage (`"6·KJa·?V···xQn@·27·QA..."`) — WaveDecoder missing from checkpoint
+- **Episodic recall:** 12% — index wiped on load
+- **Test 3 (Continual Learning):** FAILED — initial recall 0.0%
+- **Test 4 (Long Sequence Speed):** SyntaxError in test file — unterminated string literal at line 37
+
+### Bug 1 — Wrong model loaded (most critical)
+The notebook used `FLUXModel` base (36,962,909 params) instead of `FLUXLarge` (75,799,389 params). The "bigger GRU" scaling was applied to the decoder only while the backbone was actually smaller. This caused the checkpoint to be half the expected size.
+
+### Bug 2 — WaveDecoder not saved to checkpoint
+Cell 6 built the checkpoint dict manually and included every component except `decoder_state_dict`. The training script `train_openwebtext.py` saves it correctly, but the notebook's manual dict did not. 8 hours of decoder training were lost on save. Fixed March 27 — `decoder_state_dict` now included and verified with an assert.
+
+### Bug 3 — Episodic memory dimension mismatch on load
+Checkpoint stored episodic vectors at dim=256 but the model expected dim=512. On load: `"⚠ Episodic memory dim mismatch: checkpoint=256, model=512 — rebuilding index (vectors discarded)"`. All 4,000+ learned episodic entries were silently wiped, reducing usable memory to 23 entries.
+
+### Bug 4 — Step latency 6,582ms vs 1,205ms
+The bigger GRU (4 layers, 1024 hidden, 256 embed) on a T4 GPU took 5.5x longer per step than Run 2. 4,500 steps took 8.2 hours instead of ~2.5 hours. Fixed March 27 — `max_seq_len` cut from 512 to 256 (halves GRU unroll time), `torch.compile` added to decoder cell (~20–40% further speedup). Expected T4 time: ~3.75 hrs.
+
+### Bug 5 — SyntaxError in test_phase8_test4.py
+Line 37 had an unterminated string literal (`"""Measure forward pass speed in bytes/second.""""`). Test 4 silently passed because the error was caught and the cell continued. The test never actually ran.
+
+---
+
+## Fixes Applied (March 27)
+| Fix | File | Description |
+|-----|------|-------------|
+| `decoder_state_dict` added to checkpoint | `phase8_collab.ipynb` Cell 6 | Decoder now saved + verified with assert after save |
+| Assert decoder present after save | `phase8_collab.ipynb` Cell 6 | Fails loudly if decoder missing instead of silently |
+| `torch.compile` on WaveDecoder | `phase8_collab.ipynb` Cell 4 | 20–40% GRU speedup |
+| `max_seq_len` 512 → 256 | `phase8_collab.ipynb` Cell 5 | Halves per-step latency |
+| Checkpoint every 500 steps | `phase8_collab.ipynb` Cell 5 | No more losing 8hrs to a disconnect |
+| `on_checkpoint` generation probe | `train_openwebtext.py` | Live quality preview every 500 steps during training |
+| `on_checkpoint` hooked in notebook | `phase8_collab.ipynb` Cell 5 | Shows ✓/~/✗ quality rating at each checkpoint |
+
+## Next Run Expectations
+- **Model:** FLUXLarge — 75,799,389 params, field_features=512
+- **Decoder:** GRU 4-layer, 1024 hidden, 256 embed, 16 heads (~larger than Run 2)
+- **Steps:** 4,500 on 5,000 OpenWebText docs
+- **Expected time:** ~3.75 hrs on T4, ~1 hr on A100
+- **Expected final loss:** ~1.65–1.81 (between Run 2 and Run 3 training curves)
+- **Expected generation quality:** broken English (like Run 2) but with bigger decoder capacity
+- **Checkpoint:** should include decoder, field, all 7 phase weights — ~3+ GB
+
+
+
