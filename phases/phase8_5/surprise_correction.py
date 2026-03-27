@@ -206,7 +206,7 @@ class SurpriseCorrector:
         self._surprise_history.append(surprise)
         self._total_corrections += 1
         
-        # Note: verbose output moved to CurriculumSchool for cleaner display
+        # Note: detailed Q/A logging done in curriculum_school.py
         
         # Step 2: Get field state before learning
         energy_before = self.model.field.total_energy()
@@ -398,8 +398,7 @@ class SurpriseCorrector:
                 target=target_features,
                 iterations=adaptive_iters,
             )
-            
-            # Verbose field settling moved to debug mode to reduce noise
+            # Field settling details logged via curriculum progress
     
     def _store_in_episodic(
         self,
