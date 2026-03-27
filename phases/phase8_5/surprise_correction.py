@@ -206,9 +206,7 @@ class SurpriseCorrector:
         self._surprise_history.append(surprise)
         self._total_corrections += 1
         
-        if self.verbose:
-            print(f"    Surprise: {surprise:.3f} (FLUX conf={flux_confidence:.2f}, "
-                  f"teacher={feedback.score:.1f})")
+        # Note: verbose output moved to CurriculumSchool for cleaner display
         
         # Step 2: Get field state before learning
         energy_before = self.model.field.total_energy()
@@ -401,9 +399,7 @@ class SurpriseCorrector:
                 iterations=adaptive_iters,
             )
             
-            if self.verbose:
-                print(f"      Field settled: energy {result.initial_energy:.2f} → "
-                      f"{result.final_energy:.2f}, iters={result.iterations_used}")
+            # Verbose field settling moved to debug mode to reduce noise
     
     def _store_in_episodic(
         self,

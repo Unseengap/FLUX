@@ -298,6 +298,17 @@ class CurriculumSchool:
                 feedback=feedback,
             )
             
+            # Show sample teacher-student interaction every 25 iterations
+            if self.verbose and (attempt + 1) % 25 == 0:
+                print(f"\n      ─── Sample #{attempt+1} ───")
+                print(f"      📝 Prompt: \"{prompt[:40]}{'...' if len(prompt) > 40 else ''}\"")
+                print(f"      🤖 FLUX:   \"{continuation[:60]}{'...' if len(continuation) > 60 else ''}\"")
+                print(f"      👩‍🏫 Score:  {feedback.score:.1f}/10")
+                if feedback.corrected_text != continuation:
+                    corrected_preview = feedback.corrected_text[:60]
+                    print(f"      ✏️ Correct: \"{corrected_preview}{'...' if len(feedback.corrected_text) > 60 else ''}\"")
+                print(f"      ⚡ Surprise: {result.surprise:.3f}")
+            
             # Progress logging
             if self.verbose and (attempt + 1) % 50 == 0:
                 recent = scores[-50:] if len(scores) >= 50 else scores
