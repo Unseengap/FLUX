@@ -174,14 +174,16 @@ class FLUXLarge(FLUXModel):
         # All Phase 7 trained weights load without dimension mismatch.
 
         # ── WaveDecoder: autoregressive byte-level generation ──
-        # The OutputHead predicts byte distributions for training.
-        # The WaveDecoder generates coherent byte SEQUENCES.
+        # Config matches Run 2 (the run that produced working broken-English output):
+        #   embed_dim=256, hidden_dim=1024, num_layers=4, num_heads=16
+        # This makes the WaveDecoder ~38M params and the full model ~75M total.
         self.decoder = WaveDecoder(
             wave_dim=merged['wave_dim'],              # 432
             field_features=merged['field_features'],  # 512
-            embed_dim=128,
-            hidden_dim=512,
-            num_layers=2,
+            embed_dim=256,                            # Run 2: was 128 — restored
+            hidden_dim=1024,                          # Run 2: was 512 — restored
+            num_layers=4,                             # Run 2: was 2  — restored
+            num_heads=16,                             # Run 2 default
             vocab_size=256,
         ).to(device)
 
@@ -286,6 +288,28 @@ class FLUXLarge(FLUXModel):
             )
 
         return result
+
+    def get_stats(self) -> FLUXStats:
+        """Override to include WaveDecoder parameters in total count."""
+        stats = super().get_stats()
+        decoder_p = sum(p.numel() for p in self.decoder.parameters())
+        return FLUXStats(
+            total_params=stats.total_params + decoder_p,
+            cse_params=stats.cse_params,
+            field_params=stats.field_params,
+            gr_params=stats.gr_params,
+            tl_params=stats.tl_params,
+            cgn_params=stats.cgn_params,
+            memory_params=stats.memory_params,
+            output_head_params=stats.output_head_params,
+            episodic_entries=stats.episodic_entries,
+            working_entries=stats.working_entries,
+            field_energy=stats.field_energy,
+            field_attractors=stats.field_attractors,
+            temperature=stats.temperature,
+            learning_steps=stats.learning_steps,
+            decoder_params=decoder_p,
+        )
 
     def get_scale_profile(self) -> ScaleProfile:
         """Return a profile describing this model's scale."""

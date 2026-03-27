@@ -126,6 +126,7 @@ class FLUXStats:
     cgn_params: int = 0
     memory_params: int = 0
     output_head_params: int = 0
+    decoder_params: int = 0       # WaveDecoder (Phase 8+ only, 0 for base model)
     episodic_entries: int = 0
     working_entries: int = 0
     field_energy: float = 0.0
