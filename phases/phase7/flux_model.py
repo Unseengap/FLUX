@@ -340,9 +340,13 @@ class FLUXModel(nn.Module):
             wave_vec.unsqueeze(0)
         ).squeeze(0)                                  # [feature_dim]
 
-        self.episodic_memory.write(
-            compressed, fact=text, causal_source="forward_pass"
-        )
+        # Only write to episodic memory during learning.
+        # Inference passes should not pollute episodic store with
+        # repeated queries — that drowns deliberate facts.
+        if learn:
+            self.episodic_memory.write(
+                compressed, fact=text, causal_source="forward_pass"
+            )
 
         memory_result = self.memory_router.route_query(
             wave_vec, episodic_k=5, working_k=10

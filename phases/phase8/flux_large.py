@@ -415,7 +415,8 @@ class FLUXLarge(FLUXModel):
                 except Exception:
                     pass
 
-            # Episodic memory
+            # Episodic memory — dimension may differ (Phase 7=256, Phase 8=512)
+            # load_state handles the mismatch gracefully (discards stale vectors)
             if 'episodic_memory_state' in ckpt7:
                 try:
                     model.episodic_memory.load_state(ckpt7['episodic_memory_state'])
@@ -523,7 +524,10 @@ class FLUXLarge(FLUXModel):
                 print("  ⚠ Working memory state incompatible — using fresh init")
 
         if 'episodic_memory_state' in ckpt:
-            model.episodic_memory.load_state(ckpt['episodic_memory_state'])
+            try:
+                model.episodic_memory.load_state(ckpt['episodic_memory_state'])
+            except Exception:
+                print("  ⚠ Episodic memory state incompatible — using fresh init")
 
         if 'semantic_memory_state' in ckpt:
             try:

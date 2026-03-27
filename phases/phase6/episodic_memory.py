@@ -269,13 +269,36 @@ class EpisodicMemory:
         }
 
     def load_state(self, state: Dict[str, Any]) -> None:
-        """Restore episodic memory from checkpoint."""
-        self.feature_dim = state['feature_dim']
+        """Restore episodic memory from checkpoint.
+
+        Handles dimension mismatches gracefully: if the checkpoint was
+        saved with a different feature_dim (e.g. Phase 7 = 256 loaded
+        into Phase 8 = 512), the stale vectors are discarded and the
+        index is rebuilt at the current model's feature_dim.  Metadata
+        (facts, causal sources) is always preserved.
+        """
+        ckpt_dim = state['feature_dim']
         self._next_id = state['next_id']
 
         vecs = state['vectors']
+
+        # Dimension mismatch — discard incompatible vectors, keep metadata
+        if ckpt_dim != self.feature_dim:
+            print(f"  ⚠ Episodic memory dim mismatch: checkpoint={ckpt_dim}, "
+                  f"model={self.feature_dim} — rebuilding index (vectors discarded)")
+            if self.index is not None:
+                self.index = faiss.IndexFlatIP(self.feature_dim)
+            else:
+                self._vectors = []
+            # Preserve metadata so facts aren't lost (vectors will be
+            # re-written on next learn_fact / forward call if needed)
+            self._metadata = []
+            for d in state['metadata']:
+                self._metadata.append(EpisodicEntry(**d))
+            return
+
+        # Dimensions match — normal restore
         if self.index is not None:
-            # Recreate index to ensure dimension matches exactly
             self.index = faiss.IndexFlatIP(self.feature_dim)
             if len(vecs) > 0:
                 self.index.add(vecs.astype('float32'))
