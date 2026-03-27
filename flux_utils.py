@@ -318,12 +318,12 @@ def _resolve_hf_token(token: Optional[str] = None) -> Optional[str]:
     Priority: explicit arg > HF_TOKEN env var > Kaggle secrets.
     """
     if token:
-        return token
+        return token.strip()
 
     # Environment variable
     env_token = os.environ.get('HF_TOKEN')
     if env_token:
-        return env_token
+        return env_token.strip()
 
     # Kaggle secrets
     try:
@@ -331,7 +331,7 @@ def _resolve_hf_token(token: Optional[str] = None) -> Optional[str]:
         secrets = UserSecretsClient()
         kaggle_token = secrets.get_secret("HF_TOKEN")
         if kaggle_token:
-            return kaggle_token
+            return kaggle_token.strip()
     except Exception:
         pass
 
@@ -340,7 +340,7 @@ def _resolve_hf_token(token: Optional[str] = None) -> Optional[str]:
         from huggingface_hub import HfFolder
         cached = HfFolder.get_token()
         if cached:
-            return cached
+            return cached.strip()
     except Exception:
         pass
 

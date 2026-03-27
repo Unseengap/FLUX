@@ -275,7 +275,8 @@ class EpisodicMemory:
 
         vecs = state['vectors']
         if self.index is not None:
-            self.index.reset()
+            # Recreate index to ensure dimension matches exactly
+            self.index = faiss.IndexFlatIP(self.feature_dim)
             if len(vecs) > 0:
                 self.index.add(vecs.astype('float32'))
         else:
