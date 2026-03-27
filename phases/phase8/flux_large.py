@@ -586,10 +586,18 @@ class FLUXLarge(FLUXModel):
         # ── WaveDecoder state ──
         if 'decoder_state_dict' in ckpt:
             try:
-                model.decoder.load_state_dict(ckpt['decoder_state_dict'])
+                dec_state = ckpt['decoder_state_dict']
+                # torch.compile wraps modules in OptimizedModule, which
+                # prefixes all state_dict keys with '_orig_mod.'.  Strip
+                # this prefix so the weights load into a non-compiled decoder.
+                if any(k.startswith('_orig_mod.') for k in dec_state):
+                    dec_state = {k.replace('_orig_mod.', '', 1): v
+                                 for k, v in dec_state.items()}
+                model.decoder.load_state_dict(dec_state)
                 print(f"  ✓ WaveDecoder loaded from checkpoint")
-            except Exception:
-                print("  ⚠ WaveDecoder state incompatible — using fresh init (needs retraining)")
+            except Exception as e:
+                print(f"  ⚠ WaveDecoder state incompatible — using fresh init (needs retraining)")
+                print(f"    Error: {e}")
         else:
             print("  ℹ No WaveDecoder in checkpoint — decoder needs training")
 

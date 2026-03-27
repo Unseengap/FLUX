@@ -421,7 +421,12 @@ class OpenWebTextTrainer:
             'wave_to_field_state': self.model.wave_to_field.state_dict(),
             'field_to_wave_state': self.model.field_to_wave.state_dict(),
             'output_head_state': self.model.output_head.state_dict(),
-            'decoder_state_dict': self.model.decoder.state_dict(),
+            # Strip _orig_mod. prefix added by torch.compile so checkpoints
+            # are always clean and loadable without compile.
+            'decoder_state_dict': {
+                k.replace('_orig_mod.', '', 1): v
+                for k, v in self.model.decoder.state_dict().items()
+            },
             'optimizer_state': self.optimizer.state_dict(),
             'metrics': {
                 'step': step,

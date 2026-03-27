@@ -34,7 +34,7 @@ from flux_utils import get_device, checkpoint_exists
 
 
 def measure_flux_speed(model: FLUXLarge, text: str) -> float:
-    """Measure forward pass speed in bytes/second.""""
+    """Measure forward pass speed in bytes/second."""
     # Warm up
     model.forward(text[:100], learn=False)
 
