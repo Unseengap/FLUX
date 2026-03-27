@@ -155,7 +155,8 @@ def load_flx(path: Path, device: str = 'cpu', auto_download: bool = True) -> Dic
         else:
             raise FileNotFoundError(f".flx file not found: {path}")
     
-    flx = torch.load(str(path), map_location=device)
+    # weights_only=False needed for numpy arrays in checkpoint (trusted source)
+    flx = torch.load(str(path), map_location=device, weights_only=False)
     
     # Validate format
     fmt = flx.get('format', '')
