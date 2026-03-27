@@ -70,13 +70,13 @@ class EpisodicMemory:
     def __init__(self, feature_dim: int = 256):
         self.feature_dim = feature_dim
         self._next_id: int = 0
+        self._vectors: List[np.ndarray] = []
 
         # FAISS index (inner-product)
         if FAISS_AVAILABLE:
             self.index = faiss.IndexFlatIP(feature_dim)
         else:
             self.index = None
-            self._vectors: List[np.ndarray] = []
 
         self._metadata: List[EpisodicEntry] = []
 
