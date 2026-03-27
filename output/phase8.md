@@ -1012,3 +1012,252 @@ In annear Wills Banter healthed secures to dec
     Field energy:       9021.4971
     Field attractors:   267
 [20:37:13]   ◼ CELL Cell 14 — Interactive Exploration + Benchmark — PASS
+
+
+
+
+
+
+Secoud run bigger gru results 
+
+
+ [18:53:16] 
+▶ CELL: Cell 5 — Training on OpenWebText
+[18:53:16]   Started: 2026-03-26 18:53:16
+── Starting Phase 8 Training ──
+
+=================================================================
+  Loading Training Data (OpenWebText subset)
+=================================================================
+  ℹ Loading OpenWebText subset (5,000 docs)...
+README.md:  7.46k/? [00:00<00:00, 697kB/s]Resolving data files: 100% 80/80 [00:00<00:00, 10638.02it/s]Resolving data files: 100% 80/80 [00:00<00:00, 7758.43it/s]  ✓ Loaded 5,000 documents from OpenWebText
+  Train: 4,500 docs
+  Eval:  500 docs
+
+=================================================================
+  Stage A: Output Head + Bridge — OpenWebText Training
+=================================================================
+  Corpus: 4500 documents
+  Training: single-pass stream (no epochs)
+  Grad accum: 4 (effective batch = 4)
+  LR: 5e-4 with cosine decay
+  Step     50/4500  loss=5.1049  ppl=182.8  lr=0.000060  tokens=154,048  latency=6582ms
+[18:58:59]   📊 step_50_loss: 5.1049
+  Step    100/4500  loss=3.6850  ppl=41.7  lr=0.000125  tokens=311,206  latency=6590ms
+[19:04:29]   📊 step_100_loss: 3.6850
+  Step    150/4500  loss=3.2498  ppl=27.1  lr=0.000185  tokens=441,034  latency=6587ms
+[19:09:58]   📊 step_150_loss: 3.2498
+  Step    200/4500  loss=3.0111  ppl=21.3  lr=0.000250  tokens=590,161  latency=6584ms
+[19:15:27]   📊 step_200_loss: 3.0111
+  Step    250/4500  loss=2.7816  ppl=16.3  lr=0.000310  tokens=742,589  latency=6582ms
+[19:20:57]   📊 step_250_loss: 2.7816
+  Step    300/4500  loss=2.6137  ppl=13.8  lr=0.000375  tokens=880,947  latency=6578ms
+[19:26:26]   📊 step_300_loss: 2.6137
+  Step    350/4500  loss=2.5326  ppl=12.8  lr=0.000435  tokens=1,043,220  latency=6575ms
+[19:31:55]   📊 step_350_loss: 2.5326
+  Step    400/4500  loss=2.4793  ppl=12.1  lr=0.000500  tokens=1,188,700  latency=6582ms
+[19:37:24]   📊 step_400_loss: 2.4793
+  Step    450/4500  loss=2.3808  ppl=10.9  lr=0.000500  tokens=1,333,222  latency=6589ms
+[19:42:53]   📊 step_450_loss: 2.3808
+  Step    500/4500  loss=2.3741  ppl=10.9  lr=0.000500  tokens=1,468,045  latency=6586ms
+[19:48:22]   📊 step_500_loss: 2.3741
+  Step    550/4500  loss=2.2902  ppl=10.0  lr=0.000500  tokens=1,614,278  latency=6590ms
+[19:53:52]   📊 step_550_loss: 2.2902
+  Step    600/4500  loss=2.2785  ppl=9.8  lr=0.000500  tokens=1,759,733  latency=6578ms
+[19:59:21]   📊 step_600_loss: 2.2785
+  Step    650/4500  loss=2.2654  ppl=9.9  lr=0.000500  tokens=1,904,984  latency=6583ms
+[20:04:50]   📊 step_650_loss: 2.2654
+  Step    700/4500  loss=2.2501  ppl=9.6  lr=0.000500  tokens=2,052,014  latency=6576ms
+[20:10:19]   📊 step_700_loss: 2.2501
+  Step    750/4500  loss=2.1670  ppl=8.8  lr=0.000500  tokens=2,195,257  latency=6585ms
+[20:15:48]   📊 step_750_loss: 2.1670
+  Step    800/4500  loss=2.1445  ppl=8.6  lr=0.000499  tokens=2,338,823  latency=6584ms
+[20:21:17]   📊 step_800_loss: 2.1445
+  Step    850/4500  loss=2.1395  ppl=8.6  lr=0.000499  tokens=2,495,985  latency=6588ms
+[20:26:46]   📊 step_850_loss: 2.1395
+  Step    900/4500  loss=2.1625  ppl=9.1  lr=0.000499  tokens=2,632,397  latency=6582ms
+[20:32:16]   📊 step_900_loss: 2.1625
+  Step    950/4500  loss=2.1189  ppl=8.4  lr=0.000499  tokens=2,777,870  latency=6573ms
+[20:37:45]   📊 step_950_loss: 2.1189
+  Step   1000/4500  loss=2.0843  ppl=8.1  lr=0.000499  tokens=2,916,374  latency=6580ms
+[20:43:14]   📊 step_1000_loss: 2.0843
+  Step   1050/4500  loss=2.0690  ppl=8.1  lr=0.000498  tokens=3,056,455  latency=6577ms
+[20:48:43]   📊 step_1050_loss: 2.0690
+  Step   1100/4500  loss=2.0985  ppl=8.5  lr=0.000498  tokens=3,214,932  latency=6589ms
+[20:54:12]   📊 step_1100_loss: 2.0985
+  Step   1150/4500  loss=2.1293  ppl=8.9  lr=0.000498  tokens=3,367,629  latency=6579ms
+[20:59:41]   📊 step_1150_loss: 2.1293
+  Step   1200/4500  loss=2.0395  ppl=7.8  lr=0.000497  tokens=3,510,609  latency=6582ms
+[21:05:10]   📊 step_1200_loss: 2.0395
+  Step   1250/4500  loss=2.0398  ppl=7.8  lr=0.000497  tokens=3,649,705  latency=6578ms
+[21:10:39]   📊 step_1250_loss: 2.0398
+  Step   1300/4500  loss=2.0482  ppl=7.9  lr=0.000497  tokens=3,780,307  latency=6583ms
+[21:16:08]   📊 step_1300_loss: 2.0482
+  Step   1350/4500  loss=2.0064  ppl=7.5  lr=0.000496  tokens=3,925,136  latency=6585ms
+[21:21:38]   📊 step_1350_loss: 2.0064
+  Step   1400/4500  loss=1.9775  ppl=7.3  lr=0.000496  tokens=4,075,412  latency=6579ms
+[21:27:07]   📊 step_1400_loss: 1.9775
+  Step   1450/4500  loss=1.9429  ppl=7.0  lr=0.000496  tokens=4,225,264  latency=6574ms
+[21:32:36]   📊 step_1450_loss: 1.9429
+  Step   1500/4500  loss=1.9990  ppl=7.5  lr=0.000495  tokens=4,364,313  latency=6583ms
+[21:38:05]   📊 step_1500_loss: 1.9990
+  Step   1550/4500  loss=1.9534  ppl=7.1  lr=0.000495  tokens=4,509,614  latency=6572ms
+[21:43:34]   📊 step_1550_loss: 1.9534
+  Step   1600/4500  loss=2.0200  ppl=7.8  lr=0.000494  tokens=4,647,935  latency=6582ms
+[21:49:03]   📊 step_1600_loss: 2.0200
+  Step   1650/4500  loss=1.9610  ppl=7.3  lr=0.000494  tokens=4,798,319  latency=6581ms
+[21:54:32]   📊 step_1650_loss: 1.9610
+  Step   1700/4500  loss=1.9496  ppl=7.1  lr=0.000493  tokens=4,934,808  latency=6590ms
+[22:00:01]   📊 step_1700_loss: 1.9496
+  Step   1750/4500  loss=2.0243  ppl=8.8  lr=0.000493  tokens=5,069,193  latency=6580ms
+[22:05:30]   📊 step_1750_loss: 2.0243
+  Step   1800/4500  loss=1.8987  ppl=6.7  lr=0.000492  tokens=5,215,155  latency=6581ms
+[22:10:59]   📊 step_1800_loss: 1.8987
+  Step   1850/4500  loss=1.8817  ppl=6.7  lr=0.000492  tokens=5,367,896  latency=6571ms
+[22:16:28]   📊 step_1850_loss: 1.8817
+  Step   1900/4500  loss=1.8871  ppl=6.7  lr=0.000491  tokens=5,515,284  latency=6576ms
+[22:21:57]   📊 step_1900_loss: 1.8871
+  Step   1950/4500  loss=1.9450  ppl=7.2  lr=0.000491  tokens=5,659,268  latency=6577ms
+[22:27:26]   📊 step_1950_loss: 1.9450
+  Step   2000/4500  loss=1.9404  ppl=7.2  lr=0.000490  tokens=5,812,219  latency=7036ms
+[22:32:55]   📊 step_2000_loss: 1.9404
+  Step   2050/4500  loss=1.8632  ppl=6.5  lr=0.000489  tokens=5,950,791  latency=6582ms
+[22:38:24]   📊 step_2050_loss: 1.8632
+  Step   2100/4500  loss=1.8756  ppl=6.6  lr=0.000489  tokens=6,104,846  latency=6591ms
+[22:43:53]   📊 step_2100_loss: 1.8756
+  Step   2150/4500  loss=1.9525  ppl=9.7  lr=0.000488  tokens=6,248,195  latency=6582ms
+[22:49:22]   📊 step_2150_loss: 1.9525
+  Step   2200/4500  loss=1.8695  ppl=6.6  lr=0.000487  tokens=6,385,236  latency=6584ms
+[22:54:51]   📊 step_2200_loss: 1.8695
+  Step   2250/4500  loss=1.8644  ppl=6.5  lr=0.000487  tokens=6,530,716  latency=6580ms
+[23:00:20]   📊 step_2250_loss: 1.8644
+  Step   2300/4500  loss=1.8232  ppl=6.3  lr=0.000486  tokens=6,683,423  latency=6583ms
+[23:05:49]   📊 step_2300_loss: 1.8232
+  Step   2350/4500  loss=1.8467  ppl=6.6  lr=0.000485  tokens=6,821,410  latency=6587ms
+[23:11:18]   📊 step_2350_loss: 1.8467
+  Step   2400/4500  loss=1.8431  ppl=6.4  lr=0.000484  tokens=6,953,530  latency=6578ms
+[23:16:47]   📊 step_2400_loss: 1.8431
+  Step   2450/4500  loss=1.8386  ppl=6.5  lr=0.000483  tokens=7,113,843  latency=6579ms
+[23:22:16]   📊 step_2450_loss: 1.8386
+  Step   2500/4500  loss=1.8250  ppl=6.8  lr=0.000483  tokens=7,269,621  latency=6585ms
+[23:27:45]   📊 step_2500_loss: 1.8250
+  Step   2550/4500  loss=1.8252  ppl=6.3  lr=0.000482  tokens=7,418,198  latency=6579ms
+[23:33:14]   📊 step_2550_loss: 1.8252
+  Step   2600/4500  loss=1.8647  ppl=6.6  lr=0.000481  tokens=7,576,489  latency=6592ms
+[23:38:43]   📊 step_2600_loss: 1.8647
+  Step   2650/4500  loss=1.8004  ppl=6.1  lr=0.000480  tokens=7,725,598  latency=6577ms
+[23:44:12]   📊 step_2650_loss: 1.8004
+  Step   2700/4500  loss=1.7912  ppl=6.2  lr=0.000479  tokens=7,881,607  latency=6593ms
+[23:49:41]   📊 step_2700_loss: 1.7912
+  Step   2750/4500  loss=1.7754  ppl=5.9  lr=0.000478  tokens=8,018,964  latency=6578ms
+[23:55:10]   📊 step_2750_loss: 1.7754
+  Step   2800/4500  loss=1.8388  ppl=6.7  lr=0.000477  tokens=8,175,526  latency=6585ms
+[00:00:39]   📊 step_2800_loss: 1.8388
+  Step   2850/4500  loss=1.8147  ppl=6.3  lr=0.000477  tokens=8,307,171  latency=6575ms
+[00:06:09]   📊 step_2850_loss: 1.8147
+  Step   2900/4500  loss=1.8813  ppl=7.1  lr=0.000476  tokens=8,441,588  latency=6580ms
+[00:11:38]   📊 step_2900_loss: 1.8813
+  Step   2950/4500  loss=1.8109  ppl=6.2  lr=0.000475  tokens=8,586,517  latency=6572ms
+[00:17:07]   📊 step_2950_loss: 1.8109
+  Step   3000/4500  loss=1.7835  ppl=6.0  lr=0.000474  tokens=8,726,809  latency=6580ms
+[00:22:36]   📊 step_3000_loss: 1.7835
+  Step   3050/4500  loss=1.7412  ppl=5.8  lr=0.000473  tokens=8,889,825  latency=6572ms
+[00:28:05]   📊 step_3050_loss: 1.7412
+  Step   3100/4500  loss=1.7711  ppl=6.0  lr=0.000472  tokens=9,046,206  latency=6589ms
+[00:33:34]   📊 step_3100_loss: 1.7711
+  Step   3150/4500  loss=1.7546  ppl=5.9  lr=0.000471  tokens=9,193,471  latency=6576ms
+[00:39:03]   📊 step_3150_loss: 1.7546
+  Step   3200/4500  loss=1.7714  ppl=6.2  lr=0.000469  tokens=9,341,123  latency=6580ms
+[00:44:32]   📊 step_3200_loss: 1.7714
+  Step   3250/4500  loss=1.7403  ppl=5.8  lr=0.000468  tokens=9,485,908  latency=6572ms
+[00:50:00]   📊 step_3250_loss: 1.7403
+  Step   3300/4500  loss=1.7675  ppl=6.0  lr=0.000467  tokens=9,626,767  latency=6574ms
+[00:55:29]   📊 step_3300_loss: 1.7675
+  Step   3350/4500  loss=1.7576  ppl=5.9  lr=0.000466  tokens=9,762,383  latency=6570ms
+[01:00:58]   📊 step_3350_loss: 1.7576
+  Step   3400/4500  loss=1.7195  ppl=5.6  lr=0.000465  tokens=9,907,095  latency=6585ms
+[01:06:27]   📊 step_3400_loss: 1.7195
+  Step   3450/4500  loss=1.7096  ppl=5.6  lr=0.000464  tokens=10,040,835  latency=6570ms
+[01:11:56]   📊 step_3450_loss: 1.7096
+  Step   3500/4500  loss=1.7426  ppl=5.8  lr=0.000463  tokens=10,177,715  latency=6583ms
+[01:17:25]   📊 step_3500_loss: 1.7426
+  Step   3550/4500  loss=1.7634  ppl=6.0  lr=0.000462  tokens=10,315,374  latency=6579ms
+[01:22:54]   📊 step_3550_loss: 1.7634
+  Step   3600/4500  loss=1.7368  ppl=6.1  lr=0.000460  tokens=10,460,717  latency=6576ms
+[01:28:23]   📊 step_3600_loss: 1.7368
+  Step   3650/4500  loss=1.6910  ppl=5.5  lr=0.000459  tokens=10,611,719  latency=6576ms
+[01:33:52]   📊 step_3650_loss: 1.6910
+  Step   3700/4500  loss=1.6813  ppl=5.4  lr=0.000458  tokens=10,756,026  latency=6585ms
+[01:39:21]   📊 step_3700_loss: 1.6813
+  Step   3750/4500  loss=1.7257  ppl=5.9  lr=0.000457  tokens=10,897,945  latency=6569ms
+[01:44:50]   📊 step_3750_loss: 1.7257
+  Step   3800/4500  loss=1.7149  ppl=5.6  lr=0.000455  tokens=11,042,553  latency=6590ms
+[01:50:19]   📊 step_3800_loss: 1.7149
+  Step   3850/4500  loss=1.7099  ppl=5.6  lr=0.000454  tokens=11,177,208  latency=6576ms
+[01:55:48]   📊 step_3850_loss: 1.7099
+  Step   3900/4500  loss=1.7207  ppl=5.8  lr=0.000453  tokens=11,331,033  latency=6578ms
+[02:01:17]   📊 step_3900_loss: 1.7207
+  Step   3950/4500  loss=1.6747  ppl=5.4  lr=0.000452  tokens=11,484,870  latency=6583ms
+[02:06:46]   📊 step_3950_loss: 1.6747
+  Step   4000/4500  loss=1.6964  ppl=5.6  lr=0.000450  tokens=11,634,781  latency=6579ms
+[02:12:15]   📊 step_4000_loss: 1.6964
+  Step   4050/4500  loss=1.6776  ppl=5.4  lr=0.000449  tokens=11,786,295  latency=6576ms
+[02:17:44]   📊 step_4050_loss: 1.6776
+  Step   4100/4500  loss=1.7351  ppl=5.8  lr=0.000447  tokens=11,922,849  latency=6576ms
+[02:23:13]   📊 step_4100_loss: 1.7351
+  Step   4150/4500  loss=1.6623  ppl=5.3  lr=0.000446  tokens=12,071,935  latency=6572ms
+[02:28:41]   📊 step_4150_loss: 1.6623
+  Step   4200/4500  loss=1.7056  ppl=5.7  lr=0.000445  tokens=12,215,815  latency=6582ms
+[02:34:10]   📊 step_4200_loss: 1.7056
+  Step   4250/4500  loss=1.7042  ppl=5.7  lr=0.000443  tokens=12,369,560  latency=6577ms
+[02:39:39]   📊 step_4250_loss: 1.7042
+  Step   4300/4500  loss=1.6599  ppl=5.4  lr=0.000442  tokens=12,517,957  latency=6586ms
+[02:45:08]   📊 step_4300_loss: 1.6599
+  Step   4350/4500  loss=1.7108  ppl=5.9  lr=0.000440  tokens=12,650,006  latency=6579ms
+[02:50:37]   📊 step_4350_loss: 1.7108
+  Step   4400/4500  loss=1.6675  ppl=5.4  lr=0.000439  tokens=12,787,451  latency=6580ms
+[02:56:06]   📊 step_4400_loss: 1.6675
+  Step   4450/4500  loss=1.7012  ppl=5.5  lr=0.000438  tokens=12,928,200  latency=6578ms
+[03:01:35]   📊 step_4450_loss: 1.7012
+  Step   4500/4500  loss=1.7142  ppl=5.8  lr=0.000436  tokens=13,095,692  latency=6582ms
+[03:07:04]   📊 step_4500_loss: 1.7142
+[03:07:04]   ✓ Training complete: 4500 steps
+[03:07:04]   📊 train_loss: 1.6467
+[03:07:04]   📊 train_ppl: 5.19
+[03:07:04]   📊 avg_loss: 2.0027
+[03:07:04]   📊 total_tokens: 13,095,692
+[03:07:04]   📊 steps_per_sec: 0.15
+
+  Training complete:
+    Steps:         4500
+    Final loss:    1.6467
+    Final ppl:     5.19
+    Avg loss:      2.0027
+    Min loss:      1.3151
+    Tokens:        13,095,692
+    Time:          29613.4s
+    Speed:         0.15 steps/s
+
+=================================================================
+  Stage B: Evaluation on Held-Out Texts
+=================================================================
+[03:07:37]   📊 eval_loss: 1.6726
+[03:07:37]   📊 eval_ppl: 5.33
+  Eval loss:       1.6726
+  Eval perplexity: 5.33
+  Eval samples:    500
+
+=================================================================
+  Stage C: Generation Verification
+=================================================================
+  'The future of AI is' → +40 bytes
+  'FLUX architecture uses' → +40 bytes
+  'In the deep ocean' → +40 bytes
+[03:07:37]   ✓ Generation verification passed
+[03:07:37]   📊 training_time: 29659.7s
+[03:07:37]   ✓ Phase 8 training completed in 29659.7s
+[03:07:37]   ◼ CELL Cell 5 — Training on OpenWebText — PASS
+
+
+
+
