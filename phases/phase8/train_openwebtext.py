@@ -99,6 +99,7 @@ class OpenWebTextTrainer:
         checkpoint_interval: int = 5000,
         log: Optional[PhaseLogger] = None,
         max_seq_len: int = 512,
+        on_checkpoint: Optional[callable] = None,
     ):
         self.model = model
         self.lr = lr
@@ -106,6 +107,7 @@ class OpenWebTextTrainer:
         self.checkpoint_interval = checkpoint_interval
         self.log = log
         self.max_seq_len = max_seq_len  # max bytes per training sample
+        self.on_checkpoint = on_checkpoint  # called as on_checkpoint(step, avg_loss) after each save
 
         # Trainable: output head + bridges + decoder
         self.trainable_params = (
@@ -431,6 +433,12 @@ class OpenWebTextTrainer:
         save_checkpoint(8, state)
         if self.log:
             self.log.success(f"Checkpoint saved at step {step}")
+        # Notify caller — used for live generation previews in notebooks
+        if self.on_checkpoint is not None:
+            try:
+                self.on_checkpoint(step, avg_loss)
+            except Exception as _cb_err:
+                print(f"  ⚠ on_checkpoint callback error: {_cb_err}")
 
 
 def load_openwebtext_subset(max_docs: int = 10000) -> List[str]:
