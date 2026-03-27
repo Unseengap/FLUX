@@ -96,7 +96,7 @@ def main():
     ckpt_path = Path('checkpoints') / 'phase8_5.phase.pt'
     if ckpt_path.exists():
         print("  Loading from Phase 8.5 checkpoint...")
-        ckpt = torch.load(str(ckpt_path), map_location='cpu')
+        ckpt = torch.load(str(ckpt_path), map_location='cpu', weights_only=False)
         model = FLUXLarge(config=ckpt.get('config', None), device=device)
         if 'decoder_state_dict' in ckpt:
             model.decoder.load_state_dict(ckpt['decoder_state_dict'])

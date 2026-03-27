@@ -124,7 +124,7 @@ def load_flux(path: str) -> Dict[str, Any]:
             f"Run training first to create the model file."
         )
 
-    state = torch.load(str(path), map_location='cpu')
+    state = torch.load(str(path), map_location='cpu', weights_only=False)
 
     assert state.get('format') == 'FLUX', (
         f"Not a FLUX model file — got format: {state.get('format')}"
@@ -164,7 +164,7 @@ def verify_flux_integrity(path: str) -> bool:
     ]
 
     try:
-        state = torch.load(str(path), map_location='cpu')
+        state = torch.load(str(path), map_location='cpu', weights_only=False)
 
         if state.get('format') != 'FLUX':
             print(f"  ✗ Wrong format: {state.get('format')}")

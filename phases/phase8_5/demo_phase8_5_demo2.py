@@ -43,7 +43,7 @@ def main():
     print("\n  Loading FLUXLarge (curriculum-trained)...")
     ckpt_path = Path('checkpoints') / 'phase8_5.phase.pt'
     if ckpt_path.exists():
-        ckpt = torch.load(str(ckpt_path), map_location='cpu')
+        ckpt = torch.load(str(ckpt_path), map_location='cpu', weights_only=False)
         flux = FLUXLarge(config=ckpt.get('config', None), device=device)
         if 'decoder_state_dict' in ckpt:
             flux.decoder.load_state_dict(ckpt['decoder_state_dict'])

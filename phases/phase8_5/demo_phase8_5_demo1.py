@@ -45,7 +45,7 @@ def main():
 
     if ckpt_path.exists():
         print("\n  Loading Phase 8.5 (curriculum-trained) model...")
-        ckpt = torch.load(str(ckpt_path), map_location='cpu')
+        ckpt = torch.load(str(ckpt_path), map_location='cpu', weights_only=False)
         model = FLUXLarge(config=ckpt.get('config', None), device=device)
         if 'decoder_state_dict' in ckpt:
             model.decoder.load_state_dict(ckpt['decoder_state_dict'])
