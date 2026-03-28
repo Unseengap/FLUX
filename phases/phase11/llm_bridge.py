@@ -184,6 +184,7 @@ class LLMBridge(ModelBridge):
             'trust_remote_code': config.trust_remote_code,
             'torch_dtype': torch.float16,
             'device_map': 'auto',
+            'attn_implementation': 'eager',  # Avoid rope_scaling compatibility issues
         }
         
         # ── Quantization ──
