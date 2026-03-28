@@ -102,7 +102,7 @@ class GeminiTeacher:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model_name: str = "gemini-2.0-flash",
+        model_name: str = "gemini-2.5-flash-lite",
         rate_limit_delay: float = 1.0,
         verbose: bool = False,
     ):
@@ -133,8 +133,8 @@ class GeminiTeacher:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
             
-            # Try models in order of preference
-            models_to_try = [self.model_name, 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+            # Try models in order of preference (2.5+ are current, 2.0 is deprecated)
+            models_to_try = [self.model_name, 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.0-flash']
             
             for model in models_to_try:
                 try:
@@ -183,7 +183,16 @@ class GeminiTeacher:
         
         try:
             response = self._model.generate_content(prompt)
-            return response.text
+            # Handle both regular and thinking models (2.5+/3.0)
+            try:
+                return response.text
+            except ValueError:
+                # Thinking models return content in parts
+                text = ""
+                for part in response.parts:
+                    if hasattr(part, 'text'):
+                        text += part.text
+                return text
         except Exception as e:
             self._error_count += 1
             if self.verbose:

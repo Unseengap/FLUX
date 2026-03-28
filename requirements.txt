@@ -14,3 +14,6 @@ huggingface_hub>=0.19.0
 
 # Flask app
 flask>=3.0.0
+
+# Gemini API (Phase 8.5 teacher)
+google-generativeai>=0.8.0
