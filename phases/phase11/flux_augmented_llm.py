@@ -723,13 +723,20 @@ class FLUXAugmentedLLM(nn.Module):
         """Clear conversation history (not memory)."""
         self.conversation_history.clear()
     
-    def save_flx(self, path: str):
+    def save_flx(self, path: str, include_full_flux: bool = True):
         """
         Save to .flx format.
+        
+        Args:
+            path: Output path
+            include_full_flux: If True, saves full FLUXLarge model (~2GB)
+                              If False, saves only lightweight components (~12MB)
         
         Note: LLM weights are NOT saved (too large).
         The LLM is referenced by name and reloaded.
         """
+        print(f"\n  Building .flx archive...")
+        
         flx = {
             'format': 'FLUX',
             'version': '3.0-augmented',
@@ -739,21 +746,8 @@ class FLUXAugmentedLLM(nn.Module):
                 'wave_dim': self.config.wave_dim,
                 'memory_entries': len(self.memory),
                 'conversations': len(self.conversation_history),
-            },
-            
-            'cse': {
-                'config': {'wave_dim': self.config.wave_dim},
-                'state_dict': self.encoder.state_dict(),
-            },
-            
-            'memory': {
-                'episodic': self.memory.get_state(),
-            },
-            
-            'bridges': {
-                'llm_to_wave': self.llm_bridge.to_wave_proj.state_dict(),
-                'wave_to_llm': self.llm_bridge.from_wave_proj.state_dict()
-                    if self.llm_bridge.from_wave_proj else None,
+                'has_full_flux': include_full_flux and hasattr(self, 'flux_large') and self.flux_large is not None,
+                'has_adapters': hasattr(self, 'grid_encoder'),
             },
             
             'llm_reference': {
@@ -764,10 +758,103 @@ class FLUXAugmentedLLM(nn.Module):
             'conversation_history': self.conversation_history,
         }
         
+        # ── Save CSE (Phase 1) ──
+        flx['cse'] = {
+            'config': {'wave_dim': self.config.wave_dim},
+            'state_dict': self.encoder.state_dict(),
+        }
+        print(f"    ✓ CSE")
+        
+        # ── Save Full FLUXLarge (Phases 2-7) ──
+        if include_full_flux and hasattr(self, 'flux_large') and self.flux_large is not None:
+            print(f"    Saving full FLUXLarge (this is the big part)...")
+            
+            # Field (Phase 2)
+            flx['field'] = {
+                'config': {
+                    'h': self.flux_large.config.get('field_h', 96),
+                    'w': self.flux_large.config.get('field_w', 96),
+                    'd': self.flux_large.config.get('field_d', 96),
+                    'features': self.flux_large.config.get('field_features', 512),
+                },
+                'state_dict': self.flux_large.field.state_dict(),
+            }
+            print(f"    ✓ Field (Phase 2)")
+            
+            # Gravitational Relevance (Phase 3)
+            if hasattr(self.flux_large, 'gr'):
+                flx['field']['gravity_state'] = self.flux_large.gr.get_state()
+                print(f"    ✓ GravitationalRelevance (Phase 3)")
+            
+            # Thermodynamic Learner (Phase 4)
+            if hasattr(self.flux_large, 'tl'):
+                flx['field']['thermodynamic_state'] = self.flux_large.tl.get_state()
+                print(f"    ✓ ThermodynamicLearner (Phase 4)")
+            
+            # Memory Systems (Phase 6)
+            flx['memory'] = {}
+            if hasattr(self.flux_large, 'working_memory'):
+                flx['memory']['working'] = self.flux_large.working_memory.get_state_dict_memory()
+            if hasattr(self.flux_large, 'episodic_memory'):
+                flx['memory']['episodic'] = self.flux_large.episodic_memory.get_state()
+                print(f"    ✓ EpisodicMemory ({self.flux_large.episodic_memory.size} entries)")
+            if hasattr(self.flux_large, 'semantic_memory'):
+                flx['memory']['semantic'] = self.flux_large.semantic_memory.get_state()
+            
+            # Decoder (Phase 8)
+            if hasattr(self.flux_large, 'decoder'):
+                flx['decoder'] = {
+                    'config': getattr(self.flux_large.decoder, 'config', {}),
+                    'state_dict': self.flux_large.decoder.state_dict(),
+                }
+                print(f"    ✓ WaveDecoder (Phase 8)")
+            
+            # Causal Graph (Phase 5)
+            if hasattr(self.flux_large, 'causal_graph'):
+                flx['causal'] = {
+                    'graph': self.flux_large.causal_graph.get_state(),
+                }
+                print(f"    ✓ CausalGraph (Phase 5)")
+        else:
+            # Lightweight memory only
+            flx['memory'] = {
+                'episodic': self.memory.get_state(),
+            }
+            print(f"    ✓ Memory (lightweight, {len(self.memory)} entries)")
+        
+        # ── Save Bridges ──
+        flx['bridges'] = {
+            'llm_to_wave': self.llm_bridge.to_wave_proj.state_dict(),
+            'wave_to_llm': self.llm_bridge.from_wave_proj.state_dict()
+                if self.llm_bridge.from_wave_proj else None,
+        }
+        print(f"    ✓ LLM Bridges")
+        
+        # ── Save Adapters (Phase 8.9) ──
+        if hasattr(self, 'grid_encoder') or hasattr(self, 'image_decoder'):
+            flx['adapters'] = {}
+            
+            if hasattr(self, 'grid_encoder'):
+                flx['adapters']['grid_encoder'] = self.grid_encoder.state_dict()
+                print(f"    ✓ GridToWave")
+            if hasattr(self, 'grid_decoder'):
+                flx['adapters']['grid_decoder'] = self.grid_decoder.state_dict()
+                print(f"    ✓ WaveToGrid")
+            if hasattr(self, 'image_decoder'):
+                flx['adapters']['image_decoder'] = self.image_decoder.state_dict()
+                print(f"    ✓ WaveToImage")
+        
+        # ── Save to disk ──
+        print(f"\n  Writing to {path}...")
         torch.save(flx, path)
         
         size_mb = Path(path).stat().st_size / (1024 * 1024)
-        print(f"  ✓ Saved to {path} ({size_mb:.1f} MB)")
+        size_gb = size_mb / 1024
+        
+        if size_gb > 1:
+            print(f"  ✓ Saved: {path} ({size_gb:.2f} GB)")
+        else:
+            print(f"  ✓ Saved: {path} ({size_mb:.1f} MB)")
     
     @classmethod
     def from_flx(cls, path: str, device: str = None) -> 'FLUXAugmentedLLM':
