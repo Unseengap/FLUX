@@ -548,14 +548,14 @@ class WaveToText(nn.Module):
             torch.zeros_like(h_init).unsqueeze(0).repeat(self.n_layers, 1, 1),
         )
         
-        prev_byte = torch.tensor([[self.START]], device=device)
+        prev_byte = torch.tensor([self.START], device=device)  # [1]
         output_bytes = []
         
         with torch.no_grad():
             for _ in range(self.max_bytes):
-                byte_emb = self.byte_embed(prev_byte)
-                output, hidden = self.lstm(byte_emb, hidden)
-                logits = self.to_logits(output.squeeze(1))
+                byte_emb = self.byte_embed(prev_byte).unsqueeze(0)  # [1] -> [1, hidden] -> [1, 1, hidden]
+                output, hidden = self.lstm(byte_emb, hidden)  # [1, 1, hidden]
+                logits = self.to_logits(output.squeeze(0).squeeze(0))  # [hidden] -> [256]
                 
                 if temperature != 1.0:
                     logits = logits / temperature
@@ -563,9 +563,9 @@ class WaveToText(nn.Module):
                 # Sample or argmax
                 if temperature > 0:
                     probs = F.softmax(logits, dim=-1)
-                    next_byte = torch.multinomial(probs, 1)
+                    next_byte = torch.multinomial(probs.unsqueeze(0), 1).squeeze(0)  # [1]
                 else:
-                    next_byte = logits.argmax(dim=-1, keepdim=True)
+                    next_byte = logits.argmax(dim=-1, keepdim=True)  # [1]
                 
                 byte_val = next_byte.item()
                 
@@ -574,7 +574,7 @@ class WaveToText(nn.Module):
                     break
                 
                 output_bytes.append(byte_val)
-                prev_byte = next_byte.unsqueeze(0)
+                prev_byte = next_byte  # Keep as [1]
         
         return bytes(output_bytes)
     

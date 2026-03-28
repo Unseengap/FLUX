@@ -612,10 +612,15 @@ class FLUXHybrid(nn.Module):
         """Precise byte-level generation via Phase 8 WaveDecoder."""
         self.decoder.eval()
         
+        # Encode prompt to wave sequence for cross-attention
+        wave_result = self.cse.encode(prompt)
+        wave_seq = wave_result.full.to(self._device_str)  # [seq_len, wave_dim]
+        
         with torch.no_grad():
             text = self.decoder.generate(
-                context=context,
-                max_bytes=max_length,
+                wave_sequence=wave_seq,
+                field_features=context,
+                max_length=max_length,
                 temperature=temperature,
             )
         
