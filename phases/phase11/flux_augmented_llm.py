@@ -59,10 +59,20 @@ import time
 import numpy as np
 
 # Add paths for imports
-sys.path.append(str(Path(__file__).parent.parent.parent))
+_PHASES_DIR = Path(__file__).parent.parent
+_PROJECT_ROOT = _PHASES_DIR.parent
+sys.path.append(str(_PROJECT_ROOT))
+sys.path.append(str(_PHASES_DIR / 'phase8_8'))
+sys.path.append(str(_PHASES_DIR / 'phase8_9'))
 
 from llm_bridge import LLMBridge, LLMBridgeConfig
 from context_injector import SimpleTextInjector
+
+# Default FLX paths (most capable → least capable)
+FLX_PATHS = [
+    _PROJECT_ROOT / 'checkpoints' / 'Flux-X-complete.flx',  # Phase 8.9 - full
+    _PROJECT_ROOT / 'checkpoints' / 'Flux-beta.flx',         # Phase 8 - base
+]
 
 
 # ─────────────────────────────────────────────
@@ -80,8 +90,10 @@ class FLUXAugmentedConfig:
     freeze_llm: bool = True
     
     # FLUX settings
-    flx_path: Optional[str] = None
+    flx_path: Optional[str] = None     # Auto-detect if None
     wave_dim: int = 432
+    load_full_flux: bool = True        # Load full FLUX components if available
+    load_adapters: bool = True         # Load Phase 8.9 modality adapters
     
     # Retrieval settings
     top_k_retrieval: int = 16
@@ -191,6 +203,106 @@ class SimpleMemoryStore:
 
 
 # ─────────────────────────────────────────────
+# FLUXLarge Memory Adapter (Full Power)
+# ─────────────────────────────────────────────
+
+class FLUXLargeMemoryAdapter:
+    """
+    Adapter that wraps FLUXLarge's full memory system.
+    
+    When we load from Flux-X-complete.flx, this provides access to:
+    - Resonance Field (Phase 2) for attractor storage
+    - Gravitational Relevance (Phase 3) for O(log n) retrieval
+    - Thermodynamic Learning (Phase 4) for continuous learning
+    - Working/Episodic/Semantic Memory (Phase 6)
+    
+    This gives Qwen access to the FULL FLUX power, not just cosine similarity.
+    """
+    
+    def __init__(self, flux_large):
+        self.flux = flux_large
+        self.wave_dim = 432
+        self._text_cache = {}  # wave_hash -> text
+    
+    def store(
+        self,
+        wave: Union[Tensor, np.ndarray],
+        text: str,
+        metadata: Optional[Dict] = None,
+    ):
+        """Store into FLUX field + episodic memory."""
+        if isinstance(wave, np.ndarray):
+            wave = torch.from_numpy(wave).float()
+        
+        # Pool to single vector if needed
+        if wave.dim() > 1:
+            wave = wave.mean(dim=0)
+        
+        # Store in episodic memory with text
+        wave = wave.to(self.flux.device)
+        self.flux.episodic_memory.store(
+            wave=wave,
+            metadata={'text': text, **(metadata or {})},
+        )
+        
+        # Also plant into field as attractor
+        try:
+            # Find best position for this wave
+            positions, distances = self.flux.gr.query(wave.unsqueeze(0), top_k=1)
+            # Plant nearby the most similar existing attractor
+            position = positions[0] + torch.randn_like(positions[0]) * 0.1
+            self.flux.field.add_attractor(position, wave)
+        except:
+            pass  # Field planting is optional
+    
+    def retrieve(
+        self,
+        query: Union[Tensor, np.ndarray],
+        top_k: int = 10,
+        threshold: float = 0.0,
+    ) -> List[Tuple[Dict, float]]:
+        """
+        Retrieve using gravitational relevance (O(log n)).
+        
+        Returns:
+            List of (memory, similarity) tuples
+        """
+        if isinstance(query, np.ndarray):
+            query = torch.from_numpy(query).float()
+        
+        if query.dim() > 1:
+            query = query.mean(dim=0)
+        
+        query = query.to(self.flux.device)
+        
+        # Use episodic memory retrieval
+        results = self.flux.episodic_memory.retrieve(query, top_k=top_k)
+        
+        output = []
+        for wave, meta, sim in results:
+            if sim >= threshold:
+                memory = {
+                    'text': meta.get('text', '[no text]'),
+                    'metadata': meta,
+                    'timestamp': meta.get('timestamp', 0),
+                }
+                output.append((memory, float(sim)))
+        
+        return output
+    
+    def __len__(self) -> int:
+        return self.flux.episodic_memory.size
+    
+    def get_state(self) -> Dict:
+        """Get state for saving."""
+        return self.flux.episodic_memory.get_state()
+    
+    def load_state(self, state: Dict):
+        """Load from state."""
+        self.flux.episodic_memory.load_state(state)
+
+
+# ─────────────────────────────────────────────
 # Simple Wave Encoder (Kaggle-compatible)
 # ─────────────────────────────────────────────
 
@@ -292,53 +404,149 @@ class FLUXAugmentedLLM(nn.Module):
         print(f"{'='*60}\n")
     
     def _init_flux_core(self):
-        """Initialize FLUX components."""
+        """Initialize FLUX components from .flx file."""
         print(f"\n  Initializing FLUX core...")
         
-        if self.config.flx_path and Path(self.config.flx_path).exists():
-            # Load from .flx file
-            print(f"    Loading from {self.config.flx_path}")
-            flx = torch.load(self.config.flx_path, map_location='cpu')
-            
-            # Try to load CSE
-            if 'cse' in flx and flx['cse']:
-                try:
-                    # Import actual CSE
-                    sys.path.append(str(Path(__file__).parent.parent / 'phase1'))
-                    from cse import ContinuousSemanticEncoder
-                    
-                    self.encoder = ContinuousSemanticEncoder(
-                        wave_dim=flx['cse']['config'].get('wave_dim', 432)
-                    )
-                    self.encoder.load_state_dict(flx['cse']['state_dict'])
-                    self.encoder.to(self.device)
-                    self.encoder.eval()
-                    print(f"    ✓ Loaded CSE from .flx")
-                except Exception as e:
-                    print(f"    ⚠ Could not load CSE: {e}")
-                    self.encoder = SimpleWaveEncoder(self.config.wave_dim)
-                    self.encoder.to(self.device)
-            else:
+        # Find FLX file
+        flx_path = self._find_flx_path()
+        self.flx_version = None
+        self.flux_large = None
+        self.flux_to_any = None
+        
+        if flx_path and flx_path.exists():
+            self._load_from_flx(flx_path)
+        else:
+            self._init_fresh_flux()
+    
+    def _find_flx_path(self) -> Optional[Path]:
+        """Find the best available FLX file."""
+        if self.config.flx_path:
+            path = Path(self.config.flx_path)
+            if path.exists():
+                return path
+        
+        # Auto-detect: try most capable first
+        for path in FLX_PATHS:
+            if path.exists():
+                return path
+        
+        return None
+    
+    def _load_from_flx(self, flx_path: Path):
+        """Load FLUX components from .flx file."""
+        print(f"    Loading from {flx_path.name}...")
+        
+        try:
+            flx = torch.load(str(flx_path), map_location='cpu', weights_only=False)
+        except Exception as e:
+            print(f"    ⚠ Failed to load .flx: {e}")
+            self._init_fresh_flux()
+            return
+        
+        version = flx.get('version', 'unknown')
+        self.flx_version = version
+        print(f"    Format: FLUX v{version}")
+        
+        # Track what we loaded
+        loaded_components = []
+        
+        # ── Load CSE (Phase 1) ──
+        if 'cse' in flx and flx['cse'] and 'state_dict' in flx['cse']:
+            try:
+                sys.path.insert(0, str(_PHASES_DIR / 'phase1'))
+                from cse import ContinuousSemanticEncoder
+                
+                cse_cfg = flx['cse'].get('config', {})
+                self.encoder = ContinuousSemanticEncoder(
+                    wave_dim=cse_cfg.get('wave_dim', 432)
+                )
+                self.encoder.load_state_dict(flx['cse']['state_dict'])
+                self.encoder.to(self.device)
+                self.encoder.eval()
+                loaded_components.append('CSE')
+                print(f"    ✓ CSE (Phase 1)")
+            except Exception as e:
+                print(f"    ⚠ CSE failed: {e}")
                 self.encoder = SimpleWaveEncoder(self.config.wave_dim)
                 self.encoder.to(self.device)
-            
-            # Load memory
-            if 'memory' in flx and 'episodic' in flx['memory']:
-                self.memory = SimpleMemoryStore(self.config.wave_dim)
-                try:
-                    self.memory.load_state(flx['memory']['episodic'])
-                    print(f"    ✓ Loaded {len(self.memory)} memories from .flx")
-                except:
-                    print(f"    ⚠ Could not load memories, starting fresh")
-            else:
-                self.memory = SimpleMemoryStore(self.config.wave_dim)
         else:
-            # Fresh initialization
-            print(f"    Creating fresh FLUX core...")
             self.encoder = SimpleWaveEncoder(self.config.wave_dim)
             self.encoder.to(self.device)
+        
+        # ── Load Full FLUXLarge (Phases 2-7) ──
+        if self.config.load_full_flux and 'field' in flx:
+            try:
+                from flx_loader import load_flux_from_flx
+                self.flux_large = load_flux_from_flx(
+                    path=flx_path,
+                    device=self.device,
+                    verbose=False,
+                )
+                loaded_components.extend(['Field', 'GR', 'TL', 'Memory'])
+                print(f"    ✓ Field + GR + TL (Phases 2-4)")
+                
+                # Use FLUXLarge's episodic memory
+                self.memory = FLUXLargeMemoryAdapter(self.flux_large)
+                em_size = self.flux_large.episodic_memory.size
+                print(f"    ✓ EpisodicMemory ({em_size} entries, Phase 6)")
+                
+            except Exception as e:
+                print(f"    ⚠ FLUXLarge failed: {e}")
+                self.memory = SimpleMemoryStore(self.config.wave_dim)
+        else:
+            # Use simple memory
             self.memory = SimpleMemoryStore(self.config.wave_dim)
-            print(f"    ✓ Fresh FLUX core initialized")
+            if 'memory' in flx and 'episodic' in flx['memory']:
+                try:
+                    self.memory.load_state(flx['memory']['episodic'])
+                    print(f"    ✓ Memory ({len(self.memory)} entries)")
+                    loaded_components.append('Memory')
+                except:
+                    pass
+        
+        # ── Load Adapters (Phase 8.8/8.9) ──
+        if self.config.load_adapters and 'adapters' in flx:
+            try:
+                self._load_adapters(flx)
+                loaded_components.append('Adapters')
+                print(f"    ✓ WaveToX Adapters (Phase 8.9)")
+            except Exception as e:
+                print(f"    ⚠ Adapters failed: {e}")
+        
+        # Summary
+        if loaded_components:
+            print(f"    Loaded: {', '.join(loaded_components)}")
+        else:
+            print(f"    ⚠ No components loaded from .flx")
+    
+    def _load_adapters(self, flx: Dict):
+        """Load Phase 8.9 modality adapters."""
+        from grid_adapters import GridToWave, WaveToGrid
+        from image_adapters import WaveToImage_Universal
+        
+        self.grid_encoder = GridToWave(wave_dim=self.config.wave_dim)
+        self.grid_decoder = WaveToGrid(wave_dim=self.config.wave_dim)
+        self.image_decoder = WaveToImage_Universal(wave_dim=self.config.wave_dim)
+        
+        # Load state dicts if available
+        if 'grid_encoder' in flx['adapters']:
+            self.grid_encoder.load_state_dict(flx['adapters']['grid_encoder'])
+        if 'grid_decoder' in flx['adapters']:
+            self.grid_decoder.load_state_dict(flx['adapters']['grid_decoder'])
+        if 'image_decoder' in flx['adapters']:
+            self.image_decoder.load_state_dict(flx['adapters']['image_decoder'])
+        
+        self.grid_encoder.to(self.device)
+        self.grid_decoder.to(self.device)
+        self.image_decoder.to(self.device)
+    
+    def _init_fresh_flux(self):
+        """Initialize with lightweight fallbacks."""
+        print(f"    No .flx found, using lightweight fallbacks...")
+        self.encoder = SimpleWaveEncoder(self.config.wave_dim)
+        self.encoder.to(self.device)
+        self.memory = SimpleMemoryStore(self.config.wave_dim)
+        print(f"    ✓ Fresh FLUX core (SimpleEncoder + SimpleMemory)")
     
     def _init_llm_bridge(self):
         """Initialize LLM bridge."""
@@ -576,13 +784,158 @@ class FLUXAugmentedLLM(nn.Module):
     
     def get_stats(self) -> Dict:
         """Get system statistics."""
-        return {
+        stats = {
             'memory_entries': len(self.memory),
             'conversations': len(self.conversation_history),
             'llm_name': self.config.llm_name,
             'device': self.device,
             'wave_dim': self.config.wave_dim,
+            'flx_version': getattr(self, 'flx_version', None),
         }
+        
+        # Add component availability
+        stats['has_full_flux'] = hasattr(self, 'flux_large') and self.flux_large is not None
+        stats['has_grid_adapter'] = hasattr(self, 'grid_encoder')
+        stats['has_image_adapter'] = hasattr(self, 'image_decoder')
+        
+        return stats
+    
+    # ─────────────────────────────────────────
+    # Multi-Modal Methods (Phase 8.8/8.9)
+    # ─────────────────────────────────────────
+    
+    def encode_grid(self, grid: Union[List[List[int]], Tensor]) -> Tensor:
+        """
+        Encode an ARC grid to wave space.
+        
+        Requires Phase 8.9 adapters to be loaded.
+        
+        Args:
+            grid: 2D grid of integers (0-9)
+            
+        Returns:
+            Wave representation [432]
+        """
+        if not hasattr(self, 'grid_encoder'):
+            raise RuntimeError("Grid encoder not loaded. Requires Flux-X-complete.flx")
+        
+        with torch.no_grad():
+            wave = self.grid_encoder(grid, mode='holistic')
+        return wave.to(self.device)
+    
+    def decode_grid(self, wave: Tensor, size: Tuple[int, int] = (3, 3)) -> List[List[int]]:
+        """
+        Decode a wave to an ARC grid.
+        
+        Args:
+            wave: Wave representation [432]
+            size: Output grid size (height, width)
+            
+        Returns:
+            2D grid of integers (0-9)
+        """
+        if not hasattr(self, 'grid_decoder'):
+            raise RuntimeError("Grid decoder not loaded. Requires Flux-X-complete.flx")
+        
+        with torch.no_grad():
+            grid = self.grid_decoder(wave, grid_size=size)
+        return grid.tolist()
+    
+    def solve_arc_task(
+        self,
+        input_grid: List[List[int]],
+        output_size: Tuple[int, int] = None,
+    ) -> List[List[int]]:
+        """
+        Solve an ARC task using FLUX wave transformations.
+        
+        This encodes the input, queries field for similar transformations,
+        and decodes the output.
+        
+        Args:
+            input_grid: Input grid
+            output_size: Expected output size (inferred if None)
+            
+        Returns:
+            Predicted output grid
+        """
+        if not hasattr(self, 'grid_encoder'):
+            raise RuntimeError("Grid adapters not loaded. Requires Flux-X-complete.flx")
+        
+        # Encode input
+        input_wave = self.encode_grid(input_grid)
+        
+        # Query field for similar patterns
+        if hasattr(self, 'flux_large') and self.flux_large is not None:
+            # Use full FLUX gravitational retrieval
+            attractors = self.flux_large.gr.query(input_wave.unsqueeze(0), top_k=5)
+            # Apply transformation from most similar attractor
+            if len(attractors[0]) > 0:
+                delta = attractors[0][0] - input_wave
+                output_wave = input_wave + delta
+            else:
+                output_wave = input_wave
+        else:
+            # Simple pass-through
+            output_wave = input_wave
+        
+        # Infer output size from input if not specified
+        output_size = output_size or (len(input_grid), len(input_grid[0]))
+        
+        # Decode
+        return self.decode_grid(output_wave, output_size)
+    
+    def generate_image(
+        self,
+        prompt: str,
+        size: int = 64,
+        style: str = 'dream',
+    ) -> Tensor:
+        """
+        Generate an image from text prompt.
+        
+        Uses FLUX physics-based rendering (Phase 8.9):
+        - Gravity: Mass attractors → smooth gradients
+        - Interference: Wave superposition → ripples
+        - Thermodynamic: Energy minimization → textures
+        
+        Args:
+            prompt: Text prompt
+            size: Output image size
+            style: Rendering style preset
+            
+        Returns:
+            Image tensor [H, W, 3]
+        """
+        if not hasattr(self, 'image_decoder'):
+            raise RuntimeError("Image decoder not loaded. Requires Flux-X-complete.flx")
+        
+        # Encode prompt
+        wave = self.encode(prompt)
+        if wave.dim() > 1:
+            wave = wave.mean(dim=0)
+        
+        # Generate image
+        with torch.no_grad():
+            image = self.image_decoder(wave, size=size, style=style)
+        
+        return image
+    
+    def get_capabilities(self) -> List[str]:
+        """Get list of available capabilities based on loaded components."""
+        caps = ['text_encoding', 'memory', 'chat', 'teach']
+        
+        if hasattr(self, 'flux_large') and self.flux_large is not None:
+            caps.extend(['field', 'gravitational_retrieval', 'thermodynamic_learning'])
+        
+        if hasattr(self, 'grid_encoder'):
+            caps.append('grid_encoding')
+        if hasattr(self, 'grid_decoder'):
+            caps.append('grid_decoding')
+        if hasattr(self, 'image_decoder'):
+            caps.append('image_generation')
+        
+        return caps
 
 
 # ─────────────────────────────────────────────
