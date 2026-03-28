@@ -222,7 +222,7 @@ class SimpleWaveEncoder(nn.Module):
         """Encode text to wave."""
         # Convert to bytes
         bytes_list = list(text.encode('utf-8'))
-        bytes_tensor = torch.tensor(bytes_list, dtype=torch.long)
+        bytes_tensor = torch.tensor(bytes_list, dtype=torch.long, device=self.byte_embed.weight.device)
         
         # Embed
         embeds = self.byte_embed(bytes_tensor)  # [seq, hidden]
