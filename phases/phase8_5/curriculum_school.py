@@ -280,6 +280,8 @@ class CurriculumSchool:
             
             # FLUX generates
             prompt = text[:min(30, len(text)//2)]
+            expected_continuation = text[len(prompt):]  # Ground truth
+            
             flux_output = self.model.generate(
                 prompt, 
                 max_length=grade_config.max_seq_len,
@@ -287,8 +289,12 @@ class CurriculumSchool:
             )
             continuation = flux_output[len(prompt):]
             
-            # Teacher scores
-            feedback = self.teacher.score_generation(prompt, continuation)
+            # Teacher scores (pass ground truth for fallback learning)
+            feedback = self.teacher.score_generation(
+                prompt, 
+                continuation,
+                ground_truth=expected_continuation,
+            )
             scores.append(feedback.score)
             
             # Apply correction through surprise system
@@ -298,22 +304,37 @@ class CurriculumSchool:
                 feedback=feedback,
             )
             
-            # Progress logging
-            if self.verbose and (attempt + 1) % 50 == 0:
-                recent = scores[-50:] if len(scores) >= 50 else scores
+            # Detailed logging every 10 attempts
+            if self.verbose and (attempt + 1) % 10 == 0:
+                recent = scores[-10:] if len(scores) >= 10 else scores
                 avg = sum(recent) / len(recent)
-                print(f"      [{attempt+1:3d}/{subject.max_attempts}] "
-                      f"avg_score={avg:.2f} surprise={result.surprise:.3f}")
+                episodic_now = self.model.episodic_memory.size
+                
+                print(f"\n      ─── Attempt {attempt+1}/{subject.max_attempts} ───")
+                print(f"      Prompt:     \"{prompt[:40]}...\"")
+                print(f"      FLUX said:  \"{continuation[:40]}...\"")
+                print(f"      Should be:  \"{expected_continuation[:40]}...\"")
+                print(f"      Score: {feedback.score:.1f}/10  │  Surprise: {result.surprise:.3f}")
+                print(f"      Decoder loss: {result.decoder_loss:.4f}  │  Episodic: {episodic_now}")
+                print(f"      Avg(last 10): {avg:.2f}")
             
             # Early exit if consistently passing
             if len(scores) >= 20:
                 recent_avg = sum(scores[-20:]) / 20
                 if recent_avg >= subject.pass_threshold:
                     if self.verbose:
-                        print(f"      ✓ Early pass at attempt {attempt+1}")
+                        print(f"\n      ✓ Early pass at attempt {attempt+1} (avg={recent_avg:.2f})")
                     break
         
-        return sum(scores) / max(len(scores), 1)
+        # Subject training summary
+        final_avg = sum(scores) / max(len(scores), 1)
+        if self.verbose:
+            print(f"\n      ─── {subject.name.upper()} Training Complete ───")
+            print(f"      Attempts: {len(scores)}")
+            print(f"      Final avg score: {final_avg:.2f}/{subject.pass_threshold:.1f} needed")
+            print(f"      Episodic entries: {self.model.episodic_memory.size}")
+        
+        return final_avg
     
     def _test_subject(
         self,
@@ -327,23 +348,28 @@ class CurriculumSchool:
             (passed, average_score)
         """
         scores = []
+        sample_outputs = []  # Store samples for logging
         
         if subject.name == 'spelling':
             # Test word spelling
             words = get_spelling_test_words(subject.test_count)
-            for word in words:
+            for i, word in enumerate(words):
                 flux_output = self.model.generate(word[:2], max_length=len(word) + 5)
                 passed, score, _ = self.teacher.grade_spelling(word, flux_output)
                 scores.append(score)
+                if i < 3:  # Store first 3 samples
+                    sample_outputs.append((f"'{word[:2]}...'", flux_output, word, score))
         
         elif subject.name == 'grammar':
             # Test grammar with sentence prompts
             prompts = get_sentence_test_prompts()[:subject.test_count]
-            for prompt in prompts:
+            for i, prompt in enumerate(prompts):
                 flux_output = self.model.generate(prompt, max_length=60)
                 continuation = flux_output[len(prompt):]
                 passed, score, _ = self.teacher.grade_grammar(prompt + continuation)
                 scores.append(score)
+                if i < 3:
+                    sample_outputs.append((prompt[:20], continuation[:30], "-", score))
         
         elif subject.name == 'coherence':
             # Test coherence with open prompts
@@ -360,11 +386,13 @@ class CurriculumSchool:
                 "According to experts,",
             ][:subject.test_count]
             
-            for prompt in test_prompts:
+            for i, prompt in enumerate(test_prompts):
                 flux_output = self.model.generate(prompt, max_length=80)
                 continuation = flux_output[len(prompt):]
                 passed, score, _ = self.teacher.grade_coherence(prompt + continuation)
                 scores.append(score)
+                if i < 3:
+                    sample_outputs.append((prompt[:20], continuation[:30], "-", score))
         
         elif subject.name == 'knowledge':
             # Test fact recall from episodic memory
@@ -377,13 +405,15 @@ class CurriculumSchool:
                 ("The speed of light is", "300000"),
             ][:min(subject.test_count, 5)]
             
-            for question, expected in test_facts:
+            for i, (question, expected) in enumerate(test_facts):
                 flux_output = self.model.generate(question, max_length=40)
                 continuation = flux_output[len(question):]
                 passed, score, _ = self.teacher.grade_knowledge(
                     question, expected, continuation
                 )
                 scores.append(score)
+                if i < 3:
+                    sample_outputs.append((question[:20], continuation[:20], expected, score))
             
             # Also test episodic recall
             episodic_count = min(self.model.episodic_memory.size, subject.test_count - 5)
@@ -393,6 +423,17 @@ class CurriculumSchool:
         
         avg_score = sum(scores) / max(len(scores), 1)
         passed = avg_score >= subject.pass_threshold
+        
+        # Verbose test output
+        if self.verbose and sample_outputs:
+            print(f"\n      ─── {subject.name.upper()} Test Samples ───")
+            for prompt, output, expected, score in sample_outputs[:3]:
+                print(f"      Prompt: \"{prompt}...\"")
+                print(f"      Output: \"{output}...\"")
+                if expected != "-":
+                    print(f"      Expected: \"{expected}\"")
+                print(f"      Score: {score:.1f}/10")
+                print()
         
         return passed, avg_score
     

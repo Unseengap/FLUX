@@ -67,6 +67,7 @@ class TeacherFeedback:
     feedback: str                  # Brief explanation
     subject_scores: Dict[str, float] = field(default_factory=dict)
     raw_response: str = ""         # Full API response for debugging
+    has_correction: bool = True    # False if using heuristic (no real correction)
 
 
 @dataclass
@@ -194,6 +195,7 @@ class GeminiTeacher:
         prompt: str,
         flux_output: str,
         context: str = "",
+        ground_truth: str = "",
     ) -> TeacherFeedback:
         """
         Score FLUX's text generation and provide correction.
@@ -204,13 +206,14 @@ class GeminiTeacher:
             prompt: The input prompt given to FLUX
             flux_output: What FLUX generated
             context: Optional additional context
+            ground_truth: Known correct continuation (used when API unavailable)
         
         Returns:
             TeacherFeedback with score, correction, and per-subject scores
         """
         if not self.is_available:
             # Fallback: heuristic scoring when API unavailable
-            return self._heuristic_score(prompt, flux_output)
+            return self._heuristic_score(prompt, flux_output, ground_truth)
         
         api_prompt = f"""You are grading an AI model's text generation.
 
@@ -268,10 +271,11 @@ Respond in JSON:
         
         return self._heuristic_score(prompt, flux_output)
     
-    def _heuristic_score(self, prompt: str, flux_output: str) -> TeacherFeedback:
+    def _heuristic_score(self, prompt: str, flux_output: str, ground_truth: str = "") -> TeacherFeedback:
         """
         Fallback scoring when API unavailable.
         Uses simple heuristics to estimate quality.
+        If ground_truth is provided, uses it as the correction target.
         """
         text = flux_output.strip()
         
@@ -289,16 +293,21 @@ Respond in JSON:
         
         overall = (spelling_score + grammar_score + coherence_score + relevance_score) / 4
         
+        # Use ground truth if available, otherwise no real correction
+        has_real_correction = bool(ground_truth)
+        correction = ground_truth if ground_truth else text
+        
         return TeacherFeedback(
             score=overall,
-            corrected_text=text,  # No correction without API
-            feedback="(Heuristic scoring - API unavailable)",
+            corrected_text=correction,
+            feedback="(Heuristic scoring - ground truth provided)" if has_real_correction else "(Heuristic - no correction)",
             subject_scores={
                 'spelling': spelling_score,
                 'grammar': grammar_score,
                 'coherence': coherence_score,
                 'relevance': relevance_score,
             },
+            has_correction=has_real_correction,
         )
     
     def grade_spelling(self, word: str, flux_spelling: str) -> Tuple[bool, float, str]:

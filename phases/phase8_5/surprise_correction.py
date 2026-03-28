@@ -206,17 +206,15 @@ class SurpriseCorrector:
         self._surprise_history.append(surprise)
         self._total_corrections += 1
         
-        if self.verbose:
-            print(f"    Surprise: {surprise:.3f} (FLUX conf={flux_confidence:.2f}, "
-                  f"teacher={feedback.score:.1f})")
+        # Verbose logging reduced - curriculum_school handles detailed logs now
         
         # Step 2: Get field state before learning
         energy_before = self.model.field.total_energy()
         temp_before = self.model.tl.temp_manager.temperature
         
-        # Step 3: Decoder learning (if surprise is high enough)
+        # Step 3: Decoder learning (if surprise is high enough AND we have real correction)
         decoder_loss = 0.0
-        if learn_decoder and surprise > self.surprise_threshold:
+        if learn_decoder and surprise > self.surprise_threshold and feedback.has_correction:
             decoder_loss = self._train_decoder_on_correction(
                 prompt, 
                 feedback.corrected_text,
@@ -401,9 +399,7 @@ class SurpriseCorrector:
                 iterations=adaptive_iters,
             )
             
-            if self.verbose:
-                print(f"      Field settled: energy {result.initial_energy:.2f} → "
-                      f"{result.final_energy:.2f}, iters={result.iterations_used}")
+            # Logging moved to curriculum_school for cleaner output
     
     def _store_in_episodic(
         self,
