@@ -37,7 +37,7 @@ from model_bridge import ModelBridge, BridgeConfig, register_bridge
 @dataclass
 class LLMBridgeConfig(BridgeConfig):
     """Extended config for LLM bridges."""
-    model_name: str = "microsoft/phi-3-mini-4k-instruct"
+    model_name: str = "Qwen/Qwen2.5-3B-Instruct"
     load_in_4bit: bool = True           # Quantize for Kaggle
     load_in_8bit: bool = False          # Alternative quantization
     use_flash_attention: bool = False   # Flash attention if available
@@ -119,7 +119,7 @@ class LLMBridge(ModelBridge):
         if config is None:
             config = LLMBridgeConfig(
                 name="llm",
-                model_name=model_name or "microsoft/phi-3-mini-4k-instruct",
+                model_name=model_name or "Qwen/Qwen2.5-3B-Instruct",
             )
         
         self.llm = None
@@ -142,6 +142,8 @@ class LLMBridge(ModelBridge):
         # Select context template
         if 'phi' in config.model_name.lower():
             self.context_template = CONTEXT_TEMPLATES['phi3']
+        elif 'qwen' in config.model_name.lower():
+            self.context_template = CONTEXT_TEMPLATES['chat']
         else:
             self.context_template = CONTEXT_TEMPLATES['default']
     

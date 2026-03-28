@@ -35,7 +35,7 @@ def demo_chat_with_memory():
         print("(This will download the LLM if not cached)")
         
         config = FLUXAugmentedConfig(
-            llm_name="microsoft/phi-3-mini-4k-instruct",
+            llm_name="Qwen/Qwen2.5-3B-Instruct",
             load_in_4bit=True,
             top_k_retrieval=5,
         )

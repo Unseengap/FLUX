@@ -74,7 +74,7 @@ class FLUXAugmentedConfig:
     """Configuration for FLUX-Augmented LLM."""
     
     # LLM settings
-    llm_name: str = "microsoft/phi-3-mini-4k-instruct"
+    llm_name: str = "Qwen/Qwen2.5-3B-Instruct"
     load_in_4bit: bool = True
     load_in_8bit: bool = False
     freeze_llm: bool = True
