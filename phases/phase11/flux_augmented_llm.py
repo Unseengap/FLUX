@@ -240,11 +240,13 @@ class FLUXLargeMemoryAdapter:
         if wave.dim() > 1:
             wave = wave.mean(dim=0)
         
-        # Store in episodic memory with text
+        # Store in episodic memory with text using write() method
         wave = wave.to(self._device)
-        self.flux.episodic_memory.store(
-            wave=wave,
-            metadata={'text': text, **(metadata or {})},
+        self.flux.episodic_memory.write(
+            vector=wave,
+            fact=text,
+            confidence=metadata.get('confidence', 0.9) if metadata else 0.9,
+            causal_source=metadata.get('source', 'teach') if metadata else 'teach',
         )
         
         # Also plant into field as attractor
@@ -277,27 +279,30 @@ class FLUXLargeMemoryAdapter:
         
         query = query.to(self._device)
         
-        # Use episodic memory retrieval
-        results = self.flux.episodic_memory.retrieve(query, top_k=top_k)
+        # Use episodic memory search
+        results = self.flux.episodic_memory.search(query, k=top_k)
         
         output = []
-        for wave, meta, sim in results:
+        for entry, sim in results:
             if sim >= threshold:
                 memory = {
-                    'text': meta.get('text', '[no text]'),
-                    'metadata': meta,
-                    'timestamp': meta.get('timestamp', 0),
+                    'text': entry.fact,
+                    'metadata': {
+                        'confidence': entry.confidence,
+                        'causal_source': entry.causal_source,
+                    },
+                    'timestamp': entry.timestamp,
                 }
                 output.append((memory, float(sim)))
         
         return output
     
     def __len__(self) -> int:
-        return self.flux.episodic_memory.size
+        return len(self.flux.episodic_memory._metadata)
     
     def get_state(self) -> Dict:
         """Get state for saving."""
-        return self.flux.episodic_memory.get_state()
+        return self.flux.episodic_memory.save_state()
     
     def load_state(self, state: Dict):
         """Load from state."""
@@ -785,23 +790,23 @@ class FLUXAugmentedLLM(nn.Module):
             
             # Gravitational Relevance (Phase 3)
             if hasattr(self.flux_large, 'gr'):
-                flx['field']['gravity_state'] = self.flux_large.gr.get_state()
+                flx['field']['gravity_state'] = self.flux_large.gr.save_state()
                 print(f"    ✓ GravitationalRelevance (Phase 3)")
             
             # Thermodynamic Learner (Phase 4)
             if hasattr(self.flux_large, 'tl'):
-                flx['field']['thermodynamic_state'] = self.flux_large.tl.get_state()
+                flx['field']['thermodynamic_state'] = self.flux_large.tl.save_state()
                 print(f"    ✓ ThermodynamicLearner (Phase 4)")
             
             # Memory Systems (Phase 6)
             flx['memory'] = {}
             if hasattr(self.flux_large, 'working_memory'):
-                flx['memory']['working'] = self.flux_large.working_memory.get_state_dict_memory()
+                flx['memory']['working'] = self.flux_large.working_memory.state_dict_memory()
             if hasattr(self.flux_large, 'episodic_memory'):
-                flx['memory']['episodic'] = self.flux_large.episodic_memory.get_state()
+                flx['memory']['episodic'] = self.flux_large.episodic_memory.save_state()
                 print(f"    ✓ EpisodicMemory ({self.flux_large.episodic_memory.size} entries)")
             if hasattr(self.flux_large, 'semantic_memory'):
-                flx['memory']['semantic'] = self.flux_large.semantic_memory.get_state()
+                flx['memory']['semantic'] = self.flux_large.semantic_memory.save_state()
             
             # Decoder (Phase 8)
             if hasattr(self.flux_large, 'decoder'):
@@ -814,7 +819,7 @@ class FLUXAugmentedLLM(nn.Module):
             # Causal Graph (Phase 5)
             if hasattr(self.flux_large, 'causal_graph'):
                 flx['causal'] = {
-                    'graph': self.flux_large.causal_graph.get_state(),
+                    'graph': self.flux_large.causal_graph.save_state(),
                 }
                 print(f"    ✓ CausalGraph (Phase 5)")
         else:
