@@ -122,22 +122,31 @@ class LLMBridge(ModelBridge):
                 model_name=model_name or "Qwen/Qwen2.5-3B-Instruct",
             )
         
+        # Get hidden_dim BEFORE calling super().__init__
+        # We need this to configure the bridge projections
+        if load_model:
+            # Get hidden size from model config without loading full model
+            from transformers import AutoConfig
+            model_cfg = AutoConfig.from_pretrained(
+                config.model_name,
+                trust_remote_code=config.trust_remote_code,
+            )
+            config.source_dim = model_cfg.hidden_size
+        else:
+            config.source_dim = LLMBridge._estimate_hidden_dim(config.model_name)
+        
+        # Initialize parent class FIRST (required by nn.Module)
+        super().__init__(config)
+        
+        # NOW we can assign attributes
         self.llm = None
         self.tokenizer = None
         self.device = device
         self._model_loaded = False
         
-        # We need to know hidden_dim before calling super().__init__
-        # Try to get it from model config without loading full model
+        # Load the actual model
         if load_model:
             self._load_model(config)
-            config.source_dim = self.llm.config.hidden_size
-        else:
-            # Estimate based on model name
-            config.source_dim = self._estimate_hidden_dim(config.model_name)
-        
-        # Initialize bridge projections
-        super().__init__(config)
         
         # Select context template
         if 'phi' in config.model_name.lower():
@@ -147,7 +156,8 @@ class LLMBridge(ModelBridge):
         else:
             self.context_template = CONTEXT_TEMPLATES['default']
     
-    def _estimate_hidden_dim(self, model_name: str) -> int:
+    @staticmethod
+    def _estimate_hidden_dim(model_name: str) -> int:
         """Estimate hidden dim from model name."""
         model_name = model_name.lower()
         if 'phi-3-mini' in model_name:
@@ -162,8 +172,12 @@ class LLMBridge(ModelBridge):
             return 8192
         elif 'mistral-7b' in model_name:
             return 4096
+        elif 'qwen2.5-3b' in model_name:
+            return 2048
+        elif 'qwen2.5-7b' in model_name:
+            return 3584
         elif 'qwen' in model_name:
-            return 4096
+            return 2048  # Default Qwen
         else:
             return 4096  # Default
     
