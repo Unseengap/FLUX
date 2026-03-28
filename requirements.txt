@@ -1,7 +1,7 @@
 torch>=2.0.0
 numpy>=1.24.0
 scipy>=1.10.0
-faiss-gpu>=1.7.4
+faiss-cpu>=1.7.4
 datasets>=2.14.0
 evaluate>=0.4.0
 matplotlib>=3.7.0
