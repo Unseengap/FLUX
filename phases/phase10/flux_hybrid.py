@@ -122,9 +122,18 @@ class FLUXHybrid(nn.Module):
         field_d = config.get('field_d', 96)
         field_features = config.get('field_features', 512)
         
+        # Wave dimensions dict for CSE
+        wave_dims = config.get('wave_dims', {
+            'phonetic': 64,
+            'syntactic': 64,
+            'semantic': 256,
+            'temporal': 32,
+            'intensity': 16,
+        })
+        
         # ── Core components (from .flx) ──
         self.cse = ContinuousSemanticEncoder(
-            wave_dim=wave_dim,
+            wave_dims=wave_dims,
             byte_window=config.get('byte_window', 8),
             byte_stride=config.get('byte_stride', 1),
             interference_radius=config.get('interference_radius', 6),
@@ -137,8 +146,9 @@ class FLUXHybrid(nn.Module):
         )
         
         self.gr = GravitationalRelevance(
-            field=self.field,
-            k=config.get('gr_k', 32),
+            feature_dim=field_features,
+            k_neighbors=config.get('gr_k', 32),
+            device=device,
         )
         
         self.tl = ThermodynamicLearner(
@@ -148,11 +158,15 @@ class FLUXHybrid(nn.Module):
         
         # Memory systems
         self.working_memory = WorkingMemory(
-            feature_dim=field_features,
             window_size=config.get('wm_window', 2048),
+            wave_dim=wave_dim,
+            feature_dim=field_features,
         )
-        self.episodic_memory = EpisodicMemory(dim=field_features)
-        self.semantic_memory = SemanticMemory(dim=field_features)
+        self.episodic_memory = EpisodicMemory(feature_dim=field_features)
+        self.semantic_memory = SemanticMemory(
+            field=self.field,
+            protection_threshold=config.get('sm_protection', 5.0),
+        )
         
         # ── Bridges ──
         self.wave_to_field = nn.Linear(wave_dim, field_features)
@@ -164,8 +178,8 @@ class FLUXHybrid(nn.Module):
             wave_dim=wave_dim,
             field_features=field_features,
             hidden_dim=config.get('decoder_hidden', 1024),
-            n_layers=config.get('decoder_layers', 4),
-            n_heads=config.get('decoder_heads', 8),
+            num_layers=config.get('decoder_layers', 4),
+            num_heads=config.get('decoder_heads', 8),
         )
         
         # ── Wave-mode: Phase 10 modules (optional) ──
