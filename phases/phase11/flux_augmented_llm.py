@@ -223,6 +223,8 @@ class FLUXLargeMemoryAdapter:
         self.flux = flux_large
         self.wave_dim = 432
         self._text_cache = {}  # wave_hash -> text
+        # Get device from model parameters
+        self._device = next(flux_large.parameters()).device
     
     def store(
         self,
@@ -239,7 +241,7 @@ class FLUXLargeMemoryAdapter:
             wave = wave.mean(dim=0)
         
         # Store in episodic memory with text
-        wave = wave.to(self.flux.device)
+        wave = wave.to(self._device)
         self.flux.episodic_memory.store(
             wave=wave,
             metadata={'text': text, **(metadata or {})},
@@ -273,7 +275,7 @@ class FLUXLargeMemoryAdapter:
         if query.dim() > 1:
             query = query.mean(dim=0)
         
-        query = query.to(self.flux.device)
+        query = query.to(self._device)
         
         # Use episodic memory retrieval
         results = self.flux.episodic_memory.retrieve(query, top_k=top_k)
