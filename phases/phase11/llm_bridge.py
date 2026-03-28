@@ -167,7 +167,7 @@ class LLMBridge(ModelBridge):
     
     def _load_model(self, config: LLMBridgeConfig):
         """Load the LLM and tokenizer."""
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
         
         print(f"  Loading LLM: {config.model_name}...")
         
@@ -179,12 +179,29 @@ class LLMBridge(ModelBridge):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
+        # ── Load and patch config for rope_scaling compatibility ──
+        model_config = AutoConfig.from_pretrained(
+            config.model_name,
+            trust_remote_code=config.trust_remote_code,
+        )
+        
+        # Fix rope_scaling compatibility issue with Phi-3
+        if hasattr(model_config, 'rope_scaling') and model_config.rope_scaling is not None:
+            if isinstance(model_config.rope_scaling, dict):
+                if 'type' not in model_config.rope_scaling:
+                    # Add missing 'type' key - Phi-3 uses 'longrope' by default
+                    if 'rope_type' in model_config.rope_scaling:
+                        model_config.rope_scaling['type'] = model_config.rope_scaling['rope_type']
+                    else:
+                        model_config.rope_scaling['type'] = 'longrope'
+                    print(f"    Patched rope_scaling config for compatibility")
+        
         # ── Prepare loading kwargs ──
         load_kwargs = {
+            'config': model_config,
             'trust_remote_code': config.trust_remote_code,
             'torch_dtype': torch.float16,
             'device_map': 'auto',
-            'attn_implementation': 'eager',  # Avoid rope_scaling compatibility issues
         }
         
         # ── Quantization ──
