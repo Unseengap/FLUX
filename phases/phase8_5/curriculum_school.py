@@ -79,17 +79,17 @@ KNOWLEDGE = SubjectConfig('knowledge', pass_threshold=4.0, max_attempts=150, tes
 
 GRADE_CONFIGS = {
     0: GradeConfig(
-        grade=0, name='Kindergarten (Bytes)',
+        grade=0, name='Kindergarten (Simple Words)',
         subjects=[replace(SPELLING, pass_threshold=7.0, test_count=30)],
-        material_stage=1, max_seq_len=16, lr=1e-3,
+        material_stage=3, max_seq_len=16, lr=1e-3,  # Use words, not random bytes
     ),
     1: GradeConfig(
-        grade=1, name='Grade 1 (Bigrams)',
+        grade=1, name='Grade 1 (Common Words)',
         subjects=[
             replace(SPELLING, pass_threshold=6.5, test_count=25),
             replace(GRAMMAR, pass_threshold=4.0, test_count=10),
         ],
-        material_stage=2, max_seq_len=32, lr=8e-4,
+        material_stage=3, max_seq_len=32, lr=8e-4,  # Still words, longer sequences
     ),
     2: GradeConfig(
         grade=2, name='Grade 2 (Words)',

@@ -451,7 +451,7 @@ class SurpriseCorrector:
                 
                 # Write to episodic memory — THE ONE-SHOT MOMENT
                 entry_id = self.model.episodic_memory.write(
-                    embedding=compressed,
+                    vector=compressed,
                     fact=f"Q: {prompt[:50]}... A: {correct_text[:50]}...",
                     causal_source=causal,
                     confidence=score / 10.0,  # Use teacher score as confidence
