@@ -250,6 +250,9 @@ class SpatialMemory(nn.Module):
                     self.exploration_mass[gr, gc] += SPATIAL_MEMORY_CONFIG['visit_mass_gain']
                     self.last_observation[gr, gc] = cell_features
                     self.last_visit_time[gr, gc] = self.current_step
+                    
+                    # Clear change_detected once we've visited (acknowledged the change)
+                    self.change_detected[gr, gc] = False
         
         # Record in history
         obs = SpatialObservation(
@@ -473,22 +476,27 @@ class SpatialMemory(nn.Module):
         
         Actions: 0=up, 1=down, 2=left, 3=right
         """
-        if not target.path or len(target.path) < 2:
-            # Random exploration
+        # Direct movement to target (ignore stale path)
+        # This is more robust than following potentially outdated paths
+        target_pos = target.position
+        dr = target_pos[0] - current_pos[0]
+        dc = target_pos[1] - current_pos[1]
+        
+        # If already at target, random exploration
+        if dr == 0 and dc == 0:
             return torch.randint(0, 4, (1,)).item()
         
-        next_pos = target.path[1]  # First step after current
-        dr = next_pos[0] - current_pos[0]
-        dc = next_pos[1] - current_pos[1]
-        
-        if dr < 0:
-            return 0  # Up
-        elif dr > 0:
-            return 1  # Down
-        elif dc < 0:
-            return 2  # Left
+        # Prefer larger delta first (move in primary direction)
+        if abs(dr) >= abs(dc):
+            if dr < 0:
+                return 0  # Up
+            else:
+                return 1  # Down
         else:
-            return 3  # Right
+            if dc < 0:
+                return 2  # Left
+            else:
+                return 3  # Right
     
     # ─────────────────────────────────────────────
     # Visualization
