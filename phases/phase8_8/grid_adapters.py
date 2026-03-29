@@ -98,9 +98,21 @@ class GridToWave(XToWave):
         """
         # Convert to tensor if needed
         if isinstance(grid, list):
+            # Handle nested list structures
+            if len(grid) == 0:
+                grid = [[0]]
+            if not isinstance(grid[0], list):
+                grid = [grid]  # Wrap single row
             grid = torch.tensor(grid, dtype=torch.long, device=self.device)
         else:
             grid = grid.to(self.device)
+        
+        # Ensure 2D
+        if grid.dim() == 1:
+            grid = grid.unsqueeze(0)
+        elif grid.dim() > 2:
+            # Flatten extra dimensions
+            grid = grid.view(-1, grid.shape[-1])
         
         H, W = grid.shape
         

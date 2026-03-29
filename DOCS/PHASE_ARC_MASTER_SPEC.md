@@ -4821,3 +4821,7 @@ components:
 ````
 
 Built with [Mintlify](https://mintlify.com).
+
+
+
+BASED ON THE DOCS DOES IT FOLLOW THE BENCHMARK AND SUBMISSIONS OR THATS SHOULD BE DIFFERENT? BELIV THE TOOLKIT IS ALREAY IN THE ROOT HERE: arc-agi-training
