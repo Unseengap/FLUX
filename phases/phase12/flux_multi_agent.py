@@ -56,8 +56,8 @@ class MultiAgentConfig:
     flx_path: str = "checkpoints/Flux-Base.flx"
     output_path: str = "checkpoints/Flux-multi-model.flx"
     
-    # LLM settings
-    llm_name: str = "Qwen/Qwen2.5-Omni-7B"
+    # LLM settings (Qwen2-VL is more stable for vision than Omni)
+    llm_name: str = "Qwen/Qwen2-VL-7B-Instruct"
     load_in_4bit: bool = True
     enable_vision: bool = True
     enable_audio: bool = False
@@ -83,14 +83,14 @@ class FLUXMultiAgent(nn.Module):
     """
     The complete FLUX agent that combines:
     - Spatial Memory (visual mapping)
-    - LLM Reasoning (Qwen-Omni — unified vision+audio+text)
+    - LLM Reasoning (Qwen2-VL — vision+text, omni fallback)
     - Causal Tracking (action → effect learning)
     - Game Memory (per-game episodic storage)
     
     This is the final assembly of all FLUX components.
     
-    Uses Qwen2.5-Omni instead of separate models:
-    - ONE model for vision + audio + text
+    Uses Qwen2-VL by default (Qwen2.5-Omni as fallback):
+    - ONE model for vision + text
     - Can directly "see" grid images (no ASCII conversion needed)
     - Saves ~4GB VRAM vs loading separate CLIP/Whisper
     """

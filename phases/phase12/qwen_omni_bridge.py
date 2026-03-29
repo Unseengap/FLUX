@@ -33,8 +33,8 @@ except ImportError:
 class QwenOmniConfig:
     """Configuration for Qwen-Omni bridge."""
     
-    # Model selection
-    model_name: str = "Qwen/Qwen2.5-Omni-7B"
+    # Model selection (Qwen2-VL is more stable than Omni for now)
+    model_name: str = "Qwen/Qwen2-VL-7B-Instruct"
     fallback_model: str = "Qwen/Qwen2.5-3B-Instruct"  # Text-only fallback
     
     # Quantization
@@ -139,11 +139,8 @@ class QwenOmniBridge:
             self._setup_mock()
     
     def _try_load_omni(self):
-        """Try to load Qwen-Omni with vision support."""
+        """Try to load Qwen-Omni or Qwen2-VL with vision support."""
         try:
-            from transformers import AutoModelForVision2Seq, AutoProcessor
-            import bitsandbytes
-            
             print(f"  Loading {self.config.model_name}...")
             
             # Quantization config
@@ -157,14 +154,45 @@ class QwenOmniBridge:
                     bnb_4bit_quant_type="nf4",
                 )
             
-            # Load processor
+            # Try Qwen2-VL specific class first (most reliable)
+            try:
+                from transformers import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
+                
+                # Use Qwen2-VL-7B as fallback (more stable than Omni)
+                model_name = "Qwen/Qwen2-VL-7B-Instruct"
+                print(f"  Using Qwen2-VL-7B-Instruct (vision model)...")
+                
+                self.processor = Qwen2VLProcessor.from_pretrained(
+                    model_name,
+                    trust_remote_code=True,
+                )
+                
+                self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+                    model_name,
+                    quantization_config=quantization_config,
+                    device_map="auto" if self._device == "cuda" else None,
+                    trust_remote_code=True,
+                    torch_dtype=torch.float16,
+                )
+                
+                self._model_loaded = True
+                self._vision_available = True
+                print(f"  ✓ Qwen2-VL-7B loaded with vision")
+                return
+                
+            except ImportError:
+                print(f"  ⚠ Qwen2VL classes not available, trying AutoModel...")
+            
+            # Fallback to AutoModel with trust_remote_code
+            from transformers import AutoProcessor, AutoModel
+            
             self.processor = AutoProcessor.from_pretrained(
                 self.config.model_name,
                 trust_remote_code=True,
             )
             
-            # Load model
-            self.model = AutoModelForVision2Seq.from_pretrained(
+            # Use AutoModel (not AutoModelForCausalLM) for vision models
+            self.model = AutoModel.from_pretrained(
                 self.config.model_name,
                 quantization_config=quantization_config,
                 device_map="auto" if self._device == "cuda" else None,
@@ -377,17 +405,80 @@ class QwenOmniBridge:
         max_tokens: int,
         temperature: float,
     ) -> str:
-        """Generate with processor (for vision models)."""
-        # Process inputs
+        """Generate with processor (for vision models like Qwen2-VL)."""
+        try:
+            # Try using qwen_vl_utils if available
+            from qwen_vl_utils import process_vision_info
+            has_qwen_utils = True
+        except ImportError:
+            has_qwen_utils = False
+        
+        # Format messages for Qwen2-VL
         if image is not None:
-            inputs = self.processor(
-                images=image,
-                text=self._format_messages(messages),
-                return_tensors="pt",
-            ).to(self._device)
+            # Qwen2-VL expects messages in specific format
+            formatted_messages = []
+            for msg in messages:
+                if msg['role'] == 'system':
+                    formatted_messages.append({
+                        "role": "system",
+                        "content": msg['content'] if isinstance(msg['content'], str) else msg['content']
+                    })
+                elif msg['role'] == 'user':
+                    content = msg['content']
+                    if isinstance(content, list):
+                        # Already has image/text structure
+                        formatted_content = []
+                        for item in content:
+                            if item.get('type') == 'image':
+                                formatted_content.append({"type": "image", "image": image})
+                            elif item.get('type') == 'text':
+                                formatted_content.append({"type": "text", "text": item['text']})
+                        formatted_messages.append({"role": "user", "content": formatted_content})
+                    else:
+                        # Text only - add image
+                        formatted_messages.append({
+                            "role": "user",
+                            "content": [
+                                {"type": "image", "image": image},
+                                {"type": "text", "text": content}
+                            ]
+                        })
+            
+            # Apply chat template
+            text = self.processor.apply_chat_template(
+                formatted_messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            
+            # Process inputs with image
+            if has_qwen_utils:
+                image_inputs, video_inputs = process_vision_info(formatted_messages)
+                inputs = self.processor(
+                    text=[text],
+                    images=image_inputs,
+                    videos=video_inputs,
+                    padding=True,
+                    return_tensors="pt",
+                ).to(self._device)
+            else:
+                # Simple fallback without qwen_vl_utils
+                inputs = self.processor(
+                    text=[text],
+                    images=[image],
+                    padding=True,
+                    return_tensors="pt",
+                ).to(self._device)
         else:
+            # Text only
+            text = self.processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
             inputs = self.processor(
-                text=self._format_messages(messages),
+                text=[text],
+                padding=True,
                 return_tensors="pt",
             ).to(self._device)
         
@@ -401,13 +492,13 @@ class QwenOmniBridge:
                 do_sample=self.config.do_sample,
             )
         
-        # Decode
-        response = self.processor.decode(outputs[0], skip_special_tokens=True)
-        
-        # Extract just the generated part
-        prompt_text = self._format_messages(messages)
-        if prompt_text in response:
-            response = response[len(prompt_text):]
+        # Decode only the generated part
+        generated_ids = outputs[:, inputs['input_ids'].shape[1]:]
+        response = self.processor.batch_decode(
+            generated_ids, 
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False
+        )[0]
         
         return response.strip()
     
