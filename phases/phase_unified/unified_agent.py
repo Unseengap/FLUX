@@ -185,6 +185,7 @@ class FLUXUnifiedAgent:
         self.history: List[StepHistory] = []
         self.last_grid: Optional[List[List[int]]] = None
         self.current_position: Tuple[int, int] = (0, 0)
+        self._detected_agent_pos: Optional[Tuple[int, int]] = None  # Movement-tracked position
         
         # VLM state
         self.vlm_available = model is not None and processor is not None
@@ -221,6 +222,7 @@ class FLUXUnifiedAgent:
         self.step_count = 0
         self.history = []
         self.last_grid = None
+        self._detected_agent_pos = None  # Reset movement tracking
         
         # Reset components
         self.frame_differ.reset()
@@ -290,6 +292,17 @@ class FLUXUnifiedAgent:
         
         # B. REFLECT: Compare to previous frame
         diff = self.frame_differ.diff(grid, position, last_action)
+        
+        # DEBUG: Log if we detected changes
+        if self.verbose and diff.num_changes > 0:
+            self.log(f"Detected {diff.num_changes} changes: {[(c.row, c.col, c.old_value, c.new_value) for c in diff.changes[:5]]}")
+        
+        # B2. DETECT AGENT MOVEMENT: Track where agent actually moved
+        if last_action is not None and last_action in [1, 2, 3, 4] and self.last_grid is not None:
+            self._detect_agent_by_movement(self.last_grid, grid, last_action)
+            # Re-find position using updated movement tracking
+            position = self._find_position(grid)
+            self.current_position = position
         
         # C. RECORD EFFECT OF LAST ACTION
         if last_action is not None and self.history:
@@ -605,41 +618,123 @@ class FLUXUnifiedAgent:
         ]
     
     def _find_position(self, grid: List[List[int]]) -> Tuple[int, int]:
-        """Find agent position in grid."""
+        """
+        Find agent position in grid.
+        
+        Uses multiple strategies:
+        1. Movement-based detection (if we have previous grid)
+        2. Look for common agent colors
+        3. Find rarest non-zero color
+        4. Default to grid center
+        """
         if not grid or not grid[0]:
             return (0, 0)
         
         grid_h, grid_w = len(grid), len(grid[0])
         
-        # Strategy 1: Look for common agent colors
+        # Strategy 1: Track via movement (if we moved and grid changed)
+        if hasattr(self, '_detected_agent_pos') and self._detected_agent_pos is not None:
+            return self._detected_agent_pos
+        
+        # Strategy 2: Look for common agent colors (often color 1, 2, or 3)
         agent_colors = [1, 2, 3, 8, 9]
         for color in agent_colors:
+            positions = []
             for r, row in enumerate(grid):
                 for c, val in enumerate(row):
                     if isinstance(val, int) and val == color:
-                        return (r, c)
+                        positions.append((r, c))
+            # If there's exactly one cell of this color, it's likely the agent
+            if len(positions) == 1:
+                return positions[0]
         
-        # Strategy 2: Find rarest non-zero color
+        # Strategy 3: Find rarest non-zero color (likely the agent marker)
         color_counts: Dict[int, int] = {}
+        color_positions: Dict[int, List[Tuple[int, int]]] = {}
         for r, row in enumerate(grid):
             for c, val in enumerate(row):
-                if isinstance(val, int):
+                if isinstance(val, int) and val > 0:
                     color_counts[val] = color_counts.get(val, 0) + 1
+                    if val not in color_positions:
+                        color_positions[val] = []
+                    color_positions[val].append((r, c))
         
         if color_counts:
+            # Find rarest color with only a few cells (likely agent)
             rarest = min(
-                (c for c in color_counts if c > 0),
+                (c for c in color_counts if color_counts[c] <= 5),
                 key=lambda x: color_counts[x],
                 default=None,
             )
-            if rarest is not None and color_counts.get(rarest, 0) <= 5:
-                for r, row in enumerate(grid):
-                    for c, val in enumerate(row):
-                        if isinstance(val, int) and val == rarest:
-                            return (r, c)
+            if rarest is not None and color_positions.get(rarest):
+                # Return the first position of the rarest color
+                return color_positions[rarest][0]
         
         # Default: center
         return (grid_h // 2, grid_w // 2)
+    
+    def _detect_agent_by_movement(
+        self,
+        old_grid: List[List[int]],
+        new_grid: List[List[int]],
+        action: int,
+    ):
+        """
+        Detect agent position by observing what changed after a movement action.
+        
+        When UP/DOWN/LEFT/RIGHT is pressed, the agent moves. Look for:
+        - A cell that disappeared (old position)
+        - A cell that appeared nearby (new position)
+        """
+        if action not in [1, 2, 3, 4]:  # Only movement actions
+            return
+        
+        if old_grid is None or new_grid is None:
+            return
+        
+        if not old_grid or not new_grid:
+            return
+        
+        # Find cells that changed
+        appeared = []  # Cells that are now non-zero but were zero
+        disappeared = []  # Cells that are now zero but were non-zero
+        
+        old_h, old_w = len(old_grid), len(old_grid[0]) if old_grid else 0
+        new_h, new_w = len(new_grid), len(new_grid[0]) if new_grid else 0
+        
+        for r in range(min(old_h, new_h)):
+            old_row = old_grid[r] if r < old_h else []
+            new_row = new_grid[r] if r < new_h else []
+            
+            for c in range(min(len(old_row), len(new_row))):
+                old_val = old_row[c] if isinstance(old_row[c], int) else 0
+                new_val = new_row[c] if isinstance(new_row[c], int) else 0
+                
+                if old_val == 0 and new_val > 0:
+                    appeared.append((r, c, new_val))
+                elif old_val > 0 and new_val == 0:
+                    disappeared.append((r, c, old_val))
+        
+        # If we have both appeared and disappeared cells, track the movement
+        if appeared and disappeared:
+            # Find cells that match the movement direction
+            dr, dc = {1: (-1, 0), 2: (1, 0), 3: (0, -1), 4: (0, 1)}.get(action, (0, 0))
+            
+            for old_r, old_c, old_color in disappeared:
+                expected_new = (old_r + dr, old_c + dc)
+                for new_r, new_c, new_color in appeared:
+                    # Check if the new cell is where we expected based on movement
+                    if (new_r, new_c) == expected_new or (new_r == old_r + dr and new_c == old_c + dc):
+                        self._detected_agent_pos = (new_r, new_c)
+                        if self.verbose:
+                            self.log(f"Detected agent moved: ({old_r},{old_c}) -> ({new_r},{new_c})")
+                        return
+            
+            # Fallback: just use the first appeared cell
+            if appeared:
+                self._detected_agent_pos = (appeared[0][0], appeared[0][1])
+                if self.verbose:
+                    self.log(f"Agent moved to: {self._detected_agent_pos}")
     
     # ─────────────────────────────────────────────
     # Statistics
@@ -679,6 +774,7 @@ class FLUXUnifiedAgent:
         self.history = []
         self.last_grid = None
         self.current_position = (0, 0)
+        self._detected_agent_pos = None  # Reset movement tracking
 
 
 # ─────────────────────────────────────────────
