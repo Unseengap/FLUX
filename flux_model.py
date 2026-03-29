@@ -8,7 +8,7 @@ Usage in notebooks:
     from flux_model import FLUXModel
     
     # Load existing model
-    model = FLUXModel.load('checkpoints/Flux-X-complete.flx')
+    model = FLUXModel.load('checkpoints/Flux-Base.flx')
     
     # Upgrade a component
     model.upgrade_component('grid_to_wave', trained_encoder)
@@ -21,7 +21,7 @@ Usage in notebooks:
     model.config.learning.realtime_learning = True
     
     # Save
-    model.save('checkpoints/Flux-UNIFIED.flx')
+    model.save('checkpoints/Flux-MULTI.flx')
 """
 
 import torch

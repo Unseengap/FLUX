@@ -1,0 +1,324 @@
+[12:40:52] ============================================================
+[12:40:52] FLUX Phase 12 Log
+[12:40:52] Started: 2026-03-29 12:40:52
+[12:40:52] ============================================================
+
+[12:40:52] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:52]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:52]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:56]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:56]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56]   ℹ Reset for game: ls20
+[12:40:56]   ℹ Game ended: WON, score=50.0
+[12:40:56] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:56]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:56]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56]   ℹ Reset for game: test_game
+[12:40:56] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:56]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:56]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56]   ℹ Reset for game: test_game
+[12:40:56] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:56]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:56]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56]   ℹ Reset for game: test_game
+[12:40:56] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:56]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:56]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56]   ℹ Reset for game: test_save
+[12:40:56] 
+──────────────────── Saving Flux-multi-model.flx ────────────────────
+[12:40:56]   ✓ Saved: /var/folders/1f/qw575t2s04g9799k7ks6xh0h0000gp/T/tmp7czopm81.flx (0.1 MB)
+[12:40:56]   ℹ Loading FLUXMultiAgent from /var/folders/1f/qw575t2s04g9799k7ks6xh0h0000gp/T/tmp7czopm81.flx...
+[12:40:56] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:40:56]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:40:56]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:40:56]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:40:56]   ✓ SpatialMemory (Ice/Water) ready
+[12:40:56]   ✓ VisualReasoner ready
+[12:40:56]   ✓ CausalTracker ready
+[12:40:56]   ✓ RuleInducer ready
+[12:40:56] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:40:56]   ℹ Active components: 5/5
+[12:40:56]   ✓ FLUXMultiAgent loaded
+[12:41:35] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:35]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:35]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:37]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:37]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37]   ℹ Reset for game: ls20
+[12:41:37]   ℹ Game ended: WON, score=50.0
+[12:41:37] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:37]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:37]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37]   ℹ Reset for game: test_game
+[12:41:37] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:37]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:37]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37]   ℹ Reset for game: test_game
+[12:41:37] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:37]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:37]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37]   ℹ Reset for game: test_game
+[12:41:37] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:37]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:37]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37]   ℹ Reset for game: test_save
+[12:41:37] 
+──────────────────── Saving Flux-multi-model.flx ────────────────────
+[12:41:37]   ✓ Saved: /var/folders/1f/qw575t2s04g9799k7ks6xh0h0000gp/T/tmpzs9dnsjs.flx (0.1 MB)
+[12:41:37]   ℹ Loading FLUXMultiAgent from /var/folders/1f/qw575t2s04g9799k7ks6xh0h0000gp/T/tmpzs9dnsjs.flx...
+[12:41:37] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:37]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:37]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:37]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:37]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:37]   ✓ VisualReasoner ready
+[12:41:37]   ✓ CausalTracker ready
+[12:41:37]   ✓ RuleInducer ready
+[12:41:37] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:37]   ℹ Active components: 5/5
+[12:41:37]   ✓ FLUXMultiAgent loaded
+[12:41:51] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:51]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:51]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:54]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:54]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54]   ℹ Reset for game: ls20
+[12:41:54]   ℹ Game ended: WON, score=50.0
+[12:41:54] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:54]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:54]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54]   ℹ Reset for game: test_game
+[12:41:54] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:54]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:54]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54]   ℹ Reset for game: test_game
+[12:41:54] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:54]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:54]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54]   ℹ Reset for game: test_game
+[12:41:54] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:54]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:54]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54]   ℹ Reset for game: test_save
+[12:41:54] 
+──────────────────── Saving Flux-multi-model.flx ────────────────────
+[12:41:54]   ✓ Saved: /var/folders/1f/qw575t2s04g9799k7ks6xh0h0000gp/T/tmphjt9nujp.flx (0.1 MB)
+[12:41:54]   ℹ Loading FLUXMultiAgent from /var/folders/1f/qw575t2s04g9799k7ks6xh0h0000gp/T/tmphjt9nujp.flx...
+[12:41:54] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:41:54]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:41:54]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:41:54]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:41:54]   ✓ SpatialMemory (Ice/Water) ready
+[12:41:54]   ✓ VisualReasoner ready
+[12:41:54]   ✓ CausalTracker ready
+[12:41:54]   ✓ RuleInducer ready
+[12:41:54] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:41:54]   ℹ Active components: 5/5
+[12:41:54]   ✓ FLUXMultiAgent loaded
+[12:42:20] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:42:20]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:42:20]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:42:23]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:42:23]   ✓ SpatialMemory (Ice/Water) ready
+[12:42:23]   ✓ VisualReasoner ready
+[12:42:23]   ✓ CausalTracker ready
+[12:42:23]   ✓ RuleInducer ready
+[12:42:23] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:42:23]   ℹ Active components: 5/5
+[12:42:23]   ℹ Reset for game: demo_puzzle
+[12:42:25] 
+──────────────────── Saving Flux-multi-model.flx ────────────────────
+[12:42:25]   ✓ Saved: /Users/admin/Desktop/flux/phases/phase12/demo_agent.flx (0.1 MB)
+[12:42:25]   ℹ Game ended: DEMO_COMPLETE, score=100
+[12:42:39] 
+──────────────────── Initializing FLUXMultiAgent ────────────────────
+[12:42:39]   ⚠ Flux-Base.flx not found at /Users/admin/Desktop/flux/checkpoints/Flux-Base.flx
+[12:42:39]   ℹ Initializing Qwen-Omni LLM bridge...
+[12:42:42]   ✓ LLM ready: Qwen/Qwen2.5-3B-Instruct (vision=False)
+[12:42:42]   ✓ SpatialMemory (Ice/Water) ready
+[12:42:42]   ✓ VisualReasoner ready
+[12:42:42]   ✓ CausalTracker ready
+[12:42:42]   ✓ RuleInducer ready
+[12:42:42] 
+──────────────────── FLUXMultiAgent Initialized ────────────────────
+[12:42:42]   ℹ Active components: 5/5
+[12:42:42]   ℹ Reset for game: demo_puzzle
+[12:42:44] 
+──────────────────── Saving Flux-multi-model.flx ────────────────────
+[12:42:44]   ✓ Saved: /Users/admin/Desktop/flux/phases/phase12/demo_agent.flx (0.1 MB)
+[12:42:44]   ℹ Game ended: DEMO_COMPLETE, score=100
