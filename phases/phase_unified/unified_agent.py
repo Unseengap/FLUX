@@ -243,7 +243,7 @@ class FLUXUnifiedAgent:
     
     def _setup_strategy(self):
         """Setup appropriate strategy for control scheme."""
-        sm = self.spatial_memory. 
+        sm = self.spatial_memory
         
         if self.control_scheme == "MOVEMENT_ONLY":
             self.movement_strategy = MovementStrategy(sm)
