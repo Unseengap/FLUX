@@ -326,6 +326,87 @@ class FLUXModel:
         self._modified = True
         print(f"  ✓ Removed component: {name}")
     
+    def mark_as_legacy(
+        self,
+        name: str,
+        reason: str,
+        removal_target: str = 'v5.0',
+    ):
+        """
+        Mark a component as legacy (deprecated).
+        
+        Legacy components are flagged for future removal. AI agents should
+        check for legacy status before using components.
+        
+        Args:
+            name: Component name to mark as legacy
+            reason: Explanation of what replaced this component
+            removal_target: Version when this component will be removed
+        """
+        if name not in self.state:
+            raise KeyError(f"Component not found: {name}")
+        
+        if not isinstance(self.state[name], dict):
+            self.state[name] = {'state_dict': self.state[name]}
+        
+        self.state[name]['legacy'] = True
+        self.state[name]['legacy_reason'] = reason
+        self.state[name]['legacy_since'] = datetime.now().isoformat()
+        self.state[name]['removal_target'] = removal_target
+        self._modified = True
+        
+        print(f"  ⚠ Marked as legacy: {name}")
+        print(f"    Reason: {reason}")
+        print(f"    Removal target: {removal_target}")
+    
+    def is_legacy(self, name: str) -> bool:
+        """
+        Check if a component is marked as legacy.
+        
+        Args:
+            name: Component name to check
+        
+        Returns:
+            True if component is legacy, False otherwise
+        """
+        comp = self.state.get(name, {})
+        if isinstance(comp, dict):
+            return comp.get('legacy', False)
+        return False
+    
+    def get_legacy_components(self) -> List[str]:
+        """
+        Get list of all legacy components.
+        
+        Returns:
+            List of component names marked as legacy
+        """
+        return [
+            name for name, data in self.state.items()
+            if isinstance(data, dict) and data.get('legacy', False)
+        ]
+    
+    def get_legacy_info(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get legacy information for a component.
+        
+        Args:
+            name: Component name
+        
+        Returns:
+            Dict with legacy info or None if not legacy
+        """
+        if not self.is_legacy(name):
+            return None
+        
+        comp = self.state[name]
+        return {
+            'legacy': True,
+            'reason': comp.get('legacy_reason', 'No reason provided'),
+            'since': comp.get('legacy_since', 'Unknown'),
+            'removal_target': comp.get('removal_target', 'Unknown'),
+        }
+    
     def inject_from_checkpoint(
         self,
         component_name: str,
@@ -551,7 +632,19 @@ class FLUXModel:
             if active:
                 print(f"  [{category}]")
                 for c in active:
-                    print(f"    ✓ {c}")
+                    legacy_marker = " ⚠ LEGACY" if self.is_legacy(c) else ""
+                    print(f"    ✓ {c}{legacy_marker}")
+        
+        # Show legacy components
+        legacy = self.get_legacy_components()
+        if legacy:
+            print(f"\n  [legacy - marked for removal]")
+            for c in legacy:
+                info = self.get_legacy_info(c)
+                print(f"    ⚠ {c}")
+                if info:
+                    print(f"      Reason: {info['reason']}")
+                    print(f"      Removal: {info['removal_target']}")
         
         inactive = [c for c in self.components if not self.components[c]]
         if inactive:

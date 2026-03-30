@@ -312,6 +312,76 @@ def upload_logs_to_hf(
         return False
 
 
+def upload_flx_to_hf(
+    flx_path: str,
+    hf_token: Optional[str] = None,
+    repo_id: str = HF_REPO_ID,
+) -> bool:
+    """
+    Upload a .flx model file to HuggingFace Hub.
+    
+    This is the recommended method for uploading Flux-Apex and other .flx models.
+    
+    Args:
+        flx_path: Path to .flx file (e.g., 'checkpoints/Flux-Apex-V1.flx')
+        hf_token: HuggingFace API token (optional, falls back to env/secrets)
+        repo_id: HuggingFace repo ID (default: UnseenGAP/FLUX)
+    
+    Returns:
+        True if upload succeeded
+    
+    Example:
+        from flux_utils import upload_flx_to_hf
+        upload_flx_to_hf('checkpoints/Flux-Apex-V1.flx')
+    """
+    path = Path(flx_path)
+    if not path.exists():
+        print(f"  ✗ Cannot upload — {path} not found")
+        return False
+
+    token = _resolve_hf_token(hf_token)
+    if not token:
+        print("  ⚠ No HuggingFace token found — skipping upload")
+        print("    Set HF_TOKEN env var, or add to Kaggle secrets")
+        return False
+
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=token)
+
+        # Ensure repo exists
+        try:
+            api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
+        except Exception:
+            pass  # Repo likely already exists
+
+        # Determine path in repo (preserve checkpoints/ prefix if present)
+        if 'checkpoints' in str(path):
+            path_in_repo = f"checkpoints/{path.name}"
+        else:
+            path_in_repo = f"checkpoints/{path.name}"
+
+        # Upload
+        api.upload_file(
+            path_or_fileobj=str(path),
+            path_in_repo=path_in_repo,
+            repo_id=repo_id,
+            commit_message=f"Upload {path.name} — {datetime.now().isoformat()}",
+        )
+        
+        size_mb = path.stat().st_size / 1e6
+        print(f"  ✓ {path.name} uploaded to HuggingFace Hub ({size_mb:.1f} MB)")
+        print(f"    https://huggingface.co/{repo_id}")
+        return True
+
+    except ImportError:
+        print("  ⚠ huggingface_hub not installed — run: pip install huggingface_hub")
+        return False
+    except Exception as e:
+        print(f"  ✗ HuggingFace upload failed: {e}")
+        return False
+
+
 def _resolve_hf_token(token: Optional[str] = None) -> Optional[str]:
     """
     Resolve HuggingFace token from multiple sources.

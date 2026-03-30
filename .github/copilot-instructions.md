@@ -2,15 +2,381 @@
 
 ## Project Overview
 
-FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons. The project is structured as 8 sequential phases, each building on the previous checkpoint.
+FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons.
 
-**Source of truth:** Always consult `SPECIFICATION.md` for technical details and `ROADMAP.md` for phase plans before implementing anything.
+**Current Flagship Model:** `Flux-Apex-V1.flx` (v4.0-multi-modal-enhanced, Phase 12, 1.9B params)
+
+**Source of truth:**
+- `DOCS/FLUX_APEX_V1.md` — Complete Flux-Apex model reference
+- `DOCS/FLUX_FILE_FORMAT.md` — .flx format specification
+- `DOCS/FLUX_7B_SPEC.md` — Large-scale architecture spec
+- `flux_model.py` — FLUXModel class for loading/saving
+- `flux_utils.py` — Core utilities (checkpoints, logging, HF Hub)
+
+---
+
+## Flux-Apex Model Architecture
+
+**Flux-Apex-V1.flx** is the complete, self-describing cognitive architecture:
+
+| Property | Value |
+|----------|-------|
+| **Location** | `checkpoints/Flux-Apex-V1.flx` |
+| **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
+| **File Size** | 5,793.9 MB (5.79 GB) |
+| **Total Parameters** | 1,904,320,314 (1.9B) |
+| **Wave Dimension** | 432 (universal semantic space) |
+| **Field Dimensions** | 96 × 96 × 96 × 512 |
+| **Version** | 4.0-multi-modal-enhanced |
+
+### Top-Level Components (25 keys)
+
+| Component | Parameters | Purpose |
+|-----------|------------|---------|
+| `cse` | 2.7M | Continuous Semantic Encoder (bytes → 432D waves) |
+| `field` | 1.36B | Resonance Field (96³ × 512 knowledge storage) |
+| `memory` | 911M | Three-tier memory (working, episodic, semantic) |
+| `bridges` | 458M | Wave↔Field projections + router |
+| `decoder` | 65M | Byte-level text decoder (GRU-based) |
+| `causal` | 59M | CGN nodes + causal arrow graph |
+| `adapters` | 15M | Multi-modal (grid, image, audio) |
+| `grid_to_wave` | 384K | ARC grid encoder |
+| `spatial_memory` | 25K | Curiosity-driven exploration |
+| `llm` | — | External LLM reference (not stored) |
+
+### Component Status Flags
+
+Every component has an enabled/disabled flag in `components`:
+```python
+{
+    'cse': True,
+    'grid_to_wave': True,
+    'field': True,
+    'memory': True,
+    'decoder': True,
+    'causal_tracker': True,
+    'llm': True,  # External, loaded at runtime
+    ...
+}
+```
+
+---
+
+## Legacy Component System
+
+### Marking Components as Legacy
+
+When a component is deprecated but not yet removed, mark it as legacy:
+
+```python
+# In the .flx state, add legacy flag
+model.state['grid_adapters'] = {
+    'state_dict': ...,
+    'config': ...,
+    'legacy': True,                    # ← REQUIRED: Mark as legacy
+    'legacy_reason': 'Replaced by adapters.grid_to_wave in v4.0',
+    'legacy_since': '2026-03-30',
+    'removal_target': 'v5.0',          # When it will be removed
+}
+```
+
+### Legacy Component Rules
+
+1. **Always set `legacy: True`** when deprecating a component
+2. **Include `legacy_reason`** explaining what replaced it
+3. **Include `legacy_since`** with ISO date
+4. **Include `removal_target`** for planned removal version
+5. **AI agents must check for `legacy` flag** before using components
+6. **Legacy components should NOT be used in new code**
+
+### Checking for Legacy Components
+
+```python
+def is_legacy(model: FLUXModel, component_name: str) -> bool:
+    """Check if a component is marked as legacy."""
+    comp = model.state.get(component_name, {})
+    return comp.get('legacy', False)
+
+def get_legacy_components(model: FLUXModel) -> List[str]:
+    """Get all legacy components."""
+    return [
+        name for name, data in model.state.items()
+        if isinstance(data, dict) and data.get('legacy', False)
+    ]
+```
+
+### Current Legacy Components
+
+| Component | Legacy Since | Replacement | Removal Target |
+|-----------|--------------|-------------|----------------|
+| `grid_adapters` | 2026-03-30 | `adapters.grid_to_wave` | v5.0 |
+
+---
+
+## Loading Flux-Apex Model
+
+### Method 1: FLUXModel Class (Recommended)
+
+```python
+from flux_model import FLUXModel
+
+# Load from local path
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# Load with config override
+model = FLUXModel.load(
+    'checkpoints/Flux-Apex-V1.flx',
+    config_override={'generation': {'llm_primary': False}}
+)
+
+# Access components
+cse_state = model.get_component('cse')
+field_state = model.get_component('field')
+```
+
+### Method 2: Direct torch.load
+
+```python
+import torch
+from pathlib import Path
+
+# Load raw archive
+path = Path('checkpoints/Flux-Apex-V1.flx')
+raw = torch.load(str(path), map_location='cpu', weights_only=False)
+
+# Verify format
+assert raw['format'] == 'FLUX'
+print(f"Version: {raw['version']}")  # '4.0-multi-modal-enhanced'
+
+# Access components
+cse_weights = raw['cse']['state_dict']
+field_state = raw['field']['state_dict']['state']  # [96, 96, 96, 512]
+decoder_weights = raw['decoder']['state_dict']
+```
+
+### Method 3: HuggingFace Hub
+
+```python
+from huggingface_hub import hf_hub_download
+
+path = hf_hub_download(
+    repo_id='UnseenGAP/FLUX',
+    filename='checkpoints/Flux-Apex-V1.flx'
+)
+model = FLUXModel.load(path)
+```
+
+---
+
+## Saving & Updating Flux-Apex Model
+
+### Continuous Development Philosophy (CRITICAL)
+
+**Always save back to the SAME filename after modifications:**
+
+```python
+# Load
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# Modify (add facts, train adapters, inject knowledge)
+model.add_component('new_adapter', new_state_dict)
+model.upgrade_component('cse', improved_cse_weights)
+
+# Save back to SAME filename
+model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
+```
+
+**DO NOT** create new filenames for incremental updates. The `.flx` format tracks history internally via `metadata.modified_components` and timestamps.
+
+### When To Create NEW Filename
+
+- Major architecture version bump (V1 → V2)
+- Incompatible format changes
+- Domain-specific variant (e.g., `Flux-Apex-V1-Medical.flx`)
+
+### Complete Save Workflow
+
+```python
+from flux_model import FLUXModel
+from datetime import datetime
+
+# 1. Load current model
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# 2. Make modifications
+model.upgrade_component('decoder', new_decoder_state)
+model.add_component('vision_adapter', vision_state, config={'input_size': 224})
+
+# 3. Mark old components as legacy (if replacing)
+if 'old_decoder' in model.state:
+    model.state['old_decoder']['legacy'] = True
+    model.state['old_decoder']['legacy_reason'] = 'Replaced by new decoder v2'
+    model.state['old_decoder']['legacy_since'] = datetime.now().isoformat()
+    model.state['old_decoder']['removal_target'] = 'v5.0'
+
+# 4. Update metadata
+model.metadata['last_modified'] = datetime.now().isoformat()
+model.metadata['modified_components'] = ['decoder', 'vision_adapter']
+
+# 5. Save (ALWAYS as last step after all modifications)
+model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
+
+# 6. Upload to HuggingFace Hub
+from flux_utils import upload_flx_to_hf
+upload_flx_to_hf('checkpoints/Flux-Apex-V1.flx')
+```
+
+---
+
+## Stripping Components
+
+To remove a component from the model:
+
+```python
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# Remove component entirely
+model.remove_component('old_adapter')
+
+# Or disable without removing (preserves state for rollback)
+model.components['old_adapter'] = False
+
+model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
+```
+
+---
+
+## Adding New Components
+
+```python
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# Add new component with config
+model.add_component(
+    name='audio_encoder',
+    state_dict=trained_audio_encoder.state_dict(),
+    config={
+        'input_dim': 80,      # mel bins
+        'output_dim': 432,    # wave_dim
+        'sample_rate': 16000,
+    }
+)
+
+# Enable in runtime config
+model.enable_component('audio_encoder')
+
+model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
+```
+
+---
+
+## Injecting from External Checkpoints
+
+```python
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# Inject trained component from .pt file
+model.inject_from_checkpoint(
+    component_name='grid_to_wave',
+    checkpoint_path='checkpoints/gridtowave_contrastive.pt',
+)
+
+# Inject from another .flx file
+model.inject_from_checkpoint(
+    component_name='field',
+    checkpoint_path='checkpoints/Flux-capable.flx',
+    key_in_checkpoint='field',
+)
+
+model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
+```
+
+---
+
+## .flx File Format Structure
+
+```
+Flux-Apex-V1.flx
+├── format: "FLUX"                    # Format identifier (required)
+├── version: "4.0-multi-modal-enhanced"
+├── phase: "phase12"
+├── timestamp: "2026-03-30T..."
+├── can_continue_learning: True
+│
+├── runtime_config/                    # How to run the model
+│   ├── perception: {cse_enabled, grid_encoder_enabled, ...}
+│   ├── memory: {working_enabled, episodic_enabled, ...}
+│   ├── generation: {llm_primary, byte_decoder_enabled, ...}
+│   ├── reasoning: {causal_tracker_enabled, ...}
+│   └── learning: {realtime_learning, temperature, ...}
+│
+├── components: {cse: true, field: true, ...}  # Enable flags
+│
+├── metadata/
+│   ├── created: "2026-03-29T..."
+│   ├── last_modified: "2026-03-30T..."
+│   ├── modified_components: ["cse", "field"]
+│   └── capabilities: ["text", "grid", "image", "audio"]
+│
+├── cse/                               # Component: Continuous Semantic Encoder
+│   ├── state_dict: {22 tensors}
+│   ├── config: {wave_dims: {...}, byte_window: 8}
+│   └── legacy: false                  # Legacy flag (add when deprecating)
+│
+├── field/                             # Component: Resonance Field
+│   ├── state_dict: {state: [96,96,96,512]}
+│   ├── config: {h: 96, w: 96, d: 96, features: 512}
+│   ├── gravity_state: {...}
+│   └── thermodynamic_state: {...}
+│
+├── memory/                            # Component: Three-Tier Memory
+│   ├── working: {window_size: 2048, ...}
+│   ├── episodic: {vectors, metadata, 74 entries}
+│   └── semantic: {field_state_dict, ...}
+│
+├── decoder/                           # Component: Byte Decoder
+│   ├── state_dict: {33 tensors}
+│   └── config: {hidden_dim: 1024, layers: 4}
+│
+├── causal/                            # Component: Causal System
+│   ├── cgn_state: {56 nodes, manifolds}
+│   └── graph_state: {463 links}
+│
+├── bridges/                           # Component: Inter-component bridges
+│   ├── wave_to_field: {432 → 512}
+│   ├── field_to_wave: {512 → 432}
+│   └── router: {...}
+│
+├── adapters/                          # Component: Multi-modal adapters
+│   ├── grid_to_wave: {...}
+│   ├── wave_to_grid: {...}
+│   ├── wave_to_image: {...}
+│   └── audio_to_wave: {...}
+│
+└── llm_reference/                     # External LLM (not stored in file)
+    ├── model_name: "Qwen/Qwen2.5-3B-Instruct"
+    └── quantization: "4bit"
+```
+
+---
+
+## Wave Dimension Invariant
+
+**All waves are 432-dimensional.** This is the universal semantic space:
+
+| Path | Dimension |
+|------|-----------|
+| CSE output | `[seq_len, 432]` |
+| Field input | projects 432 → 512 |
+| Field output | projects 512 → 432 |
+| Decoder input | projects 432 → 1024 |
+| All adapters | modality ↔ 432 |
 
 ---
 
 ## Architecture & Phase Structure
 
-The project follows a strict **checkpoint chain** pattern across 8 phases:
+The project follows a **checkpoint chain** pattern across 12+ phases:
 
 | Phase | Component | Key Class |
 |-------|-----------|-----------|
@@ -21,18 +387,24 @@ The project follows a strict **checkpoint chain** pattern across 8 phases:
 | 5 | Causal Geometry Nodes (CGN) | `CausalGeometryNode` |
 | 6 | Three-Tier Memory System | `WorkingMemory`, `EpisodicMemory`, `SemanticMemory` |
 | 7 | Full FLUX Integration | `FLUXModel` |
-| 8 | Scale & GPT-2 Benchmark | `FLUXLarge` |
+| 8 | Byte Decoder | `WaveDecoder` |
+| 8.5 | Grid Adapters | `GridToWave`, `WaveToGrid` |
+| 8.8 | Spatial Memory | `SpatialMemory` |
+| 8.9 | Causal Tracker + Rules | `CausalTracker`, `RuleInducer` |
+| 10 | Hybrid LLM Integration | `HybridModel` |
+| 11 | Multi-Modal Adapters | `ImageAdapter`, `AudioAdapter` |
+| 12 | Unified Agent | `FLUXAgent` |
 
 ### Key Invariants (Never Break)
 
-1. **Every phase saves a checkpoint** to `checkpoints/phaseN.phase.pt`
-2. **Every phase loads and verifies** the previous phase's checkpoint before starting
-3. **Every phase has** at least one `demo_phaseN_demoX.py` and three `test_phaseN_testX.py` files
-4. **Every phase generates** `RESULTS_PHASE_N.md` via the `PhaseResults` utility
-5. **Checkpoints accumulate** — phase N contains all components from phases 1 through N
-6. **Every phase has** a Kaggle notebook (`notebooks/phaseN_kaggle.ipynb`)
-7. **Every phase uploads** checkpoint to HuggingFace Hub (`UnseenGAP/FLUX`)
-8. **Every phase logs** to `logs/phaseN.log` via `PhaseLogger`
+1. **Flux-Apex is the flagship** — all updates go to `Flux-Apex-V1.flx`
+2. **Save after EVERY modification** — call `model.save()` as the final step
+3. **Mark deprecated components as legacy** — set `legacy: True` before removal
+4. **Wave dimension is 432** — never change this across any component
+5. **Field dimension is 96³ × 512** — standard Apex configuration
+6. **Use FLUXModel class** for all load/save operations, not raw torch.save
+7. **Upload to HuggingFace** after significant changes
+8. **Track modified_components** in metadata
 
 ---
 
@@ -459,3 +831,55 @@ token = UserSecretsClient().get_secret("HF_TOKEN")
 - Generate results via `PhaseResults` — never write `RESULTS_PHASE_N.md` manually
 - Check acceptance criteria in `ROADMAP.md` before declaring a phase complete
 - Mark TODO items as `# TODO: Copilot — <description>` for unimplemented methods
+---
+
+## Flux-Apex Model Workflow (CRITICAL)
+
+When modifying the Flux-Apex model, follow this exact workflow:
+
+1. **Load the model**
+   ```python
+   from flux_model import FLUXModel
+   model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+   ```
+
+2. **Make modifications**
+   - Add components via `model.add_component()`
+   - Upgrade components via `model.upgrade_component()`
+   - Inject from checkpoints via `model.inject_from_checkpoint()`
+   - Remove components via `model.remove_component()`
+
+3. **Mark deprecated components as legacy**
+   ```python
+   model.state['old_component']['legacy'] = True
+   model.state['old_component']['legacy_reason'] = 'Replaced by X'
+   model.state['old_component']['legacy_since'] = datetime.now().isoformat()
+   model.state['old_component']['removal_target'] = 'v5.0'
+   ```
+
+4. **Update metadata**
+   ```python
+   model.metadata['last_modified'] = datetime.now().isoformat()
+   model.metadata['modified_components'] = ['component1', 'component2']
+   ```
+
+5. **Save as LAST STEP** (ALWAYS)
+   ```python
+   model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
+   ```
+
+6. **Upload to HuggingFace Hub** (after significant changes)
+   ```python
+   from flux_utils import upload_flx_to_hf
+   upload_flx_to_hf('checkpoints/Flux-Apex-V1.flx')
+   ```
+
+### Legacy Flag Checklist
+
+Before removing any component:
+- [ ] Set `legacy: True` on the component
+- [ ] Include `legacy_reason` explaining what replaced it
+- [ ] Include `legacy_since` with ISO date
+- [ ] Include `removal_target` version
+- [ ] Save the model
+- [ ] Wait at least one version cycle before actual removal
