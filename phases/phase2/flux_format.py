@@ -745,6 +745,142 @@ def print_config(config: FLUXRuntimeConfig):
 
 
 # ─────────────────────────────────────────────
+# Embedded VLM Loading (v5.0+)
+# ─────────────────────────────────────────────
+
+def load_embedded_vlm(
+    model_state: Dict[str, Any],
+    device: str = 'auto',
+    torch_dtype: Any = None,
+) -> tuple:
+    """
+    Load the embedded VLM from a .flx file's weights.
+    
+    CRITICAL: For trust_remote_code models like Qwen2.5-VL, you MUST use
+    AutoModel.from_pretrained() to download the model architecture, then
+    replace weights with load_state_dict(). Using from_config() will FAIL.
+    
+    The model architecture is cached by HuggingFace after first download.
+    Subsequent loads use cached architecture + embedded .flx weights.
+    
+    Args:
+        model_state: Dict from torch.load() of a .flx file
+        device: Device to load model on ('auto', 'cuda', 'cpu', 'mps')
+        torch_dtype: Data type (default: torch.float16)
+    
+    Returns:
+        Tuple of (vlm_model, processor) ready for inference
+    
+    Example:
+        >>> model = torch.load('Flux-Apex-V1.flx', map_location='cpu')
+        >>> vlm_model, processor = load_embedded_vlm(model)
+        >>> # Now use vlm_model.generate() with embedded weights
+    
+    Raises:
+        ImportError: If transformers not installed
+        KeyError: If 'vlm' not in model_state
+        RuntimeError: If VLM loading fails
+    """
+    try:
+        from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+    except ImportError:
+        raise ImportError(
+            "transformers not installed. Run: pip install transformers"
+        )
+    
+    if 'vlm' not in model_state:
+        raise KeyError(
+            "No embedded VLM in this .flx file. "
+            "Run phase_voice_kaggle.ipynb to embed VLM weights."
+        )
+    
+    if torch_dtype is None:
+        torch_dtype = torch.float16
+    
+    vlm_state = model_state['vlm']
+    embedded_weights = vlm_state.get('weights', {})
+    base_model = vlm_state.get('base_model', 'Qwen/Qwen2.5-VL-3B-Instruct')
+    
+    if not embedded_weights:
+        raise RuntimeError(
+            "VLM section exists but weights dict is empty. "
+            "The .flx file may be corrupted or incomplete."
+        )
+    
+    print(f"Loading embedded VLM from .flx...")
+    print(f"  Base model: {base_model}")
+    print(f"  Embedded weights: {len(embedded_weights)} tensors")
+    print(f"  Total params: {vlm_state.get('total_params', 0):,}")
+    
+    # Step 1: Load processor (small download - just tokenizer config)
+    print(f"  [1/3] Loading processor...")
+    processor = AutoProcessor.from_pretrained(
+        base_model,
+        trust_remote_code=True,
+    )
+    
+    # Step 2: Load model architecture from HuggingFace (CACHED after first run)
+    # CRITICAL: Use Qwen2VLForConditionalGeneration, NOT AutoModel!
+    # AutoModel gives base model WITHOUT generate() method.
+    # Qwen2VLForConditionalGeneration works for both Qwen2-VL and Qwen2.5-VL.
+    print(f"  [2/3] Loading model architecture (cached after first run)...")
+    vlm_model = Qwen2VLForConditionalGeneration.from_pretrained(
+        base_model,
+        torch_dtype=torch_dtype,
+        device_map=device,
+        trust_remote_code=True,
+        low_cpu_mem_usage=True,
+    )
+    
+    # Step 3: Replace HuggingFace weights with our embedded .flx weights
+    print(f"  [3/3] Loading embedded weights from .flx...")
+    missing, unexpected = vlm_model.load_state_dict(embedded_weights, strict=False)
+    
+    if missing:
+        print(f"    ⚠ Missing keys: {len(missing)} (may be ok for some tied weights)")
+    if unexpected:
+        print(f"    ⚠ Unexpected keys: {len(unexpected)}")
+    
+    vlm_model.eval()
+    device_info = next(vlm_model.parameters()).device
+    print(f"  ✓ VLM ready on {device_info} (weights from .flx!)")
+    
+    return vlm_model, processor
+
+
+def check_vlm_embedded(model_state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Check if a .flx file has embedded VLM and return info.
+    
+    Args:
+        model_state: Dict from torch.load() of a .flx file
+    
+    Returns:
+        Dict with VLM info or {'embedded': False} if not present
+    
+    Example:
+        >>> model = torch.load('Flux-Apex-V1.flx', map_location='cpu')
+        >>> info = check_vlm_embedded(model)
+        >>> if info['embedded']:
+        ...     print(f"VLM: {info['base_model']} ({info['total_params']:,} params)")
+    """
+    if 'vlm' not in model_state:
+        return {'embedded': False}
+    
+    vlm = model_state['vlm']
+    return {
+        'embedded': True,
+        'base_model': vlm.get('base_model', 'unknown'),
+        'quantization': vlm.get('quantization', 'unknown'),
+        'total_params': vlm.get('total_params', 0),
+        'num_weights': len(vlm.get('weights', {})),
+        'has_bridges': bool(vlm.get('bridges', {})),
+        'text_enabled': vlm.get('config', {}).get('text_enabled', True),
+        'vision_enabled': vlm.get('config', {}).get('vision_enabled', True),
+    }
+
+
+# ─────────────────────────────────────────────
 # Exports
 # ─────────────────────────────────────────────
 
@@ -774,6 +910,10 @@ __all__ = [
     # Unified model functions
     'save_unified_flux',
     'load_unified_flux',
+    
+    # VLM utilities (v5.0+)
+    'load_embedded_vlm',
+    'check_vlm_embedded',
     
     # Utilities
     'get_runtime_config',

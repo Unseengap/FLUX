@@ -4,13 +4,13 @@
 
 FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons.
 
-**Current Flagship Model:** `Flux-Apex-V1.flx` (v5.0-voice-embedded, Phase Voice, ~4.7B params)
+**Current Flagship Model:** `Flux-Apex-V1.flx` (v5.1-orchestrated, Phase Orchestrator, ~5.7B params)
 
 **Source of truth:**
 - `DOCS/FLUX_APEX_V1.md` — Complete Flux-Apex model reference
 - `DOCS/FLUX_FILE_FORMAT.md` — .flx format specification
 - `DOCS/FLUX_7B_SPEC.md` — Large-scale architecture spec
-- `DOCS/PHASE_VOICE_SPEC.md` — Voice embedding specification
+- `DOCS/PHASE_ORCHESTRATOR_SPEC.md` — VLM orchestration specification
 - `flux_model.py` — FLUXModel class for loading/saving
 - `flux_utils.py` — Core utilities (checkpoints, logging, HF Hub)
 
@@ -28,9 +28,9 @@ FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture th
 | **Total Parameters** | 1,904,320,314 (1.9B) |
 | **Wave Dimension** | 432 (universal semantic space) |
 | **Field Dimensions** | 96 × 96 × 96 × 512 |
-| **Version** | 4.0-multi-modal-enhanced |
+| **Version** | 5.1-orchestrated |
 
-### Top-Level Components (25 keys)
+### Top-Level Components (26 keys)
 
 | Component | Parameters | Purpose |
 |-----------|------------|---------|
@@ -43,7 +43,8 @@ FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture th
 | `adapters` | 15M | Multi-modal (grid, image, audio) |
 | `grid_to_wave` | 384K | ARC grid encoder |
 | `spatial_memory` | 25K | Curiosity-driven exploration |
-| `llm` | — | External LLM reference (not stored) |
+| `vlm` | 3.75B | Embedded Qwen2.5-VL-3B (text + vision) |
+| `orchestration` | — | Self-describing tool definitions |
 
 ### Component Status Flags
 
@@ -54,10 +55,11 @@ Every component has an enabled/disabled flag in `components`:
     'grid_to_wave': True,
     'field': True,
     'memory': True,
-    'voice': True,           # Embedded Qwen-Omni
-    'voice_thinker': True,   # Text + vision + audio understanding
-    'voice_talker': True,    # Speech synthesis
-    'voice_token2wav': True, # Vocoder
+    'vlm': True,             # Embedded Qwen2.5-VL-3B
+    'vlm_text': True,        # Text generation
+    'vlm_vision': True,      # Vision understanding
+    'orchestration': True,   # Self-describing tools
+    'tool_use': True,        # VLM can call FLUX tools
     'causal_tracker': True,
     ...
 }
@@ -700,6 +702,164 @@ raise FileNotFoundError(
     f"Run Phase {phase} training first."
 )
 ```
+
+---
+
+## Loading Embedded VLM from .flx (CRITICAL)
+
+The Flux-Apex model embeds Qwen2.5-VL-3B weights directly in the .flx file. Loading requires a specific pattern due to `trust_remote_code` requirements.
+
+### Why This Pattern is Required
+
+Qwen2.5-VL and similar models use `trust_remote_code=True`, which means:
+1. The model architecture code is downloaded from HuggingFace (not bundled in transformers)
+2. `from_config()` does NOT work — it can't load the custom model classes
+3. You MUST use `from_pretrained()` to get the architecture, then `load_state_dict()` for weights
+
+### Standard VLM Loading Pattern (ALWAYS USE THIS)
+
+```python
+import torch
+from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+
+# Load .flx file
+model = torch.load('checkpoints/Flux-Apex-V1.flx', map_location='cpu')
+
+if 'vlm' in model:
+    vlm_state = model['vlm']
+    embedded_weights = vlm_state.get('weights', {})
+    
+    # Step 1: Load processor (small download - tokenizer config only)
+    processor = AutoProcessor.from_pretrained(
+        "Qwen/Qwen2.5-VL-3B-Instruct",
+        trust_remote_code=True,
+    )
+    
+    # Step 2: Load model ARCHITECTURE from HuggingFace (CACHED after first run)
+    # CRITICAL: Use Qwen2VLForConditionalGeneration, NOT AutoModel!
+    # AutoModel gives base model WITHOUT generate() method.
+    vlm_model = Qwen2VLForConditionalGeneration.from_pretrained(
+        "Qwen/Qwen2.5-VL-3B-Instruct",
+        torch_dtype=torch.float16,
+        device_map="auto",
+        trust_remote_code=True,
+        low_cpu_mem_usage=True,
+    )
+    
+    # Step 3: REPLACE HuggingFace weights with embedded .flx weights
+    missing, unexpected = vlm_model.load_state_dict(embedded_weights, strict=False)
+    # missing/unexpected keys are OK for tied weights
+    
+    vlm_model.eval()
+    # Now vlm_model uses YOUR embedded weights, not HuggingFace weights!
+```
+
+### Using the Utility Function
+
+```python
+from phases.phase2.flux_format import load_embedded_vlm
+
+model = torch.load('checkpoints/Flux-Apex-V1.flx', map_location='cpu')
+vlm_model, processor = load_embedded_vlm(model)
+
+# Use for inference
+messages = [{"role": "user", "content": "Hello!"}]
+text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = processor(text=[text], return_tensors="pt").to(vlm_model.device)
+outputs = vlm_model.generate(**inputs, max_new_tokens=100)
+response = processor.decode(outputs[0], skip_special_tokens=True)
+```
+
+### Anti-Patterns (DO NOT USE)
+
+```python
+# ❌ WRONG: AutoModel gives base model WITHOUT generate() method
+vlm_model = AutoModel.from_pretrained(...)  # No generate()!
+
+# ❌ WRONG: from_config() doesn't work with trust_remote_code
+config = AutoConfig.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct")
+vlm_model = AutoModel.from_config(config)  # FAILS!
+
+# ❌ WRONG: AutoModelForCausalLM doesn't support VL models  
+vlm_model = AutoModelForCausalLM.from_pretrained(...)  # FAILS!
+
+# ❌ WRONG: AutoModelForVision2Seq doesn't exist
+vlm_model = AutoModelForVision2Seq.from_pretrained(...)  # FAILS!
+
+# ✅ CORRECT: Qwen2VLForConditionalGeneration works for BOTH Qwen2-VL AND Qwen2.5-VL
+from transformers import Qwen2VLForConditionalGeneration  # Use this!
+```
+
+### VLM Storage Structure in .flx
+
+```python
+model['vlm'] = {
+    'base_model': 'Qwen/Qwen2.5-VL-3B-Instruct',
+    'quantization': 'fp16',
+    'total_params': 3_756_000_000,
+    'weights': {                    # 824 tensors
+        'model.embed_tokens.weight': tensor(...),
+        'model.layers.0.self_attn.q_proj.weight': tensor(...),
+        # ... all model weights
+    },
+    'config': {                     # Original HF config
+        'hidden_size': 2048,
+        'num_hidden_layers': 36,
+        'vocab_size': 151936,
+        ...
+    },
+    'bridges': {                    # Wave ↔ VLM projections
+        'wave_to_vlm': {'in': 432, 'out': 2048},
+        'vlm_to_wave': {'in': 2048, 'out': 432},
+    },
+}
+```
+
+---
+
+## VLM Orchestration (v5.1+)
+
+Starting with v5.1-orchestrated, the embedded VLM can **call FLUX components as tools**.
+
+### Tool Categories
+
+| Category | Tools |
+|----------|-------|
+| **Perception** | `encode_text`, `encode_grid`, `encode_image` |
+| **Knowledge** | `query_field`, `recall_memory`, `store_memory` |
+| **Reasoning** | `predict_effect`, `get_applicable_rules`, `trace_causality` |
+| **Exploration** | `get_curiosity_map`, `mark_explored` |
+| **CGN** | `query_cgn`, `fire_cgn`, `add_causal_arrow` |
+| **Generation** | `decode_grid`, `generate_text` |
+
+### Tool Call Format
+
+```xml
+<tool>encode_grid</tool>
+<params>{"grid": [[0,1],[1,0]], "mode": "holistic"}</params>
+```
+
+### Self-Describing Model
+
+The `.flx` file contains the orchestration section:
+
+```python
+model = torch.load('Flux-Apex-V1.flx', map_location='cpu')
+
+# Discover capabilities
+if 'orchestration' in model:
+    tools = model['orchestration']['tools']
+    prompt = model['orchestration']['system_prompt']
+    caps = model['orchestration']['capabilities']
+```
+
+### Orchestration Workflow
+
+```
+User Input → VLM (decides which tools) → Tool Calls → Execute → VLM (synthesize) → Output
+```
+
+The VLM is the **brain** that orchestrates FLUX components as cognitive tools.
 
 ---
 

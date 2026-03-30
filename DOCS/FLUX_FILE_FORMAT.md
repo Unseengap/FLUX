@@ -420,6 +420,112 @@ FLUX inverts this. The framework is minimal. The state IS the model. The field's
 | grid_to_wave | 384,512 | <0.1% |
 | grid_adapters | 192,256 | <0.1% |
 | spatial_memory | 24,576 | <0.1% |
+| orchestration | — | (metadata only) |
+
+---
+
+## Orchestration Section (v5.1+)
+
+Starting with v5.1-orchestrated, the `.flx` format includes self-describing **orchestration** capabilities — the model knows its own cognitive tools.
+
+### What It Contains
+
+```
+orchestration/
+├── version: "1.0"
+├── enabled: true
+│
+├── tools/                              ← Tool definitions
+│   ├── encode_text: {...}
+│   ├── encode_grid: {...}
+│   ├── query_field: {...}
+│   ├── recall_memory: {...}
+│   ├── predict_effect: {...}
+│   ├── ... (17 total tools)
+│   └── decode_grid: {...}
+│
+├── tool_categories/
+│   ├── perception: ["encode_text", "encode_grid", "encode_image"]
+│   ├── knowledge: ["query_field", "recall_memory", "store_memory"]
+│   ├── reasoning: ["predict_effect", "get_applicable_rules", "trace_causality"]
+│   ├── exploration: ["get_curiosity_map", "mark_explored", ...]
+│   ├── cgn: ["query_cgn", "fire_cgn", "add_causal_arrow"]
+│   └── generation: ["decode_grid", "generate_text"]
+│
+├── system_prompt: "You are FLUX..."     ← VLM system prompt for tool use
+├── system_prompt_short: "..."           ← Compact version
+│
+├── settings/
+│   ├── max_iterations: 5
+│   ├── tool_timeout_ms: 5000
+│   ├── context_injection: true
+│   └── verbose_logging: false
+│
+├── format/
+│   ├── tool_tag: "<tool>"
+│   ├── params_tag: "<params>"
+│   └── variables: ["$LAST_WAVE", "$INPUT_GRID", ...]
+│
+└── capabilities/                        ← Quick discovery
+    ├── tool_count: 17
+    ├── can_encode_text: true
+    ├── can_query_field: true
+    ├── can_reason_causally: true
+    └── ...
+```
+
+### Why This Matters
+
+| Without Orchestration | With Orchestration |
+|----------------------|-------------------|
+| External code defines tools | Model describes its own tools |
+| Loader must know capabilities | Model self-reports capabilities |
+| Tool format hardcoded | Tool format stored in model |
+| System prompt external | System prompt travels with model |
+
+### Tool Definition Schema
+
+Each tool is stored as:
+
+```python
+{
+    'name': 'encode_grid',
+    'description': 'Encode ARC-style grid into wave representation',
+    'category': 'perception',
+    'component_path': 'adapters.grid_to_wave',
+    'method_name': 'encode',
+    'params': {
+        'grid': 'List[List[int]] — 2D grid with values 0-9',
+        'mode': "str — 'holistic' or 'spatial'"
+    },
+    'returns': 'wave tensor [432] or [H*W, 432]',
+    'example': '<tool>encode_grid</tool>\n<params>{"grid": [[0,1],[1,0]]}</params>',
+    'requires_wave_dim': False,
+}
+```
+
+### Discovering Capabilities
+
+Any agent loading a v5.1+ `.flx` can:
+
+```python
+model = torch.load('Flux-Apex-V1.flx', map_location='cpu')
+
+# Check if orchestration is available
+if 'orchestration' in model:
+    orch = model['orchestration']
+    
+    # List all tools
+    for name, tool in orch['tools'].items():
+        print(f"{name}: {tool['description']}")
+    
+    # Get the system prompt
+    prompt = orch['system_prompt']
+    
+    # Check specific capability
+    if orch['capabilities']['can_reason_causally']:
+        print("This model can reason about cause and effect")
+```
 
 ---
 
