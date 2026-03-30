@@ -135,7 +135,7 @@ checkpoints/
 │   ├── Wave+Byte hybrid, TaskRouter (Phase 10)
 │   └── LLM bridge config (Phase 11)
 │
-├── Flux-multi-model.flx          ← OUTPUT: Phase 12 additions
+├── Flux-Apex-V1.flx          ← OUTPUT: Phase 12 additions
 │   ├── Inherits all from Flux-Base.flx
 │   ├── Qwen-Omni reference (vision+audio+text unified)
 │   ├── VisualReasoner state
@@ -505,7 +505,7 @@ Think step by step, then end with: ACTION: [your chosen action]"""
 flux_multi_agent.py — Phase 12 Multi-Modal Agent
 
 Uses flux_model.py and flux_utils.py for proper .flx handling.
-Loads from Flux-Base.flx, saves to Flux-multi-model.flx with FULL state.
+Loads from Flux-Base.flx, saves to Flux-Apex-V1.flx with FULL state.
 """
 
 import sys
@@ -540,7 +540,7 @@ class FLUXMultiAgent:
     
     IMPORTANT: Uses FLUXModel from flux_model.py for proper .flx handling!
     - Loads FULL base from Flux-Base.flx
-    - Saves FULL updated state to Flux-multi-model.flx
+    - Saves FULL updated state to Flux-Apex-V1.flx
     - LLM referenced by name (not stored in .flx)
     
     KEY: Uses Qwen2.5-Omni instead of separate models!
@@ -754,7 +754,7 @@ class FLUXMultiAgent:
         """
         import torch
         
-        self.log.separator("Saving Flux-multi-model.flx")
+        self.log.separator("Saving Flux-Apex-V1.flx")
         
         # ─────────────────────────────────────────────
         # Update version and metadata
@@ -853,9 +853,9 @@ class FLUXMultiAgent:
                     api = HfApi(token=token)
                     api.upload_file(
                         path_or_fileobj=str(path),
-                        path_in_repo="checkpoints/Flux-multi-model.flx",
+                        path_in_repo="checkpoints/Flux-Apex-V1.flx",
                         repo_id="UnseenGAP/FLUX",
-                        commit_message=f"Phase 12: Flux-multi-model.flx — {datetime.now().isoformat()}",
+                        commit_message=f"Phase 12: Flux-Apex-V1.flx — {datetime.now().isoformat()}",
                     )
                     self.log.success("Uploaded to HuggingFace Hub")
                 except Exception as e:
@@ -872,7 +872,7 @@ class FLUXMultiAgent:
     @classmethod
     def from_flx(
         cls, 
-        path: str = "checkpoints/Flux-multi-model.flx",
+        path: str = "checkpoints/Flux-Apex-V1.flx",
         device: str = None,
     ) -> 'FLUXMultiAgent':
         """
@@ -1097,7 +1097,7 @@ def play_game_with_multi_agent(
             break
     
     # Save learned model
-    agent.save_flx("checkpoints/Flux-multi-model.flx")
+    agent.save_flx("checkpoints/Flux-Apex-V1.flx")
 ```
 
 ---
@@ -1128,7 +1128,7 @@ def play_game_with_multi_agent(
 1. Test on ARC-AGI-3 API (ls20, ft09, vc33)
 2. Compare scores: heuristic agent vs vision-LLM agent
 3. Record learned rules across games
-4. Save final Flux-multi-model.flx
+4. Save final Flux-Apex-V1.flx
 ```
 
 ---
@@ -1144,7 +1144,7 @@ def play_game_with_multi_agent(
 | 5 | Action parsing reliable | >90% correct parse rate |
 | 6 | Causal learning records effects | ✓ Tracks action → change |
 | 7 | ls20 shows improvement vs heuristic | Score > 0 (was 0 before) |
-| 8 | Saves to Flux-multi-model.flx | ✓ All components serialized |
+| 8 | Saves to Flux-Apex-V1.flx | ✓ All components serialized |
 | 9 | Cross-session learning preserved | Rules learned stay in memory |
 | 10 | VRAM usage ≤ 10GB | ✓ Fits T4 GPU |
 
@@ -1155,7 +1155,7 @@ def play_game_with_multi_agent(
 | Checkpoint | Contents | Size |
 |------------|----------|------|
 | Flux-Base.flx | ALL Phases 1-11 (main checkpoint) | ~500 MB |
-| Flux-multi-model.flx | Phase 12 additions + learned rules | ~550 MB |
+| Flux-Apex-V1.flx | Phase 12 additions + learned rules | ~550 MB |
 
 **LLM Loading Strategy:**
 - LLM weights NOT stored in .flx (too large)
@@ -1182,7 +1182,7 @@ PLUS: Unified embeddings = better cross-modal reasoning!
 Phase 12 connects everything:
 
 ┌─────────────────────────────────────────────────────────────┐
-│                    Flux-multi-model.flx                     │
+│                    Flux-Apex-V1.flx                     │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  LOAD FROM: Flux-Base.flx (contains everything below)       │

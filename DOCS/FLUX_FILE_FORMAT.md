@@ -205,12 +205,56 @@ The upgrade path looks like this:
 
 ```
 Flux-beta.flx      (v1.0-beta)  — Text: CSE + Field + Memory + ByteDecoder
-Flux-to-any.flx    (v2.0)       — + Grid/Image/Audio adapters (XToWave/WaveToX)
-Flux-hybrid.flx    (v1.1-hybrid)— + WaveGenerator + TaskRouter (dual-mode generation)
-Flux-multimodal.flx (v2.0)      — + WaveToImage + WaveToAudio + WaveToMol
+Flux-Apex-V1.flx   (v4.0)       — Full multi-modal: all phases 1-12, grid/image/audio adapters
 ```
 
 Each version extends the previous. No components are removed. Old capabilities are preserved. New capabilities are added to named slots.
+
+---
+
+## The Apex Naming Convention
+
+FLUX models follow a physics-inspired naming hierarchy:
+
+| Tier | Name | Meaning | Use Case |
+|------|------|---------|----------|
+| Development | **Flux-beta** | Initial spark | Early testing, experimental |
+| Capable | **Flux-capable** | Proven functionality | Feature-complete but unoptimized |
+| **Flagship** | **Flux-Apex** | Peak performance | Production-ready, full capability |
+| Future | **Flux-Singularity** | Beyond limits | Reserved for future breakthroughs |
+
+**Current flagship:** `Flux-Apex-V1.flx` (v4.0-multi-modal-enhanced, Phase 12)
+
+The version suffix (`V1`, `V2`, etc.) indicates major architecture revisions. Version numbers inside the file (`v4.0`) track internal format evolution.
+
+---
+
+## Continuous Development Philosophy
+
+**Critical principle: New phases re-save to the SAME filename.**
+
+When extending FLUX with new capabilities:
+
+1. **Load** the current flagship (`Flux-Apex-V1.flx`)
+2. **Add** new components, train new adapters, inject knowledge
+3. **Save** back to `Flux-Apex-V1.flx` — same filename
+
+**Why this matters:**
+
+- Components can be **disabled** via `components.X = False` in runtime_config
+- Components can be **stripped** by removing their state_dict section
+- The file is **self-describing** — it knows what it contains
+- Memory and learned rules **accumulate** — renaming loses continuity
+- External systems **don't break** — the filename is stable
+
+**When to create a NEW filename:**
+
+- Major architecture version bump (V1 → V2)
+- Incompatible format changes
+- Experimental fork you want to preserve
+- Domain-specific variant (e.g., `Flux-Apex-V1-Medical.flx`)
+
+**Default behavior:** Always save to the same filename. The `.flx` format tracks its own history via metadata timestamps and `modified_components` lists.
 
 ### 6. Deployment Without Source Code
 
@@ -317,11 +361,11 @@ The `.flx` version string is not cosmetic. It defines a contract for what sectio
 | Version | Name | New Sections | Key Capability |
 |---------|------|-------------|----------------|
 | `1.0-beta` | Flux-beta | Base 14 components | Text: encode, store, recall, generate |
-| `2.0` | Flux-to-any | `input_adapters`, `output_adapters` | Any modality: grid, image, audio |
-| `1.1-hybrid` | Flux-hybrid | `wave_generator`, `wave_chunker`, `wave_to_text`, `task_router` | Dual-mode generation (fast wave + precise byte) |
-| `2.0+` | Flux-multimodal | `wave_to_image`, `wave_to_audio`, `wave_to_mol` | Cross-modal output |
+| `2.0` | Flux-capable | `input_adapters`, `output_adapters` | Any modality: grid, image, audio |
+| `3.0` | Flux-X | `causal_tracker`, `rule_inducer`, `goal_planner` | Reasoning + knowledge injection |
+| `4.0` | **Flux-Apex-V1** | `spatial_memory`, `llm_reference`, full adapters | Complete multi-modal agent |
 
-Every version is a strict superset of its predecessor. A v2.0 reader can always load a v1.0-beta file. A v1.0-beta reader gracefully ignores sections it doesn't recognize.
+Every version is a strict superset of its predecessor. A v4.0 reader can always load a v1.0-beta file. A v1.0-beta reader gracefully ignores sections it doesn't recognize.
 
 ---
 
@@ -337,7 +381,49 @@ FLUX inverts this. The framework is minimal. The state IS the model. The field's
 
 ---
 
-## Technical Specifications: Flux-beta.flx
+## Technical Specifications: Flux-Apex-V1.flx (Current Flagship)
+
+| Property | Value |
+|----------|-------|
+| Format | FLUX |
+| Version | 4.0-multi-modal-enhanced |
+| Phase | phase12 |
+| File size | 5,793.9 MB |
+| Total parameters | 1,904,320,314 |
+| Total tensors | 652 |
+| Total configs | 14 |
+| Components | 25 top-level keys |
+| Created | 2026-03-30 |
+| Wave dimension | 432 |
+| Field dimensions | 96 × 96 × 96 |
+| Field features | 512 |
+| Decoder hidden dim | 1024 |
+| Decoder layers | 4 |
+| Episodic entries | 74 |
+| Learned rules | 10 |
+| Causal links | 463 |
+| External LLM | Qwen/Qwen2.5-3B-Instruct (4bit) |
+| External VLM | Qwen/Qwen2.5-VL-3B-Instruct |
+| Capabilities | text, grid, image, audio, vision |
+
+### Component Breakdown (Flux-Apex-V1)
+
+| Component | Parameters | % of Total |
+|-----------|------------|------------|
+| field | 1,366,229,131 | 71.7% |
+| memory | 910,997,255 | 47.8% |
+| bridges | 458,118,119 | 24.1% |
+| decoder | 65,057,792 | 3.4% |
+| causal | 58,838,360 | 3.1% |
+| adapters | 15,412,331 | 0.8% |
+| cse | 2,674,528 | 0.1% |
+| grid_to_wave | 384,512 | <0.1% |
+| grid_adapters | 192,256 | <0.1% |
+| spatial_memory | 24,576 | <0.1% |
+
+---
+
+## Historical Reference: Flux-beta.flx
 
 | Property | Value |
 |----------|-------|
