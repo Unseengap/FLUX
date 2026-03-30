@@ -47,10 +47,11 @@ class MemoryConfig:
 @dataclass  
 class GenerationConfig:
     """Controls text generation."""
-    llm_primary: bool = True              # LLM leads generation
-    byte_decoder_enabled: bool = True     # Byte decoder available
+    voice_primary: bool = True            # Embedded voice module leads (NEW)
+    llm_primary: bool = False             # External LLM (DEPRECATED)
+    byte_decoder_enabled: bool = False    # Byte decoder (LEGACY)
     byte_decoder_learns_from_llm: bool = True  # Distillation mode
-    generation_mode: str = 'llm'          # 'llm' | 'byte' | 'hybrid'
+    generation_mode: str = 'voice'        # 'voice' | 'llm' | 'byte' | 'hybrid'
 
 
 @dataclass
@@ -83,7 +84,7 @@ class FieldConfig:
 
 @dataclass
 class LLMConfig:
-    """Controls LLM bridge."""
+    """Controls LLM bridge (DEPRECATED - use VoiceConfig)."""
     model_name: str = 'Qwen/Qwen2.5-3B-Instruct'
     quantization: str = '4bit'
     max_tokens: int = 512
@@ -93,12 +94,45 @@ class LLMConfig:
 
 
 @dataclass
+class VoiceConfig:
+    """
+    Controls embedded voice module (Qwen2.5-Omni).
+    
+    Replaces external LLM with self-contained multimodal generation.
+    Supports text, audio input/output, and vision.
+    """
+    enabled: bool = True                  # Use embedded voice module
+    model_type: str = 'qwen_omni'         # 'qwen_omni' | 'custom'
+    quantization: str = '4bit'            # 'none' | '4bit' | '8bit' | 'svd'
+    
+    # Generation settings
+    max_tokens: int = 512
+    temperature: float = 0.7
+    top_p: float = 0.9
+    top_k: int = 50
+    repetition_penalty: float = 1.1
+    
+    # Modality settings
+    text_enabled: bool = True             # Text generation
+    audio_input_enabled: bool = True      # Audio understanding
+    audio_output_enabled: bool = True     # Speech synthesis
+    vision_enabled: bool = True           # Image/video understanding
+    
+    # FLUX integration
+    use_flux_context: bool = True         # Inject field context
+    flux_context_limit: int = 10          # Max field retrievals
+    store_to_field: bool = True           # Store outputs to field
+
+
+@dataclass
 class FLUXRuntimeConfig:
     """
     Master configuration for FLUX runtime behavior.
     
     Controls which components are active during inference,
     how generation works, and learning parameters.
+    
+    v5.0: Added voice config for embedded Qwen-Omni module.
     """
     perception: PerceptionConfig = field(default_factory=PerceptionConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
@@ -106,7 +140,8 @@ class FLUXRuntimeConfig:
     reasoning: ReasoningConfig = field(default_factory=ReasoningConfig)
     learning: LearningConfig = field(default_factory=LearningConfig)
     field_config: FieldConfig = field(default_factory=FieldConfig)
-    llm: LLMConfig = field(default_factory=LLMConfig)
+    voice: VoiceConfig = field(default_factory=VoiceConfig)  # NEW: Embedded voice
+    llm: LLMConfig = field(default_factory=LLMConfig)  # DEPRECATED
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to nested dict for serialization."""
@@ -117,6 +152,7 @@ class FLUXRuntimeConfig:
             'reasoning': asdict(self.reasoning),
             'learning': asdict(self.learning),
             'field': asdict(self.field_config),
+            'voice': asdict(self.voice),
             'llm': asdict(self.llm),
         }
     
@@ -130,6 +166,7 @@ class FLUXRuntimeConfig:
             reasoning=ReasoningConfig(**d.get('reasoning', {})),
             learning=LearningConfig(**d.get('learning', {})),
             field_config=FieldConfig(**d.get('field', {})),
+            voice=VoiceConfig(**d.get('voice', {})),
             llm=LLMConfig(**d.get('llm', {})),
         )
     
@@ -168,9 +205,15 @@ COMPONENT_REGISTRY = {
     'episodic_memory': {'required': False, 'phase': 6},
     'semantic_memory': {'required': False, 'phase': 6},
     
-    # Generation
-    'decoder': {'required': False, 'phase': 8},
-    'llm': {'required': False, 'phase': 11},
+    # Generation - Voice (NEW in v5.0)
+    'voice': {'required': False, 'phase': 'voice'},
+    'voice_thinker': {'required': False, 'phase': 'voice'},
+    'voice_talker': {'required': False, 'phase': 'voice'},
+    'voice_token2wav': {'required': False, 'phase': 'voice'},
+    
+    # Generation - Legacy
+    'decoder': {'required': False, 'phase': 8, 'legacy': True},
+    'llm': {'required': False, 'phase': 11, 'legacy': True},
     
     # Reasoning
     'causal_tracker': {'required': False, 'phase': 'unified'},
@@ -714,7 +757,8 @@ __all__ = [
     'ReasoningConfig',
     'LearningConfig',
     'FieldConfig',
-    'LLMConfig',
+    'VoiceConfig',  # NEW: Embedded voice module config
+    'LLMConfig',    # DEPRECATED: Use VoiceConfig
     
     # Config instance
     'DEFAULT_CONFIG',
