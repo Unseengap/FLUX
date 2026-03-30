@@ -183,8 +183,10 @@ class ResonanceField7B:
         
         # Get injection location
         location = self._wave_to_location(wave)
-        x, y, z = location.long().clamp(min=radius, max=torch.tensor([H, W, D], device=self.device) - radius - 1)
-        x, y, z = x.item(), y.item(), z.item()
+        coords = location.long()
+        x = coords[0].clamp(min=radius, max=H - radius - 1).item()
+        y = coords[1].clamp(min=radius, max=W - radius - 1).item()
+        z = coords[2].clamp(min=radius, max=D - radius - 1).item()
         
         # Get local neighborhood slices
         x_slice = slice(x - radius, x + radius + 1)
@@ -258,21 +260,21 @@ class ResonanceField7B:
         
         for _ in range(steps):
             # Compute neighbor average (3D convolution with ones kernel)
-            kernel = torch.ones(1, 1, 3, 3, 3, device=self.device) / 27
+            kernel = torch.ones(self.config.features, 1, 3, 3, 3, device=self.device) / 27
             
-            # Need to permute for conv3d: [H,W,D,F] → [F,1,H,W,D]
-            state_5d = self.state.permute(3, 0, 1, 2).unsqueeze(1)
+            # Reshape for conv3d: [H,W,D,F] → [1,F,H,W,D]
+            state_5d = self.state.permute(3, 0, 1, 2).unsqueeze(0)  # [1, F, H, W, D]
             
-            # Convolve each feature channel
+            # Convolve each feature channel (groups=F for depthwise conv)
             neighbor_avg = F.conv3d(
                 state_5d, 
-                kernel.expand(self.config.features, 1, 3, 3, 3),
+                kernel,
                 padding=1,
                 groups=self.config.features,
-            )  # [F, 1, H, W, D]
+            )  # [1, F, H, W, D]
             
             # Back to [H, W, D, F]
-            neighbor_avg = neighbor_avg.squeeze(1).permute(1, 2, 3, 0)
+            neighbor_avg = neighbor_avg.squeeze(0).permute(1, 2, 3, 0)
             
             # Energy gradient: difference from neighbors
             gradient = self.state - neighbor_avg
@@ -295,8 +297,10 @@ class ResonanceField7B:
             steps: Settling iterations
         """
         H, W, D = self.config.size_x, self.config.size_y, self.config.size_z
-        x, y, z = location.long().clamp(min=radius, max=torch.tensor([H, W, D], device=self.device) - radius - 1)
-        x, y, z = x.item(), y.item(), z.item()
+        coords = location.long()
+        x = coords[0].clamp(min=radius, max=H - radius - 1).item()
+        y = coords[1].clamp(min=radius, max=W - radius - 1).item()
+        z = coords[2].clamp(min=radius, max=D - radius - 1).item()
         
         x_slice = slice(x - radius, x + radius + 1)
         y_slice = slice(y - radius, y + radius + 1)
