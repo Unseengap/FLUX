@@ -2,7 +2,7 @@
 
 **FLUX Architecture — Flagship Model Documentation**  
 *For AI Agents, Developers, and Integration Systems*  
-*Version: 4.0-multi-modal-enhanced | Phase: 12 | Created: March 30, 2026*
+*Version: 5.0-voice-embedded | Phase: Voice | Created: March 30, 2026*
 
 ---
 
@@ -14,15 +14,16 @@
 | **Location** | `checkpoints/Flux-Apex-V1.flx` |
 | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
 | **Format** | FLUX (self-describing cognitive architecture) |
-| **Version** | 4.0-multi-modal-enhanced |
-| **Phase** | phase12 |
-| **File Size** | 5,793.9 MB (5.79 GB) |
-| **Total Parameters** | 1,904,320,314 (1.9B) |
-| **Total Tensors** | 652 |
-| **Total Configs** | 14 |
-| **Top-Level Keys** | 25 |
-| **Max Nesting Depth** | 4 |
+| **Version** | 5.0-voice-embedded |
+| **Phase** | phase_voice |
+| **File Size** | ~8,500 MB (~8.5 GB) |
+| **Total Parameters** | ~4,700,000,000 (~4.7B) |
+| **Total Tensors** | ~3,100 |
+| **Total Configs** | 18 |
+| **Top-Level Keys** | 23 |
+| **Max Nesting Depth** | 5 |
 | **Can Continue Learning** | `True` |
+| **Voice Model** | Qwen2.5-Omni-7B (4-bit quantized) |
 
 ---
 
@@ -30,23 +31,29 @@
 
 Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not just weights. It contains:
 
-1. **Wave-based encoding** (no tokenizer, raw UTF-8 bytes)
+1. **Wave-based encoding** (no tokenizer, raw UTF-8 bytes → 432D semantic waves)
 2. **Resonance field** (96³ × 512 knowledge storage)
 3. **Three-tier memory** (working, episodic, semantic)
-4. **Byte-level decoder** (GRU-based text generation)
-5. **Multi-modal adapters** (grid, image, audio)
+4. **Embedded voice model** (Qwen2.5-Omni-7B — text, vision, speech in one)
+5. **Multi-modal adapters** (grid, image, audio, voice)
 6. **Causal reasoning** (CGN nodes + arrow graph)
 7. **Spatial memory** (curiosity-driven exploration)
-8. **LLM/VLM references** (external HuggingFace models)
+8. **Wave↔Voice bridges** (432D ↔ 3584D projections)
 
 ---
 
+## What This Model IS (v5.0 Changes)
+
+- **NOW** an integrated voice LLM — Qwen2.5-Omni-7B weights embedded (4-bit quantized)
+- **REMOVED** byte decoder — replaced by voice thinker module
+- **REMOVED** external LLM references — all generation is internal
+- **NEW** wave↔voice bridges — bidirectional 432D ↔ 3584D projections
+
 ## What This Model is NOT
 
-- **NOT** an integrated LLM — external LLM loaded separately at runtime
-- **NOT** an integrated VLM — external VLM (Qwen2.5-VL) loaded separately
 - **NOT** a traditional transformer — uses physics-inspired wave mechanics
-- **NOT** a tokenizer-based model — operates on raw bytes
+- **NOT** a tokenizer-based model — operates on raw bytes via CSE
+- **NOT** dependent on external models — fully self-contained
 
 ---
 
@@ -75,35 +82,35 @@ Audio        ─┴─► AudioToWave ─────────────┤
 
 ---
 
-## Top-Level Keys (25)
+## Top-Level Keys (23)
 
 | # | Key | Type | Description |
 |---|-----|------|-------------|
 | 1 | `format` | str | `"FLUX"` — format identifier |
-| 2 | `version` | str | `"4.0-multi-modal-enhanced"` |
-| 3 | `phase` | str | `"phase12"` |
-| 4 | `runtime_config` | dict | 7 subsections for runtime behavior |
-| 5 | `components` | dict | 16 boolean flags for enabled components |
+| 2 | `version` | str | `"5.0-voice-embedded"` |
+| 3 | `phase` | str | `"phase_voice"` |
+| 4 | `runtime_config` | dict | 8 subsections for runtime behavior |
+| 5 | `components` | dict | 18 boolean flags for enabled components |
 | 6 | `timestamp` | str | ISO format creation time |
 | 7 | `can_continue_learning` | bool | `True` — supports online learning |
-| 8 | `metadata` | dict | 15 entries (lineage, tests, capabilities) |
+| 8 | `metadata` | dict | 18 entries (lineage, tests, capabilities) |
 | 9 | `cse` | dict | Continuous Semantic Encoder weights |
 | 10 | `grid_to_wave` | dict | ARC grid encoder |
 | 11 | `field` | dict | Resonance field + gravity + thermodynamic state |
 | 12 | `memory` | dict | Working, episodic, semantic memories |
-| 13 | `decoder` | dict | Byte-level text decoder |
-| 14 | `llm` | dict | External LLM configuration (no weights) |
-| 15 | `causal` | dict | CGN state + causal graph |
-| 16 | `bridges` | dict | Wave↔Field projections + router |
-| 17 | `adapters` | dict | Multi-modal adapters (6 types) |
-| 18 | `spatial_memory` | dict | Exploration/curiosity fields |
-| 19 | `causal_tracker` | dict | 463 causal links |
-| 20 | `learned_rules` | dict | 10 induced rules |
-| 21 | `llm_reference` | dict | VLM reference config |
-| 22 | `grid_adapters` | dict | Duplicate encoder (legacy) |
-| 23 | `modified` | bool | `True` — model has been modified |
-| 24 | `modified_components` | list | 3 recently modified components |
-| 25 | `state` | dict | Runtime state snapshots |
+| 13 | `voice` | dict | **Qwen2.5-Omni-7B (4-bit) — thinker, talker, token2wav** |
+| 14 | `causal` | dict | CGN state + causal graph |
+| 15 | `bridges` | dict | Wave↔Field + Wave↔Voice projections |
+| 16 | `adapters` | dict | Multi-modal adapters (6 types) |
+| 17 | `spatial_memory` | dict | Exploration/curiosity fields |
+| 18 | `causal_tracker` | dict | 463 causal links |
+| 19 | `learned_rules` | dict | 10 induced rules |
+| 20 | `modified` | bool | `True` — model has been modified |
+| 21 | `modified_components` | list | Recently modified components |
+| 22 | `state` | dict | Runtime state snapshots |
+| 23 | `removed_components` | list | `["decoder", "llm", "llm_reference", "grid_adapters"]` |
+
+> **v5.0 Changes:** Removed `decoder`, `llm`, `llm_reference`, `grid_adapters`. Added `voice` with embedded Qwen-Omni weights.
 
 ---
 
@@ -111,18 +118,24 @@ Audio        ─┴─► AudioToWave ─────────────┤
 
 | # | Component | Parameters | % of Total | Tensors |
 |---|-----------|------------|------------|---------|
-| 1 | **field** | 1,366,229,131 | 71.7% | 45 |
-| 2 | **memory** | 910,997,255 | 47.8% | 27 |
-| 3 | **bridges** | 458,118,119 | 24.1% | 46 |
-| 4 | **decoder** | 65,057,792 | 3.4% | 33 |
-| 5 | **causal** | 58,838,360 | 3.1% | 397 |
-| 6 | **adapters** | 15,412,331 | 0.8% | 53 |
-| 7 | **cse** | 2,674,528 | 0.1% | 22 |
+| 1 | **voice** | ~2,800,000,000 | 59.6% | ~2,448 |
+| 2 | **field** | 1,366,229,131 | 29.1% | 45 |
+| 3 | **memory** | 910,997,255 | 19.4% | 27 |
+| 4 | **bridges** | 460,000,000 | 9.8% | 50 |
+| 5 | **causal** | 58,838,360 | 1.3% | 397 |
+| 6 | **adapters** | 15,412,331 | 0.3% | 53 |
+| 7 | **cse** | 2,674,528 | <0.1% | 22 |
 | 8 | **grid_to_wave** | 384,512 | <0.1% | 13 |
-| 9 | **grid_adapters** | 192,256 | <0.1% | 13 |
-| 10 | **spatial_memory** | 24,576 | <0.1% | 3 |
+| 9 | **spatial_memory** | 24,576 | <0.1% | 3 |
 
-> **Note:** Percentages sum to >100% because `memory.semantic` and `bridges.router` contain copies of field state.
+**Voice Module Breakdown:**
+| Sub-component | Tensors | Purpose |
+|---------------|---------|---------|
+| thinker | 1,346 | Text + Vision + Audio understanding |
+| talker | 293 | Speech synthesis |
+| token2wav | 809 | Vocoder (speech waveform) |
+
+> **Note:** Percentages based on ~4.7B total params. `decoder`, `llm`, `llm_reference`, `grid_adapters` removed in v5.0.
 
 ---
 
@@ -247,39 +260,76 @@ wave = cse.forward(text.encode('utf-8'))  # → [seq_len, 432]
 
 ---
 
-### 4. Decoder — Byte-Level Text Generation
+### 4. Voice — Embedded Qwen2.5-Omni-7B (4-bit)
 
-**Purpose:** Generate text byte-by-byte from field context.
+**Purpose:** Unified text, vision, and speech understanding + generation.
 
 | Property | Value |
 |----------|-------|
-| Parameters | 32,528,896 |
-| Tensors | 33 |
-| Hidden Dim | 1024 |
-| Layers | 4 (GRU) |
-| Vocab Size | 257 (256 bytes + EOS) |
+| Base Model | Qwen/Qwen2.5-Omni-7B |
+| Quantization | 4-bit (bitsandbytes nf4) |
+| Parameters | ~2,800,000,000 (quantized) |
+| Tensors | ~2,448 |
+| Hidden Dim | 3584 |
+| Vocabulary | 151,936 tokens |
+
+**Sub-modules:**
+
+| Module | Tensors | Purpose |
+|--------|---------|---------|
+| thinker | 1,346 | Text + Vision + Audio understanding (main reasoning) |
+| talker | 293 | Speech synthesis (TTS) |
+| token2wav | 809 | DiT-based vocoder for waveform generation |
 
 **Architecture:**
 ```
-Input Byte → byte_embed (257×256)
-           ↓
-Context → context_proj (512→1024→4096)
-           ↓
-         GRU (4 layers, 1024 hidden)
-           ↓
-         cross_attn (wave context)
-           ↓
-         output_proj (1024→256)
-           ↓
-Output Byte Distribution
+                    ┌─────────────────────────────────────┐
+                    │        VOICE (Qwen-Omni)            │
+                    ├─────────────────────────────────────┤
+Text Input  ───────►│                                     │
+                    │                                     │
+Vision Input ──────►│    THINKER (1346 tensors)          │───► Text Output
+                    │    - Unified understanding          │
+Audio Input ───────►│    - Multi-modal reasoning          │
+                    │                                     │
+                    ├─────────────────────────────────────┤
+                    │                                     │
+                    │    TALKER (293 tensors)             │───► Speech Tokens
+                    │    - Text-to-speech synthesis       │
+                    │                                     │
+                    ├─────────────────────────────────────┤
+                    │                                     │
+                    │    TOKEN2WAV (809 tensors)          │───► Audio Waveform
+                    │    - DiT vocoder                    │
+                    │    - Mel → Waveform                 │
+                    └─────────────────────────────────────┘
 ```
 
-**Key Tensors:**
+**Wave ↔ Voice Bridges:**
+```python
+# Bridge projections (in bridges component)
+wave_to_voice: Linear(432, 3584)   # FLUX waves → voice hidden
+voice_to_wave: Linear(3584, 432)   # voice hidden → FLUX waves
 ```
-context_proj.2         [4096, 1024]     4,194,304 params
-gru.weight_hh_l0       [3072, 1024]     3,145,728 params (× 4 layers)
-cross_attn.in_proj     [3072, 1024]     3,145,728 params
+
+**Config:**
+```python
+{
+    'model_name': 'Qwen/Qwen2.5-Omni-7B',
+    'quantization': '4bit',
+    'wave_dim': 432,
+    'hidden_dim': 3584,
+    'vocab_size': 151936,
+    'modules': ['thinker', 'talker', 'token2wav'],
+    'capabilities': ['text', 'vision', 'audio', 'speech']
+}
 ```
+
+---
+
+### ~~4. Decoder — REMOVED in v5.0~~
+
+> **Note:** The byte-level GRU decoder has been removed in v5.0. Text generation is now handled by the embedded voice thinker module (Qwen-Omni).
 
 ---
 
@@ -414,10 +464,11 @@ visit_count       [64, 64]  — Visit frequency
 ### Generation Settings
 ```python
 {
-    'llm_primary': True,              # Use external LLM for generation
-    'byte_decoder_enabled': True,     # FLUX decoder available
-    'byte_decoder_learns_from_llm': True,
-    'generation_mode': 'llm'          # 'llm' | 'byte' | 'hybrid'
+    'voice_primary': True,            # Use embedded voice model for generation
+    'voice_thinker_enabled': True,    # Text/vision/audio understanding
+    'voice_talker_enabled': True,     # Speech synthesis
+    'voice_token2wav_enabled': True,  # Vocoder for waveforms
+    'generation_mode': 'voice'        # 'voice' | 'wave_only'
 }
 ```
 
@@ -452,66 +503,63 @@ visit_count       [64, 64]  — Visit frequency
 }
 ```
 
-### External LLM Settings
+### ~~External LLM Settings~~ (REMOVED in v5.0)
+
+> LLM is now embedded as the voice module. No external dependencies required.
+
+### Voice Settings (NEW in v5.0)
 ```python
 {
-    'model_name': 'Qwen/Qwen2.5-3B-Instruct',
+    'model_name': 'Qwen/Qwen2.5-Omni-7B',
     'quantization': '4bit',
-    'max_tokens': 512,
+    'hidden_dim': 3584,
+    'max_tokens': 2048,
     'temperature': 0.7,
     'use_flux_context': True,
-    'flux_context_limit': 10
+    'flux_context_limit': 20,
+    'speech_enabled': True,
+    'vision_enabled': True
 }
 ```
 
 ---
 
-## External Dependencies
+## ~~External Dependencies~~ (REMOVED in v5.0)
 
-### LLM (Text Generation)
-```python
-{
-    'name': 'Qwen/Qwen2.5-3B-Instruct',
-    'load_in_4bit': True
-}
-```
-- **NOT stored in .flx** — downloaded from HuggingFace at runtime
-- Parameters: ~3B (quantized to ~1.5GB)
+> **v5.0 Change:** All external dependencies have been removed. The voice model (Qwen2.5-Omni-7B) is now embedded directly in the .flx file.
 
-### VLM (Vision-Language)
-```python
-{
-    'name': 'Qwen/Qwen2.5-VL-3B-Instruct',
-    'load_in_4bit': True,
-    'enable_vision': True,
-    'enable_audio': False
-}
-```
-- **NOT stored in .flx** — downloaded from HuggingFace at runtime
-- Parameters: ~3B (quantized to ~1.5GB)
+~~### LLM (Text Generation)~~ → **Replaced by embedded voice.thinker**
+
+~~### VLM (Vision-Language)~~ → **Replaced by embedded voice.thinker**
+
+The model is now fully self-contained with zero runtime downloads.
 
 ---
 
 ## Enabled Components
 
-| Component | Enabled | Has Weights |
-|-----------|---------|-------------|
-| cse | ✓ | ✓ |
-| grid_to_wave | ✓ | ✓ |
-| spatial_memory | ✓ | ✓ |
-| perception_field | ✗ | ✗ |
-| field | ✓ | ✓ |
-| working_memory | ✓ | ✓ |
-| episodic_memory | ✓ | ✓ |
-| semantic_memory | ✓ | ✓ |
-| decoder | ✓ | ✓ |
-| llm | ✓ | ✗ (external) |
-| causal_tracker | ✓ | ✓ |
-| rule_inducer | ✗ | ✗ |
-| goal_planner | ✗ | ✗ |
-| causal_graph | ✓ | ✓ |
-| bridges | ✓ | ✓ |
-| learned_rules | ✓ | ✓ |
+| Component | Enabled | Has Weights | Notes |
+|-----------|---------|-------------|-------|
+| cse | ✓ | ✓ | Wave encoding |
+| grid_to_wave | ✓ | ✓ | ARC grid → wave |
+| spatial_memory | ✓ | ✓ | Exploration tracking |
+| perception_field | ✗ | ✗ | |
+| field | ✓ | ✓ | Resonance field |
+| working_memory | ✓ | ✓ | Session context |
+| episodic_memory | ✓ | ✓ | Stored facts |
+| semantic_memory | ✓ | ✓ | Deep knowledge |
+| **voice** | ✓ | ✓ | **Qwen-Omni (NEW)** |
+| voice_thinker | ✓ | ✓ | Text+Vision+Audio |
+| voice_talker | ✓ | ✓ | Speech synthesis |
+| voice_token2wav | ✓ | ✓ | Vocoder |
+| causal_tracker | ✓ | ✓ | Causal links |
+| rule_inducer | ✗ | ✗ | |
+| goal_planner | ✗ | ✗ | |
+| causal_graph | ✓ | ✓ | Arrow graph |
+| bridges | ✓ | ✓ | Wave↔Field + Wave↔Voice |
+| learned_rules | ✓ | ✓ | Induced rules |
+| ~~decoder~~ | ✗ | ✗ | **REMOVED** |
+| ~~llm~~ | ✗ | ✗ | **REMOVED** |
 
 ---
 
@@ -528,13 +576,14 @@ This model contains components from all FLUX phases:
 | 5 | CGN (Causal Geometry Nodes) | ✓ |
 | 6 | Three-Tier Memory | ✓ |
 | 7 | FLUX Integration | ✓ |
-| 8 | Byte Decoder | ✓ |
+| 8 | ~~Byte Decoder~~ | **REMOVED** |
 | 8.5 | Grid Adapters | ✓ |
 | 8.8 | Spatial Memory | ✓ |
 | 8.9 | Causal Tracker + Rules | ✓ |
-| 10 | Hybrid LLM Integration | ✓ |
+| 10 | ~~Hybrid LLM Integration~~ | **REMOVED** |
 | 11 | Multi-Modal Adapters | ✓ |
 | 12 | Unified Agent | ✓ |
+| **Voice** | **Embedded Qwen-Omni** | **NEW** |
 
 ---
 
@@ -546,17 +595,19 @@ This model contains components from all FLUX phases:
     'base': 'Flux-X-complete.flx',
     'field_source': 'Flux-capable.flx',
     'grid_encoder': 'gridtowave_contrastive.pt',
-    'llm_config': 'Flux-augmented.flx',
+    'voice_source': 'Qwen/Qwen2.5-Omni-7B (4-bit)',  # NEW in v5.0
     'cse_test': 'PASS',
     'gtw_test': 'PASS',
     'field_test': 'PASS',
     'memory_test': 'PASS',
-    'phase': 12,
-    'description': 'FLUX Multi-Modal Agent with Visual Reasoning',
-    'saved': '2026-03-29T19:30:02.828863',
-    'capabilities': ['text', 'grid', 'image', 'audio', 'vision'],
-    'last_modified': '2026-03-30T00:42:59.212371',
-    'modified_components': ['causal_tracker', 'learned_rules', 'spatial_memory']
+    'voice_test': 'PENDING',                         # NEW in v5.0
+    'phase': 'voice',
+    'description': 'FLUX Cognitive Architecture with Embedded Voice',
+    'saved': '2026-03-30T...',
+    'capabilities': ['text', 'grid', 'image', 'audio', 'vision', 'speech'],
+    'last_modified': '2026-03-30T...',
+    'modified_components': ['voice', 'bridges', 'runtime_config'],
+    'removed_components': ['decoder', 'llm', 'llm_reference', 'grid_adapters']
 }
 ```
 
@@ -576,7 +627,9 @@ raw = torch.load(str(model_path), map_location='cpu', weights_only=False)
 # Access components
 cse_weights = raw['cse']['state_dict']
 field_state = raw['field']['state_dict']['state']  # [96, 96, 96, 512]
-decoder_weights = raw['decoder']['state_dict']
+voice_thinker = raw['voice']['thinker']            # Qwen-Omni thinker
+voice_talker = raw['voice']['talker']              # Speech synthesis
+voice_token2wav = raw['voice']['token2wav']        # Vocoder
 ```
 
 ### Via FLUXModel Class
@@ -625,10 +678,15 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 | field.state_dict.state | [96, 96, 96, 512] | 452,984,832 |
 | memory.semantic.field_state_dict.state | [96, 96, 96, 512] | 452,984,832 |
 | bridges.router.module_state.semantic.field.state | [96, 96, 96, 512] | 452,984,832 |
+| bridges.wave_to_voice.weight | [3584, 432] | 1,548,288 |
+| bridges.voice_to_wave.weight | [432, 3584] | 1,548,288 |
+| voice.thinker.model.* | various | ~2,000,000,000 |
+| voice.talker.* | various | ~500,000,000 |
+| voice.token2wav.* | various | ~300,000,000 |
 | adapters.wave_to_grid.spatial_expand.weight | [57600, 256] | 14,745,600 |
-| decoder.state_dict.context_proj.2.weight | [4096, 1024] | 4,194,304 |
-| decoder.state_dict.gru.weight_hh_l* | [3072, 1024] | 3,145,728 each |
 | causal.cgn_state.state_dict.*.manifold.metric_L | [512, 512] | 262,144 each |
+
+> ~~decoder.state_dict~~ — **REMOVED in v5.0**
 
 ---
 
@@ -639,28 +697,37 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 - CSE outputs: `[seq_len, 432]`
 - Field input: projects 432 → 512
 - Field output: projects 512 → 432
-- Decoder input: projects 432 → 1024
+- **Voice input: projects 432 → 3584** (wave_to_voice bridge)
+- **Voice output: projects 3584 → 432** (voice_to_wave bridge)
 - All adapters: convert modality → 432 or 432 → modality
 
 ---
 
-## Memory Layout
+## Memory Layout (v5.0)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Flux-Apex-V1.flx (5.79 GB)               │
+│                    Flux-Apex-V1.flx (~8.5 GB)              │
 ├─────────────────────────────────────────────────────────────┤
+│  voice (Qwen-Omni 4-bit)         │ ~2.8 GB                  │
+│    ├─ thinker (1346 tensors)    │   ~2.0 GB                │
+│    ├─ talker (293 tensors)      │   ~0.5 GB                │
+│    └─ token2wav (809 tensors)   │   ~0.3 GB                │
+├──────────────────────────────────┼──────────────────────────┤
 │  field.state [96³×512]           │ 1.7 GB (×2 copies)       │
 │  memory.semantic.state           │ (shared with field)      │
 │  bridges.router.semantic.state   │ (shared with field)      │
 ├──────────────────────────────────┼──────────────────────────┤
 │  causal.cgn_state (56 nodes)     │ 112 MB                   │
-│  decoder.state_dict (GRU)        │ 124 MB                   │
+│  bridges.wave_to_voice           │ 6 MB                     │
+│  bridges.voice_to_wave           │ 6 MB                     │
 │  adapters (5 types)              │ 59 MB                    │
 │  cse.state_dict                  │ 5 MB                     │
 │  bridges.projections             │ 2 MB                     │
 │  configs + metadata              │ <1 MB                    │
-└──────────────────────────────────┴──────────────────────────┘
+├──────────────────────────────────┴──────────────────────────┤
+│  REMOVED: decoder, llm, llm_reference, grid_adapters       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -674,5 +741,33 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 
 ---
 
-*This documentation is auto-generated from model introspection.*  
+## Changelog
+
+### v5.0-voice-embedded (March 30, 2026)
+
+**Added:**
+- Embedded Qwen2.5-Omni-7B voice model (4-bit quantized, ~2.8 GB)
+- Wave↔Voice bridges (432D ↔ 3584D projections)
+- Speech synthesis via talker module
+- Vocoder (token2wav) for audio waveform generation
+
+**Removed:**
+- `decoder` — byte-level GRU text generator
+- `llm` — external LLM configuration  
+- `llm_reference` — external VLM reference
+- `grid_adapters` — duplicate of grid_to_wave (was legacy)
+
+**Changed:**
+- File size: 5.79 GB → ~8.5 GB
+- Total parameters: 1.9B → ~4.7B
+- Generation: external LLM → embedded voice thinker
+- Capabilities: added 'speech' to list
+
+### v4.0-multi-modal-enhanced (March 29, 2026)
+- Initial unified multi-modal agent
+- Phase 12 completion
+
+---
+
+*This documentation reflects v5.0-voice-embedded.*  
 *Last updated: March 30, 2026*

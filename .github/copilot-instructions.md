@@ -4,12 +4,13 @@
 
 FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons.
 
-**Current Flagship Model:** `Flux-Apex-V1.flx` (v4.0-multi-modal-enhanced, Phase 12, 1.9B params)
+**Current Flagship Model:** `Flux-Apex-V1.flx` (v5.0-voice-embedded, Phase Voice, ~4.7B params)
 
 **Source of truth:**
 - `DOCS/FLUX_APEX_V1.md` — Complete Flux-Apex model reference
 - `DOCS/FLUX_FILE_FORMAT.md` — .flx format specification
 - `DOCS/FLUX_7B_SPEC.md` — Large-scale architecture spec
+- `DOCS/PHASE_VOICE_SPEC.md` — Voice embedding specification
 - `flux_model.py` — FLUXModel class for loading/saving
 - `flux_utils.py` — Core utilities (checkpoints, logging, HF Hub)
 
@@ -53,9 +54,11 @@ Every component has an enabled/disabled flag in `components`:
     'grid_to_wave': True,
     'field': True,
     'memory': True,
-    'decoder': True,
+    'voice': True,           # Embedded Qwen-Omni
+    'voice_thinker': True,   # Text + vision + audio understanding
+    'voice_talker': True,    # Speech synthesis
+    'voice_token2wav': True, # Vocoder
     'causal_tracker': True,
-    'llm': True,  # External, loaded at runtime
     ...
 }
 ```
