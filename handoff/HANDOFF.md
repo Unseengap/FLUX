@@ -1,8 +1,17 @@
-# FLUX Custom VLM Handoff Documentation
+# FLUX Custom VLM Handoff — v5.2-custom-vlm
 
-**Generated:** 2026-03-30
-**Model Version:** 5.2-custom-vlm
-**Purpose:** Enable next AI agent to continue FLUX VLM development
+**Generated:** 2026-03-31
+**Model Version:** 5.2-custom-vlm  
+**File Size:** 13.18 GB  
+**Status:** ✓ Foundation Complete, Needs Training  
+
+---
+
+## TL;DR — What You Need to Know
+
+The FLUX model now has an embedded Qwen2.5-VL-3B VLM with **working generation** but **no tool calling** and **untrained bridges**. The VLM generates coherent text but doesn't know how to use FLUX's cognitive tools (`encode_grid`, `query_field`, etc.).
+
+**Your Goal:** Make the VLM actually use FLUX tools for ARC puzzle solving.
 
 ---
 
@@ -10,121 +19,189 @@
 
 ```python
 import torch
-from pathlib import Path
 
 # Load model
 model = torch.load('checkpoints/Flux-Apex-V1.flx', map_location='cpu', weights_only=False)
 
 # Check version
-assert model['version'] == '5.2-custom-vlm'
+print(f"Version: {model['version']}")  # 5.2-custom-vlm
+print(f"VLM weights: {len(model['vlm']['weights'])}")  # 824 tensors
 
-# Access VLM
-vlm = model['vlm']
-weights = vlm['weights']  # 824 tensors, ~3.75B params
-bridges = vlm['bridges']  # Wave↔VLM projections
+# VLM is embedded but needs HF architecture to run
+from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
-# Access custom VLM wrapper info
-custom_vlm = vlm['custom_vlm']
-print(custom_vlm['features'])
+processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct", trust_remote_code=True)
+vlm = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    "Qwen/Qwen2.5-VL-3B-Instruct",
+    torch_dtype=torch.float16,
+    device_map="auto",
+    trust_remote_code=True,
+)
+
+# Load embedded weights with key remapping
+weights = model['vlm']['weights']
+remapped = {}
+for k, v in weights.items():
+    if k.startswith('model.'):
+        remapped['model.language_model.' + k[6:]] = v
+    elif k.startswith('visual.'):
+        remapped['model.' + k] = v
+    else:
+        remapped[k] = v
+
+vlm.load_state_dict(remapped, strict=False)  # 823/824 load
 ```
 
 ---
 
-## Architecture Overview
+## Current Capabilities — What Works ✓
 
-### FluxVLM Wrapper
+| Capability | Status | Evidence |
+|------------|--------|----------|
+| **VLM Weight Loading** | ✓ Working | 823/824 weights, 5/5 verified |
+| **Text Generation** | ✓ Working | Coherent responses, 1.8-4s latency |
+| **Temperature Control** | ✓ Working | T=0, 0.7, 1.0 all produce valid output |
+| **FluxVLM Wrapper** | ✓ Working | Hooks, introspection, layer access |
+| **Model Surgery** | ✓ Working | Scale, prune, noise, rollback all work |
+| **Wave Bridges** | ✓ Created | 890K + 886K params, random init |
+| **Save/Load** | ✓ Working | Verified round-trip |
 
-The `FluxVLM` class wraps Qwen2.5-VL-3B-Instruct with:
+### Test Results (Cell 9)
 
-1. **Pre/Post Generation Hooks**
-   - `register_pre_generate_hook(fn)` - Called before generation starts
-   - `register_post_token_hook(fn)` - Called after each token
-   - `register_layer_hook(layer_idx, fn)` - Hook specific layers
-
-2. **Wave Injection**
-   - `inject_wave_context(wave, layer)` - Inject 432D wave into generation
-
-3. **Tool Call Detection**
-   - Automatic detection of `<tool>` tags mid-generation
-   - Parser: `parse_tool_calls(text)` returns list of tool calls
-
-4. **Layer Access**
-   - `get_layer(name)` - Direct layer access
-   - `introspect()` - Model info dict
-
-### Bridge Layers
-
-```python
-# Wave → VLM (432 → 2048)
-wave_to_vlm = WaveToVLMBridge(wave_dim=432, hidden_size=2048)
-vlm_hidden = wave_to_vlm(wave)  # [batch, seq, 2048]
-
-# VLM → Wave (2048 → 432)
-vlm_to_wave = VLMToWaveBridge(hidden_size=2048, wave_dim=432)
-wave_out = vlm_to_wave(vlm_hidden)  # [batch, seq, 432]
 ```
+Temperature: 0.0  → 175 chars, 3.93s
+Temperature: 0.7  → 213 chars, 2.63s  
+Temperature: 1.0  → 171 chars, 1.83s
+```
+
+Response quality: Coherent paragraphs about FLUX (though not factually accurate about FLUX specifically).
 
 ---
 
-## Key Classes
+## Critical Gaps — What's Broken ✗
 
-### FluxVLM
-```python
-class FluxVLM(nn.Module):
-    def __init__(self, config, weights, device='cuda')
-    def load_backend(self, use_hf_model=True)
-    def generate(self, prompt, max_new_tokens, temperature, ...)
-    def get_layer(self, layer_name) -> nn.Module
-    def inject_wave_context(self, wave, layer)
-    def register_pre_generate_hook(self, hook)
-    def introspect(self) -> Dict
+### 1. Tool Calling Does NOT Work
+
+**Problem:** When asked to use tools like `encode_grid`, the VLM writes *about* the tool instead of calling it.
+
+**Test Prompt:**
+```
+Analyze this ARC grid pattern...
+Use the encode_grid tool to analyze it, then describe the pattern.
 ```
 
-### FluxGenerator
-```python
-class FluxGenerator:
-    def __init__(self, flux_vlm)
-    def generate_with_hooks(self, prompt, system_prompt, max_new_tokens, ...)
-    def pre_generate_hook(self, input_ids, attention_mask, wave_context)
-    def post_token_hook(self, token_id, token_str, position)
+**Actual Output:** Long explanation of what ARC grids are (no `<tool>` tags)
+
+**Expected Output:**
+```xml
+<tool>encode_grid</tool>
+<params>{"grid": [[0,1,0],[1,2,1],[0,1,0]], "mode": "holistic"}</params>
 ```
 
-### ToolInjector
-```python
-class ToolInjector:
-    def __init__(self, model_state)
-    def parse_tool_call(self, text) -> Optional[Dict]
-    def execute_tool(self, tool_call) -> Dict
-    def format_result_for_injection(self, result) -> str
-    def set_wave_variable(self, name, value)
+**Root Cause:** VLM was never fine-tuned on tool-use format.
+
+### 2. Orchestration Not Loaded
+
+**Problem:** `model['orchestration']` exists but has 0 tools.
+
+```
+Available tools: 0
 ```
 
-### ModelSurgeon
-```python
-class ModelSurgeon:
-    def __init__(self, model)
-    def get_layer(self, name) -> nn.Module
-    def set_layer(self, name, module) -> bool
-    def freeze_layers(self, pattern) -> int
-    def unfreeze_layers(self, pattern) -> int
-    def get_trainable_params(self) -> Dict
-    def save_checkpoint(self, name)
-    def rollback(self, name) -> bool
+This means even if VLM emitted `<tool>` tags, there's nothing to execute.
+
+### 3. Bridge Layers Untrained
+
+**Problem:** Wave↔VLM bridges have random weights.
+
+```
+Cosine similarity: 0.0026 (random init)
+MSE: 2.12
 ```
 
-### WeightSurgeon
-```python
-class WeightSurgeon:
-    def __init__(self, model)
-    def scale_layer_weights(self, layer_name, factor) -> int
-    def prune_layer(self, layer_name, threshold) -> Dict
-    def add_noise(self, layer_name, std) -> int
-    def quantize_layer(self, layer_name, bits) -> Dict
-```
+**Impact:** Cannot inject FLUX wave context into VLM generations.
+
+### 4. No Vision Testing
+
+**Problem:** VLM supports images but vision pathway untested.
 
 ---
 
-## Model State Structure
+## The Goal — ARC Puzzle Solving
+
+FLUX should solve ARC-AGI puzzles using this workflow:
+
+```
+User: "Solve this ARC puzzle: [input grid]"
+      
+VLM: <tool>encode_grid</tool>
+     <params>{"grid": [...], "mode": "holistic"}</params>
+
+System: [executes, returns wave]
+
+VLM: <tool>query_field</tool>
+     <params>{"wave": "$LAST_WAVE", "top_k": 5}</params>
+
+System: [returns related patterns from memory]
+
+VLM: "I see a rotation pattern. The output should be:
+     [[1,0,1],
+      [0,2,0],
+      [1,0,1]]"
+```
+
+**Current Reality:** VLM just writes prose about grids instead of calling tools.
+
+---
+
+## Priority Task List
+
+### P0: Enable Tool Calling (CRITICAL)
+
+1. **Add orchestration tools to model**
+   - Load from `DOCS/PHASE_ORCHESTRATOR_SPEC.md`
+   - Include: `encode_grid`, `query_field`, `recall_memory`, `decode_grid`
+   - Save to `model['orchestration']['tools']`
+
+2. **Fine-tune VLM on tool-use format**
+   - Create dataset of (prompt, tool_call) pairs
+   - Format: User asks → VLM emits `<tool>name</tool><params>{...}</params>`
+   - Fine-tune on 1000+ examples
+   - Or use few-shot prompting in system prompt
+
+3. **Connect ToolInjector to real components**
+   - Replace mock `execute_tool()` with actual CSE, Field, Memory calls
+   - Wire `encode_grid` → `model['adapters']['grid_to_wave']`
+   - Wire `query_field` → `model['field']['state_dict']`
+
+### P1: Train Bridge Layers
+
+1. **Create wave-text pairs dataset**
+   - Encode text with CSE → wave
+   - Store (wave, text) pairs
+
+2. **Contrastive training**
+   - wave → WaveToVLMBridge → VLM hidden
+   - text → VLM embedding → target hidden  
+   - Loss: cosine similarity + reconstruction
+
+3. **Target:** cos_sim > 0.9 after training
+
+### P2: Vision Integration
+
+1. Test image input through VLM
+2. Verify `visual.*` weights work
+3. Connect to ARC puzzle images
+
+### P3: Remove HuggingFace Dependency
+
+1. Implement native transformer in `phases/phase_vlm_native/vlm_architecture.py`
+2. Load weights directly without `from_pretrained()`
+3. No more network dependency at runtime
+
+---
+
+## Model Structure
 
 ```python
 model = {
@@ -134,255 +211,151 @@ model = {
     
     'vlm': {
         'base_model': 'Qwen/Qwen2.5-VL-3B-Instruct',
+        'quantization': 'fp16',
+        'total_params': 3_754_622_976,
         'weights': {...},  # 824 tensors
         'config': {
             'hidden_size': 2048,
             'num_hidden_layers': 36,
+            'num_attention_heads': 16,
+            'num_key_value_heads': 2,
+            'intermediate_size': 11008,
             'vocab_size': 151936,
         },
         'bridges': {
-            'wave_to_vlm': {'state_dict': ...},
-            'vlm_to_wave': {'state_dict': ...},
+            'wave_to_vlm': {'wave_dim': 432, 'hidden_size': 2048, 'state_dict': ...},
+            'vlm_to_wave': {'hidden_size': 2048, 'wave_dim': 432, 'state_dict': ...},
         },
         'custom_vlm': {
             'enabled': True,
             'wrapper_class': 'FluxVLM',
-            'features': [...],
+            'features': ['hooks', 'wave_injection', 'tool_detection'],
         },
     },
     
-    'orchestration': {
-        'tools': {...},  # 17 tools
-        'system_prompt': '...',
+    # OTHER FLUX COMPONENTS
+    'cse': {...},           # Continuous Semantic Encoder (bytes → 432D waves)
+    'field': {...},         # Resonance Field (96³ × 512 knowledge storage)
+    'memory': {...},        # Three-tier memory (working, episodic, semantic)
+    'decoder': {...},       # Byte decoder (waves → text)
+    'causal': {...},        # CGN nodes + causal graph
+    'adapters': {
+        'grid_to_wave': {...},  # ARC grid encoder
     },
     
-    # Other components...
-    'cse': {...},
-    'field': {...},
-    'memory': {...},
+    # NEEDS POPULATION
+    'orchestration': {
+        'tools': {},        # EMPTY — needs tool definitions
+        'system_prompt': '',
+    },
 }
 ```
 
 ---
 
-## Known Issues / Limitations
+## Key Files
 
-1. **HuggingFace Architecture Dependency**
-   - Still loads model architecture from HF (cached)
-   - Weights are embedded, but class needs `trust_remote_code`
-   - Future: Implement native transformer without HF dependency
-
-2. **Bridge Layers Not Trained**
-   - WaveToVLMBridge and VLMToWaveBridge have random weights
-   - Need contrastive training on wave-text pairs
-   - Low cosine similarity expected until trained
-
-3. **Tool Execution is Simulated**
-   - ToolInjector returns mock results
-   - Actual integration with FLUX components needed
-
-4. **No Vision Testing Done**
-   - VLM supports vision but not tested in this notebook
-   - Need to verify image encoding through bridges
+| File | Purpose |
+|------|---------|
+| `checkpoints/Flux-Apex-V1.flx` | The model (13.18 GB) |
+| `notebooks/flux_vlm_native_embed.ipynb` | VLM integration notebook |
+| `flux_utils.py` | Checkpoint management, HF upload |
+| `.github/copilot-instructions.md` | AI agent instructions |
+| `DOCS/PHASE_ORCHESTRATOR_SPEC.md` | Tool definitions |
+| `DOCS/FLUX_APEX_V1.md` | Model reference |
+| `phases/phase2/flux_format.py` | VLM loading utility |
 
 ---
 
-## Recommended Next Steps
+## Critical Code Patterns
 
-1. **Train Bridge Layers**
-   - Create contrastive dataset: (wave, text) pairs
-   - Train bridges to align wave and VLM spaces
-   - Target: cos_sim > 0.9 after training
+### Loading VLM (MUST use Qwen2.5, not Qwen2)
 
-2. **Implement Native VLM**
-   - Use `phases/phase_vlm_native/vlm_architecture.py`
-   - Remove HuggingFace dependency entirely
-   - Load weights directly from .flx
-
-3. **Integrate Tool Execution**
-   - Connect ToolInjector to actual FLUX components
-   - Test query_field, encode_grid, etc.
-
-4. **Test on ARC Puzzles**
-   - Use orchestrated VLM for puzzle solving
-   - Evaluate tool call accuracy
-
-5. **Fine-tune for Tool Use**
-   - Create tool-use training data
-   - Fine-tune VLM on tool calling patterns
-
----
-
-## Test Results Summary
-
-| Test | Status | Notes |
-|------|--------|-------|
-| FluxVLM wrapper | ✓ | Created successfully |
-| Bridge layers | ✓ | Random init, needs training |
-| Generation (T=0.7) | ✓ | Works with embedded weights |
-| Tool detection | ✓ | Parses <tool> tags correctly |
-| Layer inspection | ✓ | Can access all 36 layers |
-| Weight surgery | ✓ | Scale/prune/noise work |
-| Rollback | ✓ | Checkpoint/restore works |
-
----
-
-## File Locations
-
-- **Model:** `checkpoints/Flux-Apex-V1.flx` (v5.2-custom-vlm)
-- **Notebook:** `notebooks/flux_vlm_native_embed.ipynb`
-- **Native VLM:** `phases/phase_vlm_native/vlm_architecture.py`
-- **SVD Utils:** `phases/phase_vlm_native/vlm_svd.py`
-- **Handoff Dir:** `handoff/`
-
----
-
-## Architecture Diagram
-
-```
-FLUX Custom VLM Architecture
-═════════════════════════════
-
-┌─────────────────────────────────────────────────────────────┐
-│                      User Input                              │
-│                    (text or image)                          │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      FluxProcessor                          │
-│   - Apply chat template                                      │
-│   - Handle $WAVE_VARIABLES                                   │
-│   - Extract tool calls                                       │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       FluxVLM                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              Pre-Generate Hooks                       │   │
-│  │   - Wave context injection                            │   │
-│  │   - System prompt prepending                          │   │
-│  └─────────────────────────┬────────────────────────────┘   │
-│                             │                                │
-│  ┌──────────────────────────▼────────────────────────────┐   │
-│  │           Qwen2.5-VL-3B Backbone                      │   │
-│  │  ┌────────────────────────────────────────────────┐   │   │
-│  │  │ Embed Tokens (151936 vocab)                    │   │   │
-│  │  ├────────────────────────────────────────────────┤   │   │
-│  │  │ 36 Transformer Layers                          │   │   │
-│  │  │   - Self-Attention (GQA: 16 heads, 2 KV)       │   │   │
-│  │  │   - MLP (2048 → 11008 → 2048)                  │   │   │
-│  │  │   - Layer hooks available                      │   │   │
-│  │  ├────────────────────────────────────────────────┤   │   │
-│  │  │ LM Head (2048 → 151936)                        │   │   │
-│  │  └────────────────────────────────────────────────┘   │   │
-│  └─────────────────────────┬────────────────────────────┘   │
-│                             │                                │
-│  ┌──────────────────────────▼────────────────────────────┐   │
-│  │              Post-Token Hooks                         │   │
-│  │   - Tool call detection (<tool>...</tool>)            │   │
-│  │   - Early stopping                                    │   │
-│  └─────────────────────────┬────────────────────────────┘   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    ToolInjector                             │
-│   - Parse tool calls                                         │
-│   - Execute via FLUX components                              │
-│   - Inject results back                                      │
-└──────────────────────────────────────────────────────────────┘
-
-Wave Integration Points:
-────────────────────────
-
-   CSE Output                          VLM Hidden
-  [seq, 432]   ──► WaveToVLMBridge ──► [seq, 2048]
-                                             │
-                                             ▼
-                                    Inject at layer N
-                                             │
-                                             ▼
-                              VLM generates with context
-                                             │
-  [seq, 432]   ◄── VLMToWaveBridge ◄── [seq, 2048]
-   Wave Out                            Hidden States
-```
-
----
-
-## Instructions for Next AI Agent
-
-Hello, future AI! Here's how to continue this work:
-
-### 1. START HERE
-Read this file (handoff/HANDOFF.md) for complete context.
-
-### 2. LOAD THE MODEL
 ```python
-import torch
-model = torch.load('checkpoints/Flux-Apex-V1.flx', map_location='cpu', weights_only=False)
-assert model['version'] == '5.2-custom-vlm'
+# CORRECT
+from transformers import Qwen2_5_VLForConditionalGeneration
+
+# WRONG — architecture mismatch
+from transformers import Qwen2VLForConditionalGeneration
 ```
 
-### 3. KEY GOAL
-Remove HuggingFace dependency by using native VLM implementation.
-The code is in `phases/phase_vlm_native/vlm_architecture.py`
+### Weight Key Remapping
 
-### 4. WHAT WORKS
-- FluxVLM wrapper with embedded weights
-- Generation with hooks
-- Tool detection
-- Model surgery
+```python
+# Embedded keys use: model.X, visual.X
+# HuggingFace expects: model.language_model.X, model.visual.X
 
-### 5. WHAT NEEDS WORK
-- Train bridge layers (currently random)
-- Use native VLM instead of HF
-- Connect tools to actual FLUX components
-- Test on ARC puzzles
+for emb_key, tensor in weights.items():
+    if emb_key.startswith('model.'):
+        hf_key = 'model.language_model.' + emb_key[6:]
+    elif emb_key.startswith('visual.'):
+        hf_key = 'model.' + emb_key
+    else:
+        hf_key = emb_key
+    remapped[hf_key] = tensor
+```
 
-### 6. QUICK TEST
-Run `notebooks/flux_vlm_native_embed.ipynb` to verify everything works.
+### Tool Call Format
+
+```xml
+<tool>tool_name</tool>
+<params>{"key": "value"}</params>
+```
+
+Parse with:
+```python
+import re
+pattern = r'<tool>\s*([^<]+?)\s*</tool>\s*<params>\s*([^<]+?)\s*</params>'
+matches = re.findall(pattern, text, re.DOTALL)
+```
 
 ---
 
-## API Reference
+## Bugs Already Fixed
 
-### FluxVLM Methods
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| Wrong transformer class | MLP key mismatch | Use `Qwen2_5_VLForConditionalGeneration` |
+| Key prefix mismatch | 0/5 verification | Remap `model.X` → `model.language_model.X` |
+| Verification wrong | Pass load, fail verify | Use same remapping in verify |
 
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `__init__` | `config: Dict, weights: Dict, device: str` | - | Initialize wrapper |
-| `load_backend` | `use_hf_model: bool` | - | Load underlying model |
-| `generate` | `prompt: str, max_new_tokens: int, temperature: float` | `str` | Generate text |
-| `get_layer` | `layer_name: str` | `nn.Module` | Access layer by name |
-| `inject_wave_context` | `wave: Tensor, layer: int` | - | Set wave for injection |
-| `register_pre_generate_hook` | `hook: callable` | - | Add pre-gen hook |
-| `register_post_token_hook` | `hook: callable` | - | Add post-token hook |
-| `introspect` | - | `Dict` | Get model info |
+---
 
-### WeightSurgeon Methods
+## Run the Notebook
 
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `scale_layer_weights` | `layer_name: str, factor: float` | `int` | Scale weights |
-| `prune_layer` | `layer_name: str, threshold: float` | `Dict` | Zero small weights |
-| `add_noise` | `layer_name: str, std: float` | `int` | Add Gaussian noise |
-| `quantize_layer` | `layer_name: str, bits: int` | `Dict` | Simulate quantization |
+On Kaggle (Tesla T4 16GB):
+
+```bash
+# 1. Clone repo
+git clone https://github.com/Unseengap/FLUX.git
+
+# 2. Open notebook
+notebooks/flux_vlm_native_embed.ipynb
+
+# 3. Run all cells
+# Expected: 18 cells, ~5 min total, all PASS
+```
+
+---
+
+## Success Criteria
+
+You've achieved the goal when:
+
+- [ ] VLM emits `<tool>encode_grid</tool>` when asked to analyze grids
+- [ ] ToolInjector executes the call and returns actual wave
+- [ ] VLM uses tool results to produce correct ARC output
+- [ ] Bridge similarity > 0.9 (wave ↔ VLM aligned)
+- [ ] At least 1 ARC puzzle solved end-to-end
 
 ---
 
 ## Contact / Context
 
-This handoff was generated by an AI agent working on FLUX VLM integration.
-The goal is to enable fully self-contained VLM generation without HuggingFace
-runtime dependencies, with full control over inference via hooks and surgery.
+This handoff was generated after running `flux_vlm_native_embed.ipynb` on Kaggle. The VLM infrastructure is complete but needs training/fine-tuning to actually use FLUX tools.
 
-**Key Insight:** The embedded weights work, but the architecture class still
-comes from HuggingFace. The next step is using `vlm_architecture.py` to
-implement the transformer natively.
+**Key Insight:** The model can generate text. It just doesn't know it should call tools.
 
 ---
 
-*FLUX v5.2-custom-vlm — Physics-inspired AI with embedded VLM and full control*
+*FLUX v5.2-custom-vlm — Embedded VLM, needs tool training*
