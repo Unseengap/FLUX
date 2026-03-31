@@ -2078,7 +2078,7 @@ from flux_utils import (
 ## Implementation Checklist
 
 ### Phase 1: Compression
-- [ ] Create `flux_lite_compression.ipynb`
+- [x] Create `flux_lite_compression.ipynb` ✅ **DONE** (2026-03-31)
 - [ ] Implement `CompactField` class
 - [ ] Remove semantic memory duplication
 - [ ] LoRA-compress bridges
@@ -2088,7 +2088,7 @@ from flux_utils import (
 - [ ] Save Flux-Lite-Base.flx
 
 ### Phase 2: Embed Language Models
-- [ ] Create `flux_embed_all_models.ipynb`
+- [x] Create `flux_embed_all_models.ipynb` ✅ **DONE** (2026-03-31)
 - [ ] Embed Qwen2.5-1.5B-Instruct
 - [ ] Embed/migrate VLM (Qwen2.5-VL-3B)
 - [ ] Embed Qwen2.5-Coder-1.5B
@@ -2119,6 +2119,136 @@ from flux_utils import (
 - [ ] Verify offline operation
 - [ ] Memory profiling all scenarios
 - [ ] Upload to HuggingFace
+
+---
+
+## Current Progress & Next Steps
+
+**Last Updated:** 2026-03-31
+
+### ✅ Completed
+| Date | Task | Notes |
+|------|------|-------|
+| 2026-03-31 | Created `flux_lite_compression.ipynb` | 13 cells, field/memory/bridge compression |
+| 2026-03-31 | Created `flux_embed_all_models.ipynb` | 18 cells, 7 models to embed |
+
+### 🔄 Next Steps (In Order)
+
+#### Step 1: Run Phase 1 Compression
+```bash
+# On Kaggle or Colab with GPU
+# Open: notebooks/flux_lite_compression.ipynb
+# Run all cells sequentially
+# Expected output: checkpoints/Flux-Lite-Base.flx (~500MB)
+```
+
+**Cells to monitor for issues:**
+- Cell 3: Model download from HuggingFace (may timeout)
+- Cell 4: Field compression SVD (may OOM on low RAM)
+- Cell 11: Save Flux-Lite-Base.flx
+
+#### Step 2: Debug Phase 1 (if issues)
+- Check Issues Log below
+- Fix and re-run failed cells
+- Verify `Flux-Lite-Base.flx` exists and loads
+
+#### Step 3: Run Phase 2 Embedding
+```bash
+# On Kaggle or Colab with GPU (T4 16GB minimum, P100 recommended)
+# Open: notebooks/flux_embed_all_models.ipynb
+# Run all cells sequentially
+# Expected output: checkpoints/Flux-Apex-V1.flx (~14-17GB)
+```
+
+**Cells to monitor for issues:**
+- Cell 5-11: Model downloads (each ~1-6GB, may timeout)
+- Cell 16: Save final model (may take 5-15 minutes)
+- Cell 17: HuggingFace upload (may timeout on large file)
+
+#### Step 4: Debug Phase 2 (if issues)
+- Check Issues Log below
+- Models can be embedded one-at-a-time if memory issues
+- Verify all models present in final .flx
+
+#### Step 5: Validate & Upload
+- Run `flux_lite_full_test.ipynb` (create if needed)
+- Upload to HuggingFace Hub
+- Update version in README
+
+---
+
+## Issues Log & Solutions
+
+Track issues encountered during notebook runs and their solutions.
+
+### Phase 1 Issues
+
+| Date | Cell | Issue | Solution | Status |
+|------|------|-------|----------|--------|
+| | | | | |
+
+### Phase 2 Issues
+
+| Date | Cell | Issue | Solution | Status |
+|------|------|-------|----------|--------|
+| | | | | |
+
+### Common Issues & Solutions
+
+#### OOM (Out of Memory) on Field Compression
+```python
+# Solution: Reduce field resolution further
+CompactField(original_field, target_resolution=(32, 32, 32), target_features=128)
+```
+
+#### HuggingFace Download Timeout
+```python
+# Solution: Use resume_download
+hf_hub_download(..., resume_download=True)
+```
+
+#### Model Embedding OOM
+```python
+# Solution: Embed one model at a time, save after each
+# Clear GPU memory between models:
+del model
+gc.collect()
+torch.cuda.empty_cache()
+```
+
+#### Save Timeout on Large File
+```python
+# Solution: Use faster pickle protocol
+torch.save(flux_model, path, pickle_protocol=5)  # Python 3.8+ only
+```
+
+#### CUDA Out of Memory During Inference
+```python
+# Solution: Unload models not in use
+loader.unload()  # Frees GPU memory
+```
+
+---
+
+## Session Notes
+
+Use this section to document progress during each work session.
+
+### Session: 2026-03-31
+**Goal:** Create Phase 1 and Phase 2 notebooks
+
+**Completed:**
+- [x] Created `flux_lite_compression.ipynb` with 13 cells
+- [x] Created `flux_embed_all_models.ipynb` with 18 cells
+- [x] Updated this spec with progress tracking
+
+**Next Session:**
+- [ ] Run Phase 1 notebook on Kaggle
+- [ ] Debug any issues
+- [ ] Run Phase 2 notebook
+- [ ] Verify final model loads correctly
+
+---
 
 ---
 
