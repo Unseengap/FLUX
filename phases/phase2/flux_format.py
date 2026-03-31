@@ -782,7 +782,7 @@ def load_embedded_vlm(
         RuntimeError: If VLM loading fails
     """
     try:
-        from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+        from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
     except ImportError:
         raise ImportError(
             "transformers not installed. Run: pip install transformers"
@@ -820,11 +820,10 @@ def load_embedded_vlm(
     )
     
     # Step 2: Load model architecture from HuggingFace (CACHED after first run)
-    # CRITICAL: Use Qwen2VLForConditionalGeneration, NOT AutoModel!
-    # AutoModel gives base model WITHOUT generate() method.
-    # Qwen2VLForConditionalGeneration works for both Qwen2-VL and Qwen2.5-VL.
+    # CRITICAL: Use Qwen2_5_VLForConditionalGeneration for Qwen2.5-VL models!
+    # Qwen2VLForConditionalGeneration is for Qwen2-VL (different MLP architecture).
     print(f"  [2/3] Loading model architecture (cached after first run)...")
-    vlm_model = Qwen2VLForConditionalGeneration.from_pretrained(
+    vlm_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         base_model,
         torch_dtype=torch_dtype,
         device_map=device,

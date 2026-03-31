@@ -720,7 +720,7 @@ Qwen2.5-VL and similar models use `trust_remote_code=True`, which means:
 
 ```python
 import torch
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
 # Load .flx file
 model = torch.load('checkpoints/Flux-Apex-V1.flx', map_location='cpu')
@@ -736,9 +736,9 @@ if 'vlm' in model:
     )
     
     # Step 2: Load model ARCHITECTURE from HuggingFace (CACHED after first run)
-    # CRITICAL: Use Qwen2VLForConditionalGeneration, NOT AutoModel!
-    # AutoModel gives base model WITHOUT generate() method.
-    vlm_model = Qwen2VLForConditionalGeneration.from_pretrained(
+    # CRITICAL: Use Qwen2_5_VLForConditionalGeneration for Qwen2.5-VL models!
+    # Qwen2VLForConditionalGeneration is for Qwen2-VL (different MLP architecture)
+    vlm_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         "Qwen/Qwen2.5-VL-3B-Instruct",
         torch_dtype=torch.float16,
         device_map="auto",
@@ -786,8 +786,11 @@ vlm_model = AutoModelForCausalLM.from_pretrained(...)  # FAILS!
 # ❌ WRONG: AutoModelForVision2Seq doesn't exist
 vlm_model = AutoModelForVision2Seq.from_pretrained(...)  # FAILS!
 
-# ✅ CORRECT: Qwen2VLForConditionalGeneration works for BOTH Qwen2-VL AND Qwen2.5-VL
-from transformers import Qwen2VLForConditionalGeneration  # Use this!
+# ❌ WRONG: Qwen2VLForConditionalGeneration is for Qwen2-VL, not Qwen2.5-VL!
+from transformers import Qwen2VLForConditionalGeneration  # Wrong for 2.5!
+
+# ✅ CORRECT: Use Qwen2_5_VLForConditionalGeneration for Qwen2.5-VL
+from transformers import Qwen2_5_VLForConditionalGeneration  # Use this!
 ```
 
 ### VLM Storage Structure in .flx
