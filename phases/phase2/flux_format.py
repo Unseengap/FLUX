@@ -213,7 +213,7 @@ COMPONENT_REGISTRY = {
     'episodic_memory': {'required': False, 'phase': 6},
     'semantic_memory': {'required': False, 'phase': 6},
     
-    # Generation - Voice (NEW in v5.0)
+    # Generation - Voice (v5.0)
     'voice': {'required': False, 'phase': 'voice'},
     'voice_thinker': {'required': False, 'phase': 'voice'},
     'voice_talker': {'required': False, 'phase': 'voice'},
@@ -231,6 +231,23 @@ COMPONENT_REGISTRY = {
     
     # Bridges
     'bridges': {'required': False, 'phase': 8},
+    
+    # Embedded Models (v6.0+ schema) — stored in 'models' dict
+    'models': {'required': False, 'phase': 'fabric'},
+    'instruct': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    'vlm': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    'coder': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    'whisper': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    'tts': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    'embedding': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    'clip': {'required': False, 'phase': 'fabric', 'category': 'model'},
+    
+    # Detection Models (v7.0+ schema) — also in 'models' dict
+    'face': {'required': False, 'phase': 'fabric', 'category': 'detection'},
+    'object_detect': {'required': False, 'phase': 'fabric', 'category': 'detection'},
+    'depth': {'required': False, 'phase': 'fabric', 'category': 'detection'},
+    'pose': {'required': False, 'phase': 'fabric', 'category': 'detection'},
+    'speaker_detect': {'required': False, 'phase': 'fabric', 'category': 'detection'},
 }
 
 

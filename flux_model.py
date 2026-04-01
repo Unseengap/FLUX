@@ -50,6 +50,14 @@ from flux_format import (
     print_config,
 )
 
+# Import lazy loader (optional - graceful fallback if not available)
+try:
+    from flux_lazy_loader import LazyModelManager, list_embedded_models as _list_embedded
+    LAZY_LOADER_AVAILABLE = True
+except ImportError:
+    LAZY_LOADER_AVAILABLE = False
+    LazyModelManager = None
+
 
 # ─────────────────────────────────────────────
 # Component Definitions
@@ -58,9 +66,17 @@ from flux_format import (
 COMPONENT_CATEGORIES = {
     'perception': ['cse', 'grid_to_wave', 'spatial_memory', 'perception_field'],
     'knowledge': ['field', 'working_memory', 'episodic_memory', 'semantic_memory'],
-    'generation': ['decoder', 'llm'],
+    'generation': ['decoder', 'llm', 'voice'],
     'reasoning': ['causal_tracker', 'rule_inducer', 'goal_planner', 'causal_graph'],
     'bridges': ['bridges', 'wave_to_field', 'field_to_wave'],
+    # Embedded models (v6.0+ schema)
+    'models': [
+        'instruct', 'vlm', 'coder', 'whisper', 'tts', 'embedding', 'clip',
+    ],
+    # Detection models (v7.0+ schema)
+    'detection': [
+        'face', 'object_detect', 'depth', 'pose', 'speaker_detect',
+    ],
 }
 
 
@@ -614,6 +630,123 @@ class FLUXModel:
     # Info / Debug
     # ─────────────────────────────────────────
     
+    # ─────────────────────────────────────────
+    # Embedded Models (v6.0+ schema)
+    # ─────────────────────────────────────────
+    
+    def list_embedded_models(self) -> List[Dict[str, Any]]:
+        """
+        List all embedded models in the .flx file.
+        
+        Returns:
+            List of dicts with model info (name, base_model, lazy_load, has_weights)
+        """
+        models = []
+        
+        # Check 'models' dict (v6.0+ schema)
+        if 'models' in self.state and isinstance(self.state['models'], dict):
+            for name, config in self.state['models'].items():
+                if isinstance(config, dict):
+                    models.append({
+                        'name': name,
+                        'base_model': config.get('base_model', 'unknown'),
+                        'lazy_load': config.get('lazy_load', True),
+                        'quantization': config.get('quantization', 'unknown'),
+                        'has_weights': bool(
+                            config.get('weights') or 
+                            config.get('state_dict') or
+                            config.get('onnx_models')
+                        ),
+                    })
+        
+        # Check top-level 'voice' (v5.0 schema)
+        if 'voice' in self.state and 'voice' not in [m['name'] for m in models]:
+            voice = self.state['voice']
+            if isinstance(voice, dict) and ('thinker' in voice or 'weights' in voice):
+                models.append({
+                    'name': 'voice',
+                    'base_model': voice.get('base_model', 'Qwen/Qwen2.5-Omni-7B'),
+                    'lazy_load': False,
+                    'quantization': voice.get('quantization', '4bit'),
+                    'has_weights': True,
+                })
+        
+        # Check top-level 'vlm' (backward compat)
+        if 'vlm' in self.state and 'vlm' not in [m['name'] for m in models]:
+            vlm = self.state['vlm']
+            if isinstance(vlm, dict) and 'weights' in vlm:
+                models.append({
+                    'name': 'vlm',
+                    'base_model': vlm.get('base_model', 'unknown'),
+                    'lazy_load': vlm.get('lazy_load', True),
+                    'quantization': vlm.get('quantization', 'fp16'),
+                    'has_weights': True,
+                })
+        
+        return models
+    
+    def get_embedded_model(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get an embedded model's config and weights.
+        
+        Args:
+            name: Model name (e.g., 'instruct', 'vlm', 'face')
+        
+        Returns:
+            Dict with model config and weights, or None
+        """
+        # Check 'models' dict first
+        if 'models' in self.state and name in self.state['models']:
+            return self.state['models'][name]
+        
+        # Check top-level
+        if name in self.state:
+            return self.state[name]
+        
+        return None
+    
+    def get_model_manager(self, device: str = 'auto'):
+        """
+        Get a LazyModelManager for all embedded models.
+        
+        Args:
+            device: Device to load models to ('cuda', 'cpu', 'auto')
+        
+        Returns:
+            LazyModelManager instance
+        
+        Raises:
+            ImportError: If flux_lazy_loader is not available
+        """
+        if not LAZY_LOADER_AVAILABLE:
+            raise ImportError(
+                "flux_lazy_loader not available. "
+                "Make sure flux_lazy_loader.py is in the project root."
+            )
+        
+        return LazyModelManager(self.state, default_device=device, auto_load_eager=False)
+    
+    def has_embedded_model(self, name: str) -> bool:
+        """
+        Check if an embedded model exists.
+        
+        Args:
+            name: Model name
+        
+        Returns:
+            True if model exists with weights
+        """
+        model = self.get_embedded_model(name)
+        if model is None:
+            return False
+        
+        return bool(
+            model.get('weights') or 
+            model.get('state_dict') or
+            model.get('onnx_models') or
+            model.get('thinker')  # voice module
+        )
+
     def summary(self):
         """Print model summary."""
         print("=" * 60)
@@ -628,12 +761,24 @@ class FLUXModel:
         
         print(f"\nComponents ({self.active_component_count} active):")
         for category, comps in COMPONENT_CATEGORIES.items():
+            # Skip models/detection categories - handled separately
+            if category in ('models', 'detection'):
+                continue
             active = [c for c in comps if self.has_component(c)]
             if active:
                 print(f"  [{category}]")
                 for c in active:
                     legacy_marker = " ⚠ LEGACY" if self.is_legacy(c) else ""
                     print(f"    ✓ {c}{legacy_marker}")
+        
+        # Show embedded models
+        embedded = self.list_embedded_models()
+        if embedded:
+            print(f"\n  [embedded models] ({len(embedded)})")
+            for m in embedded:
+                lazy = "lazy" if m['lazy_load'] else "eager"
+                weights = "✓" if m['has_weights'] else "○"
+                print(f"    {weights} {m['name']}: {m['base_model'][:40]} [{lazy}]")
         
         # Show legacy components
         legacy = self.get_legacy_components()
