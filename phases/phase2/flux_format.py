@@ -48,6 +48,7 @@ class MemoryConfig:
 class GenerationConfig:
     """Controls text generation."""
     voice_primary: bool = True            # Embedded voice module leads (NEW)
+    vlm_primary: bool = False             # VLM generation (backward compat)
     llm_primary: bool = False             # External LLM (DEPRECATED)
     byte_decoder_enabled: bool = False    # Byte decoder (LEGACY)
     byte_decoder_learns_from_llm: bool = True  # Distillation mode
@@ -158,16 +159,23 @@ class FLUXRuntimeConfig:
     
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'FLUXRuntimeConfig':
-        """Reconstruct from dict."""
+        """Reconstruct from dict. Filters unknown fields for backward compat."""
+        def filter_fields(dataclass_type, data: dict) -> dict:
+            """Keep only fields that exist in the dataclass."""
+            if not data:
+                return {}
+            valid_fields = {f.name for f in dataclass_type.__dataclass_fields__.values()}
+            return {k: v for k, v in data.items() if k in valid_fields}
+        
         return cls(
-            perception=PerceptionConfig(**d.get('perception', {})),
-            memory=MemoryConfig(**d.get('memory', {})),
-            generation=GenerationConfig(**d.get('generation', {})),
-            reasoning=ReasoningConfig(**d.get('reasoning', {})),
-            learning=LearningConfig(**d.get('learning', {})),
-            field_config=FieldConfig(**d.get('field', {})),
-            voice=VoiceConfig(**d.get('voice', {})),
-            llm=LLMConfig(**d.get('llm', {})),
+            perception=PerceptionConfig(**filter_fields(PerceptionConfig, d.get('perception', {}))),
+            memory=MemoryConfig(**filter_fields(MemoryConfig, d.get('memory', {}))),
+            generation=GenerationConfig(**filter_fields(GenerationConfig, d.get('generation', {}))),
+            reasoning=ReasoningConfig(**filter_fields(ReasoningConfig, d.get('reasoning', {}))),
+            learning=LearningConfig(**filter_fields(LearningConfig, d.get('learning', {}))),
+            field_config=FieldConfig(**filter_fields(FieldConfig, d.get('field', {}))),
+            voice=VoiceConfig(**filter_fields(VoiceConfig, d.get('voice', {}))),
+            llm=LLMConfig(**filter_fields(LLMConfig, d.get('llm', {}))),
         )
     
     def update(self, overrides: Dict[str, Any]):

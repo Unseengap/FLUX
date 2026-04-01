@@ -12,14 +12,15 @@
 
 1. [Product Overview](#product-overview)
 2. [Architecture: User → Police → City](#architecture)
-3. [**Home Security Intelligence**](#home-security-intelligence) ← NEW
-4. [Scenario 1: Home Protection — "Solve My Murder"](#scenario-1-home-protection)
-5. [Scenario 2: Child Safety — Rapid Response](#scenario-2-child-safety)
-6. [Scenario 3: FLUX Amber Alerts — Crowdsourced Witnesses](#scenario-3-flux-amber-alerts)
-7. [Scenario 4: City-Wide Manhunt — 23 Minutes](#scenario-4-city-wide-manhunt)
-8. [Privacy & Ownership Model](#privacy--ownership-model)
-9. [Technical Requirements](#technical-requirements)
-10. [HTML5 Demo Specification](#html5-demo-specification)
+3. [**The Incorruptible Witness**](#the-incorruptible-witness) ← CRITICAL ARCHITECTURE
+4. [**Home Security Intelligence**](#home-security-intelligence)
+5. [Scenario 1: Home Protection — "Solve My Murder"](#scenario-1-home-protection)
+6. [Scenario 2: Child Safety — Rapid Response](#scenario-2-child-safety)
+7. [Scenario 3: FLUX Amber Alerts — Crowdsourced Witnesses](#scenario-3-flux-amber-alerts)
+8. [Scenario 4: City-Wide Manhunt — 23 Minutes](#scenario-4-city-wide-manhunt)
+9. [Privacy & Ownership Model](#privacy--ownership-model)
+10. [Technical Requirements](#technical-requirements)
+11. [HTML5 Demo Specification](#html5-demo-specification)
 
 ---
 
@@ -110,6 +111,282 @@ CRITICAL EMERGENCY (pre-authorized):
   Home FLUX → [detects violence] → 
     auto-sends per YOUR settings → Police FLUX → response
 ```
+
+---
+
+## The Incorruptible Witness
+
+> *"FLUX cannot be silenced. Not by the perpetrator. Not by the owner. Not even by destroying the hardware."*
+
+### The Core Principle
+
+FLUX is not just a security camera — it's an **autonomous evidence preservation system** that becomes an incorruptible witness during serious crimes. Once a high-level crime (murder, kidnapping, etc.) is detected, FLUX transitions from "owned property" to "scene custodian."
+
+### Crime-Level Response Matrix
+
+Different crimes trigger different FLUX responses:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CRIME-LEVEL RESPONSE MATRIX                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   CRIME LEVEL              FLUX RESPONSE                                │
+│   ═══════════════════════════════════════════════════════════════════   │
+│                                                                          │
+│   LEVEL 1: Minor Incidents                                              │
+│   (Property damage, trespassing)                                        │
+│   ───────────────────────────────────────────────────────────────────   │
+│   • Normal operation                                                    │
+│   • Owner has full control                                              │
+│   • Owner decides whether to report                                     │
+│   • Evidence can be deleted by owner                                    │
+│                                                                          │
+│   LEVEL 2: Domestic Violence (Victim Can Speak)                         │
+│   ───────────────────────────────────────────────────────────────────   │
+│   • VICTIM CONTROLS THEIR OWN FABRIC                                    │
+│   • Sarah can say: "Report John to police"                              │
+│   • Sarah's Fabric obeys Sarah, not John                                │
+│   • Each person has their OWN AI in the household                       │
+│   • Perpetrator CANNOT access victim's Fabric                          │
+│   • Evidence preserved but victim decides when/if to share              │
+│                                                                          │
+│   LEVEL 3: High-Level Crimes (Victim Cannot Speak)                      │
+│   (Murder, kidnapping, incapacitation)                                  │
+│   ───────────────────────────────────────────────────────────────────   │
+│   • 🔒 LOCKDOWN MODE ACTIVATES                                          │
+│   • Owner locked out of system                                          │
+│   • Evidence encrypted and backed up instantly                          │
+│   • Police FLUX receives automatic notification                         │
+│   • Hardware destruction doesn't help (already backed up)               │
+│   • System remains locked until police clear the scene                  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Per-Person Fabric: Individual AI Sovereignty
+
+Each person in a household has their **own independent Fabric** (their personal FLUX AI):
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PER-PERSON FABRIC ARCHITECTURE                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   HOME FLUX HUB                                                         │
+│   ═══════════════                                                       │
+│                                                                          │
+│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
+│   │  Sarah's Fabric │  │  John's Fabric  │  │  Kid's Fabric   │         │
+│   ├─────────────────┤  ├─────────────────┤  ├─────────────────┤         │
+│   │ • Her memories  │  │ • His memories  │  │ • Their memories│         │
+│   │ • Her commands  │  │ • His commands  │  │ • Parental ctrl │         │
+│   │ • Her evidence  │  │ • His evidence  │  │ • Limited access│         │
+│   │ • Her reporting │  │ • His reporting │  │ • Protected     │         │
+│   └─────────────────┘  └─────────────────┘  └─────────────────┘         │
+│            │                   │                    │                   │
+│            └───────────────────┴────────────────────┘                   │
+│                                │                                        │
+│                    ┌───────────────────────┐                            │
+│                    │   Shared Home System   │                            │
+│                    │   (Cameras, sensors)   │                            │
+│                    └───────────────────────┘                            │
+│                                                                          │
+│   KEY PRINCIPLES:                                                       │
+│   • Sarah's Fabric obeys ONLY Sarah                                     │
+│   • John CANNOT access, modify, or delete Sarah's data                 │
+│   • Voice recognition ensures commands go to right Fabric               │
+│   • Each Fabric has independent police reporting capability            │
+│   • Children's Fabrics have parental oversight but own memories        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Domestic Violence: Victim-Controlled Response
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              SCENARIO: DOMESTIC VIOLENCE (VICTIM CAN SPEAK)              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   Sarah and John are married. John is abusive.                          │
+│   Sarah has her own Fabric. John has his own Fabric.                    │
+│                                                                          │
+│   20:30:00 — John comes home drunk, starts argument                     │
+│              Both Fabrics: Log event                                    │
+│              Sarah's Fabric: Detects her elevated stress                │
+│                                                                          │
+│   20:35:00 — John hits Sarah                                            │
+│              Sarah's Fabric: 🚨 Violence against owner detected         │
+│              Sarah's Fabric: Recording, awaiting Sarah's command        │
+│              Sarah's Fabric: (whispering to earpiece) "Say the word"   │
+│                                                                          │
+│   20:35:15 — Sarah says: "FLUX, report John"                            │
+│              Sarah's Fabric: Acknowledged                               │
+│              Sarah's Fabric: Compiling evidence package                 │
+│              Sarah's Fabric: Sending to Police FLUX                     │
+│                                                                          │
+│   20:35:20 — John: "FLUX, delete that recording"                        │
+│              John's Fabric: Cannot delete Sarah's recordings            │
+│              John's Fabric: Access denied to Sarah's evidence           │
+│              Sarah's Fabric: Recording continues, backup complete       │
+│                                                                          │
+│   20:35:30 — Police notified with:                                      │
+│              • Video of assault                                         │
+│              • Audio of argument                                        │
+│              • Sarah's voice command authorizing report                 │
+│              • Timestamp chain proving authenticity                     │
+│                                                                          │
+│   OUTCOME: Sarah controls when to report. John cannot interfere.        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Lockdown Mode: Murder & High-Level Crimes
+
+When victim **cannot speak** (dead, unconscious, kidnapped), FLUX becomes the incorruptible witness:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         LOCKDOWN MODE                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   TRIGGER CONDITIONS (any of these):                                    │
+│   ═════════════════════════════════                                     │
+│   • Owner killed (detected by pose + vitals + no response)              │
+│   • Owner unconscious after violence                                    │
+│   • Owner kidnapped (forced removal from home)                          │
+│   • Pre-authorized trigger ("Solve My Murder" enabled)                  │
+│                                                                          │
+│   WHAT HAPPENS:                                                         │
+│   ═════════════                                                         │
+│                                                                          │
+│   1. INSTANT BACKUP                                                     │
+│      └── Evidence encrypted and transmitted to Police FLUX              │
+│      └── Backup completes in <5 seconds                                 │
+│      └── Even if perpetrator destroys hub, evidence is ALREADY GONE     │
+│                                                                          │
+│   2. OWNER LOCKOUT                                                      │
+│      └── Original owner credentials suspended                           │
+│      └── Perpetrator (even if owner) cannot:                           │
+│          • Delete recordings                                            │
+│          • Modify timeline                                              │
+│          • Access any evidence                                          │
+│          • Factory reset the system                                     │
+│      └── System physically works but evidence is untouchable            │
+│                                                                          │
+│   3. POLICE FLUX HANDSHAKE                                              │
+│      └── Police FLUX receives complete evidence package                 │
+│      └── Chain of custody established BEFORE police arrive             │
+│      └── Cryptographic proof of authenticity                            │
+│      └── External surveillance begins (watching property from outside) │
+│                                                                          │
+│   4. SCENE PRESERVATION                                                 │
+│      └── FLUX continues recording                                       │
+│      └── Logs all activity (perpetrator returning, cleaning, etc.)     │
+│      └── Police can access live feed with warrant                       │
+│      └── System remains locked until police formally clear scene       │
+│                                                                          │
+│   LOCKDOWN RELEASE:                                                     │
+│   ═════════════════                                                     │
+│   • Only released by Police FLUX after investigation closes             │
+│   • If victim survives: victim must physically verify identity          │
+│   • If victim deceased: next-of-kin + police authorization required    │
+│   • Minimum lockdown period: 72 hours                                   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Tamper Detection & Escalation
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    TAMPER RESPONSE ESCALATION                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   ATTEMPT                        FLUX RESPONSE                          │
+│   ═══════════════════════════════════════════════════════════════════   │
+│                                                                          │
+│   Perpetrator: "Delete all recordings"                                  │
+│   FLUX: Access denied. System in lockdown.                              │
+│   FLUX: → Logs deletion attempt as additional evidence                  │
+│                                                                          │
+│   Perpetrator: Unplugs FLUX hub                                         │
+│   FLUX: Evidence already backed up. Battery keeps logging.              │
+│   FLUX: → Notifies Police FLUX of power loss                           │
+│   FLUX: → Police alerted to possible tampering                          │
+│                                                                          │
+│   Perpetrator: Physically destroys FLUX hub                             │
+│   FLUX: Evidence was backed up in <5 seconds after crime.              │
+│   FLUX: → Destruction logged via neighbor FLUX cameras                  │
+│   FLUX: → Additional evidence of cover-up attempt                       │
+│                                                                          │
+│   Perpetrator: Takes hub and drives away                                │
+│   FLUX: Cellular backup transmitted during the crime.                   │
+│   FLUX: → Hub GPS tracked (if equipped)                                 │
+│   FLUX: → Movement logged as evidence of tampering                      │
+│                                                                          │
+│   Perpetrator: Factory resets the hub                                   │
+│   FLUX: Lockdown mode prevents factory reset.                           │
+│   FLUX: → Reset attempts logged                                         │
+│   FLUX: → Biometric unlock required (victim's, not perpetrator's)      │
+│                                                                          │
+│   KEY INSIGHT: Every tampering attempt becomes ADDITIONAL EVIDENCE      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Human Dignity: Protecting Non-Users
+
+If a crime occurs and the **victim was NOT a FLUX user** (guest, visitor, etc.), FLUX still acts ethically:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              HUMAN DIGNITY MODE: NON-USER PROTECTION                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   SCENARIO: Guest killed in FLUX-enabled home                           │
+│   ═══════════════════════════════════════════                           │
+│                                                                          │
+│   • The victim (Maria) does not have FLUX                               │
+│   • The homeowner (Tom) has FLUX                                        │
+│   • Tom kills Maria in his home                                         │
+│                                                                          │
+│   TRADITIONAL SECURITY:                                                 │
+│   Tom owns the cameras → Tom deletes the evidence → Maria has no voice │
+│                                                                          │
+│   FLUX RESPONSE:                                                        │
+│   ─────────────────────────────────────────────────────────────────────  │
+│   1. FLUX detects: Human killed in home (pose, audio, no vitals)        │
+│   2. FLUX recognizes: Victim is NOT the owner (face/voice mismatch)    │
+│   3. FLUX determines: Owner appears to be perpetrator                   │
+│   4. FLUX activates: Human Dignity Protocol                             │
+│      └── "This person deserves justice even if they weren't my user"   │
+│   5. FLUX locks down: Owner cannot delete evidence                      │
+│   6. FLUX reports: Evidence preserved for victim's sake                 │
+│                                                                          │
+│   PRINCIPLE:                                                            │
+│   ═══════════                                                           │
+│   FLUX protects HUMAN LIFE, not just its owner's interests.            │
+│   An AI that would allow murder because "the victim wasn't a customer" │
+│   is not an AI worth building.                                          │
+│                                                                          │
+│   FLUX does not choose sides. FLUX protects human dignity.              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why FLUX Cannot Be Silenced
+
+| Traditional Security | FLUX Incorruptible Witness |
+|---------------------|----------------------------|
+| Owner can delete footage | **Lockdown mode** — owner locked out during investigation |
+| Perpetrator destroys DVR | Evidence already backed up, cannot be recalled |
+| Single point of failure | **Per-person Fabric** — each person's AI is independent |
+| Only records if victim has cameras | **Human dignity mode** — protects non-users too |
+| Can be intimidated/silenced | **Cannot be silenced** — tamper triggers escalation |
+| Evidence can be disputed | **Cryptographic chain** — immutable proof of authenticity |
+| "It was off" defense works | **Always-on logging** — FLUX proves it was running |
 
 ---
 
@@ -531,16 +808,19 @@ class FluxHomeSecurity:
 
 ### "Solve My Murder" Feature
 
+> **Note:** The domestic violence scenario below is just ONE example of "Solve My Murder." This feature applies to ANY high-level crime where the victim cannot speak for themselves — home invasion, random violence, medical emergency with foul play, etc. The core principle is: **if you're killed or incapacitated, your FLUX testifies on your behalf.**
+
 **The Setup:**
-- Sarah and John are married
+- Sarah and John are married (this is an illustrative example — perpetrators can be anyone)
 - Sarah has FLUX Life installed with "Solve My Murder" enabled
 - This feature pre-authorizes: "If I am killed or seriously harmed, share my FLUX recordings with police automatically"
+- Remember: For ongoing domestic violence where Sarah CAN speak, she controls her own Fabric (see [Domestic Violence: Victim-Controlled Response](#domestic-violence-victim-controlled-response))
 
 **The Incident:**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    SCENARIO: DOMESTIC VIOLENCE                          │
+│           SCENARIO: MURDER (Lockdown Mode Activates)                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │   14:30:00 — Normal day. Sarah is home alone.                           │

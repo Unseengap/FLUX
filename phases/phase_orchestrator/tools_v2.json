@@ -1,0 +1,393 @@
+{
+  "version": "2.0",
+  "format": "native_json",
+  "description": "FLUX tools in Qwen2.5 native function calling format",
+  "created": "2026-04-01",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "encode_text",
+        "description": "Encode text into 432-dimensional semantic waves using the Continuous Semantic Encoder. Use this to convert any text into FLUX's internal wave representation.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text to encode (UTF-8)"
+            }
+          },
+          "required": ["text"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "encode_grid",
+        "description": "Encode an ARC-style grid (colors 0-9, up to 30x30) into wave representation. Use mode='holistic' for a single vector or 'spatial' for per-cell encoding.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "grid": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {"type": "integer", "minimum": 0, "maximum": 9}
+              },
+              "description": "2D grid with values 0-9"
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["holistic", "spatial"],
+              "default": "holistic",
+              "description": "Encoding mode: holistic (single vector) or spatial (per-cell)"
+            }
+          },
+          "required": ["grid"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "query_field",
+        "description": "Search the 96³ resonance field for relevant knowledge using gravitational relevance. Returns patterns similar to the query wave.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "wave_id": {
+              "type": "string",
+              "description": "Wave ID from previous encode call, or '$LAST' for most recent"
+            },
+            "top_k": {
+              "type": "integer",
+              "default": 5,
+              "description": "Number of results to return"
+            }
+          },
+          "required": ["wave_id"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "recall_memory",
+        "description": "Search episodic memory for facts and experiences matching a query.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Natural language search query"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 5,
+              "description": "Maximum results to return"
+            }
+          },
+          "required": ["query"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "store_memory",
+        "description": "Store a new fact or observation in episodic memory.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The fact or observation to remember"
+            },
+            "importance": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "default": 0.5,
+              "description": "Importance weight (0-1)"
+            },
+            "tags": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Optional category tags"
+            }
+          },
+          "required": ["content"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "predict_effect",
+        "description": "Predict what will happen if an action is taken. Uses the causal tracker.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "The action to predict (e.g., 'rotate', 'flip', 'fill')"
+            },
+            "target": {
+              "type": "string",
+              "description": "What the action applies to"
+            },
+            "context": {
+              "type": "object",
+              "description": "Additional context about current state"
+            }
+          },
+          "required": ["action", "target"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_applicable_rules",
+        "description": "Find learned transformation rules that apply to the current situation.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "pattern_description": {
+              "type": "string",
+              "description": "Description of the pattern or situation"
+            },
+            "colors": {
+              "type": "array",
+              "items": {"type": "integer"},
+              "description": "Colors involved (0-9)"
+            }
+          },
+          "required": ["pattern_description"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "trace_causality",
+        "description": "Trace the causal chain that led to an observed effect.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "effect": {
+              "type": "string",
+              "description": "The effect to trace back"
+            },
+            "max_depth": {
+              "type": "integer",
+              "default": 5,
+              "description": "Maximum causal chain length"
+            }
+          },
+          "required": ["effect"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_curiosity_map",
+        "description": "Get the spatial curiosity field showing unexplored areas.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "grid_height": {
+              "type": "integer",
+              "description": "Height of grid"
+            },
+            "grid_width": {
+              "type": "integer",
+              "description": "Width of grid"
+            }
+          },
+          "required": ["grid_height", "grid_width"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "mark_explored",
+        "description": "Mark a position as explored to update curiosity map.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "row": {"type": "integer", "description": "Row position"},
+            "col": {"type": "integer", "description": "Column position"},
+            "novelty": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "description": "How novel/interesting was this position (0-1)"
+            }
+          },
+          "required": ["row", "col"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "query_cgn",
+        "description": "Query Causal Geometry Nodes for relevant concepts.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "concept": {
+              "type": "string",
+              "description": "Concept to query for"
+            },
+            "tier": {
+              "type": "string",
+              "enum": ["fast", "medium", "slow", "all"],
+              "default": "all",
+              "description": "Which tier of CGN nodes to query"
+            }
+          },
+          "required": ["concept"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "add_causal_arrow",
+        "description": "Record a new causal relationship (A causes B).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "cause": {
+              "type": "string",
+              "description": "The cause"
+            },
+            "effect": {
+              "type": "string",
+              "description": "The effect"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Why this causal link exists"
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "default": 0.8,
+              "description": "Confidence in this causal link"
+            }
+          },
+          "required": ["cause", "effect", "reason"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "decode_grid",
+        "description": "Convert wave representation back to an ARC grid.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "wave_id": {
+              "type": "string",
+              "description": "Wave ID to decode, or '$LAST'"
+            },
+            "height": {
+              "type": "integer",
+              "description": "Target grid height"
+            },
+            "width": {
+              "type": "integer",
+              "description": "Target grid width"
+            }
+          },
+          "required": ["wave_id", "height", "width"]
+        }
+      }
+    },
+    {
+      "type": "function", 
+      "function": {
+        "name": "run_code",
+        "description": "Execute Python code for precise calculations or data processing. Use when you need exact math, data manipulation, or validation.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Python code to execute"
+            },
+            "timeout": {
+              "type": "integer",
+              "default": 30,
+              "description": "Maximum execution time in seconds"
+            }
+          },
+          "required": ["code"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "ingest_document",
+        "description": "Process and store a document in FLUX memory. Supports text, JSON, and other formats.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "Document content (text or base64 for binary)"
+            },
+            "filename": {
+              "type": "string",
+              "description": "Original filename with extension"
+            },
+            "chunk_size": {
+              "type": "integer",
+              "default": 1000,
+              "description": "Size of chunks for processing"
+            }
+          },
+          "required": ["content", "filename"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_tool",
+        "description": "Create a new reusable tool and save it for later use.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Tool name (snake_case)"
+            },
+            "description": {
+              "type": "string",
+              "description": "What the tool does"
+            },
+            "code": {
+              "type": "string",
+              "description": "Python function body"
+            },
+            "parameters": {
+              "type": "object",
+              "description": "JSON Schema for parameters"
+            }
+          },
+          "required": ["name", "description", "code", "parameters"]
+        }
+      }
+    }
+  ]
+}

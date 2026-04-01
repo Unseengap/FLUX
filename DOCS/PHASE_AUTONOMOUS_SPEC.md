@@ -1,8 +1,10 @@
 # FLUX Autonomous Architecture — Phase 4 Specification
 
 **Version:** 1.0  
-**Status:** PLANNING (After Phase 3 Validation)  
+**Status:** IN PROGRESS  
 **Goal:** Self-contained, self-modifying AGI that runs from a single .flx file
+
+> **Implementation Notebook:** `notebooks/flux_autonomous_complete.ipynb`
 
 ---
 
@@ -864,27 +866,31 @@ FLUX: "After 10 years at 5% compound interest, your $10,000 would grow to
 
 | Task | Status |
 |------|--------|
-| Convert `tool_registry.py` to JSON schema format | ⬜ |
+| Convert `tool_registry.py` to JSON schema format | ✅ |
 | Remove all `<tool>` tag parsing code | ⬜ |
-| Implement `FluxToolExecutor` class | ⬜ |
-| Test with Qwen2.5-Instruct native tool calling | ⬜ |
-| Update orchestrator to use JSON format | ⬜ |
+| Implement `FluxToolExecutor` class | ✅ |
+| Test with Qwen2.5-Instruct native tool calling | ✅ |
+| Update orchestrator to use JSON format | ✅ |
+
+> **Files:** `phases/phase_orchestrator/tools_v2.json`, `notebooks/flux_autonomous_complete.ipynb`
 
 ### Phase 4.2: Code Embedding (1-2 days)
 
 | Task | Status |
 |------|--------|
-| Create `bundle_codebase()` function | ⬜ |
-| Write bootstrap.py self-extractor | ⬜ |
+| Create `bundle_codebase()` function | ✅ |
+| Write bootstrap.py self-extractor | ✅ |
 | Test wake_up() from .flx only | ⬜ |
 | Validate all imports resolve correctly | ⬜ |
 | Add to save workflow in flux_model.py | ⬜ |
+
+> **Implementation:** See Cell 13-14 in `notebooks/flux_autonomous_complete.ipynb`
 
 ### Phase 4.3: Dynamic Tools (1 day)
 
 | Task | Status |
 |------|--------|
-| Implement `create_tool` tool | ⬜ |
+| Implement `create_tool` tool | ✅ |
 | Add `user_tools` storage to .flx | ⬜ |
 | Test tool creation and persistence | ⬜ |
 | Add tool deletion/update capabilities | ⬜ |

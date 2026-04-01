@@ -1,17 +1,21 @@
-# FLUX Custom VLM Handoff — v5.2-custom-vlm
+# FLUX Custom VLM Handoff — v6.0-autonomous
 
-**Generated:** 2026-03-31
-**Model Version:** 5.2-custom-vlm  
-**File Size:** 13.18 GB  
-**Status:** ✓ Foundation Complete, Needs Training  
+**Generated:** 2026-04-01
+**Model Version:** 6.0-autonomous  
+**File Size:** ~14 GB  
+**Status:** ✓ Autonomous Migration Complete
 
 ---
 
 ## TL;DR — What You Need to Know
 
-The FLUX model now has an embedded Qwen2.5-VL-3B VLM with **working generation** but **no tool calling** and **untrained bridges**. The VLM generates coherent text but doesn't know how to use FLUX's cognitive tools (`encode_grid`, `query_field`, etc.).
+The FLUX model is now **v6.0-autonomous** with:
+- **Native JSON function calling** (uses Qwen's built-in format, no fine-tuning needed)
+- **Embedded codebase** (self-contained, runs from .flx alone)
+- **16 tools** defined in native JSON schema
+- **Tool executor** bridges VLM calls to FLUX components
 
-**Your Goal:** Make the VLM actually use FLUX tools for ARC puzzle solving.
+**Test Notebook:** `notebooks/flux_autonomous_complete.ipynb`
 
 ---
 
@@ -24,79 +28,23 @@ import torch
 model = torch.load('checkpoints/Flux-Apex-V1.flx', map_location='cpu', weights_only=False)
 
 # Check version
-print(f"Version: {model['version']}")  # 5.2-custom-vlm
-print(f"VLM weights: {len(model['vlm']['weights'])}")  # 824 tensors
+print(f"Version: {model['version']}")  # 6.0-autonomous
+print(f"Tools: {len(model['orchestration']['tools'])}")  # 16 tools
 
-# VLM is embedded but needs HF architecture to run
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+# AUTONOMOUS MODE: Wake up from .flx only
+exec(model['runtime']['bootstrap'])
+flux = wake_up(model)
 
-processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct", trust_remote_code=True)
-vlm = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-    "Qwen/Qwen2.5-VL-3B-Instruct",
-    torch_dtype=torch.float16,
-    device_map="auto",
-    trust_remote_code=True,
-)
-
-# Load embedded weights with key remapping
-weights = model['vlm']['weights']
-remapped = {}
-for k, v in weights.items():
-    if k.startswith('model.'):
-        remapped['model.language_model.' + k[6:]] = v
-    elif k.startswith('visual.'):
-        remapped['model.' + k] = v
-    else:
-        remapped[k] = v
-
-vlm.load_state_dict(remapped, strict=False)  # 823/824 load
+# Or use standard loading
+from flux_model import FLUXModel
+flux = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
 ```
 
 ---
 
-## Current Capabilities — What Works ✓
+## VLM with Native Function Calling
 
-| Capability | Status | Evidence |
-|------------|--------|----------|
-| **VLM Weight Loading** | ✓ Working | 823/824 weights, 5/5 verified |
-| **Text Generation** | ✓ Working | Coherent responses, 1.8-4s latency |
-| **Temperature Control** | ✓ Working | T=0, 0.7, 1.0 all produce valid output |
-| **FluxVLM Wrapper** | ✓ Working | Hooks, introspection, layer access |
-| **Model Surgery** | ✓ Working | Scale, prune, noise, rollback all work |
-| **Wave Bridges** | ✓ Created | 890K + 886K params, random init |
-| **Save/Load** | ✓ Working | Verified round-trip |
-
-### Test Results (Cell 9)
-
-```
-Temperature: 0.0  → 175 chars, 3.93s
-Temperature: 0.7  → 213 chars, 2.63s  
-Temperature: 1.0  → 171 chars, 1.83s
-```
-
-Response quality: Coherent paragraphs about FLUX (though not factually accurate about FLUX specifically).
-
----
-
-## Critical Gaps — What's Broken ✗
-
-### 1. Tool Calling Does NOT Work
-
-**Problem:** When asked to use tools like `encode_grid`, the VLM writes *about* the tool instead of calling it.
-
-**Test Prompt:**
-```
-Analyze this ARC grid pattern...
-Use the encode_grid tool to analyze it, then describe the pattern.
-```
-
-**Actual Output:** Long explanation of what ARC grids are (no `<tool>` tags)
-
-**Expected Output:**
-```xml
-<tool>encode_grid</tool>
-<params>{"grid": [[0,1,0],[1,2,1],[0,1,0]], "mode": "holistic"}</params>
-```
+The VLM now uses Qwen's native tool calling format:
 
 **Root Cause:** VLM was never fine-tuned on tool-use format.
 
