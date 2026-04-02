@@ -4,7 +4,7 @@
 
 FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons.
 
-**Current Flagship Model:** `Flux-Apex-V1.flx` (v8.0-autonomous, Full Codebase Embed, ~7.44B params)
+**Current Flagship Model:** `Flux-Apex-V1.flx` (v8.1-complete, All Weights Injected, ~8.34B params)
 
 **Source of truth:**
 - `DOCS/FLUX_APEX_V1.md` — Complete Flux-Apex model reference
@@ -26,13 +26,14 @@ FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture th
 |----------|-------|
 | **Location** | `checkpoints/Flux-Apex-V1.flx` |
 | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
-| **File Size** | ~15.41 GB |
-| **Total Parameters** | ~7,438,927,280 (~7.44B) |
+| **File Size** | ~17.40 GB |
+| **Total Parameters** | ~8,340,860,219 (~8.34B) |
 | **Wave Dimension** | 432 (universal semantic space) |
 | **Field Dimensions** | 48 × 48 × 48 × 256 (compressed) |
-| **Version** | 8.0-autonomous |
+| **Version** | 8.1-complete |
 | **Embedded Models** | 12 (language, vision, audio, detection) |
 | **Embedded Runtime** | 87 files, 27,647 lines (325 KB compressed) |
+| **Native FLUX Weights** | ~1.4B (all injected April 1, 2026) |
 
 ### Top-Level Components (26 keys)
 
@@ -40,13 +41,16 @@ FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture th
 |-----------|------------|---------|
 | `cse` | 1.3M | Continuous Semantic Encoder (bytes → 432D waves) |
 | `field` | 28.4M | Resonance Field (48³ × 256 knowledge storage, compressed) |
-| `memory` | 878K | Three-tier memory (working, episodic, semantic) |
+| `memory` | 542.3M | Three-tier memory (working, episodic, semantic) — **✅ INJECTED** |
 | `bridges` | 456M | Wave↔Field projections + router |
-| `causal` | 0 (placeholder) | CGN nodes + causal arrow graph — **NEEDS INJECTION** |
+| `causal` | 149.8M | CGN nodes + causal arrow graph — **✅ INJECTED** |
+| `gravity` | 75.2M | Gravitational Relevance — **✅ INJECTED** |
+| `thermodynamic` | 135M | Thermodynamic Learning — **✅ INJECTED** |
+| `causal_wave_chaining` | 570K | Causal Wave Chaining — **✅ INJECTED** |
 | `adapters` | 15M | Multi-modal (grid, image, audio) |
 | `grid_to_wave` | 192K | ARC grid encoder |
 | `spatial_memory` | 12K | Curiosity-driven exploration |
-| `models` | 6.4B | 12 embedded models (instruct, coder, vision, clip, whisper, tts, etc.) |
+| `models` | 6.9B | 12 embedded models (instruct, coder, vision, clip, whisper, tts, etc.) |
 | `orchestration` | — | Self-describing tool definitions (JSON format) |
 | `runtime` | ~325KB | 87 Python files for autonomous bootstrap |
 

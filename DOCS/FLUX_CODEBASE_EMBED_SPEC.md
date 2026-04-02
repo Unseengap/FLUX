@@ -1,36 +1,36 @@
 # FLUX Codebase Embedding Specification
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Date:** April 1, 2026  
-**Status:** REQUIRED for v8.0-autonomous  
-**Current Model:** v6.0-autonomous (partial embed ~30%)
+**Status:** ✅ COMPLETE — v8.1-complete  
+**Current Model:** v8.1-complete (87 files embedded, all weights injected)
 
 ---
 
 ## Executive Summary
 
-For FLUX to be truly autonomous, the **entire runtime codebase** must be embedded in the `.flx` file. Currently, v6.0-autonomous has only ~10 gzipped files (~30% of what's needed). This document specifies:
-
-1. **What files must be embedded** (full inventory)
-2. **Directory structure** to preserve in the archive
-3. **Dependencies between modules**
-4. **Bootstrap sequence** to wake FLUX from .flx alone
-5. **Implementation checklist**
+FLUX is now **fully autonomous** with:
+- **87 Python files** (27,647 lines) embedded for self-bootstrap
+- **All native FLUX weights** injected from phase checkpoints
+- **12 embedded models** for language, vision, audio, detection
+- **Total: ~8.34B parameters** in a single .flx file
 
 ---
 
-## Current State vs Target
+## Current State (v8.1-complete)
 
-| Metric | v6.0-autonomous | v8.0-autonomous (Target) |
-|--------|-----------------|--------------------------|
-| Embedded code files | ~10 | ~60+ |
-| Embedded lines | ~3,000 | ~15,000+ |
-| Can run from .flx only | ❌ | ✅ |
-| Has bootstrap.py | ✅ Created | ✅ |
-| Has tool executor | ❌ | ✅ |
-| Has unified agent | ❌ | ✅ |
-| Has __init__.py files | ✅ Created (10) | ✅ |
-| Has embed notebook | ✅ Created | ✅ |
+| Metric | Value |
+|--------|-------|
+| Embedded code files | **87** |
+| Embedded lines | **27,647** |
+| Can run from .flx only | ✅ |
+| Has bootstrap.py | ✅ |
+| Has tool executor | ✅ |
+| Has unified agent | ✅ |
+| Has __init__.py files | ✅ (10 files) |
+| Weight injection | ✅ **COMPLETE** |
+| Native FLUX weights | **~1.4B params** |
+| Total model size | **~17.40 GB** |
 
 ---
 

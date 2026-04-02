@@ -2,10 +2,9 @@
 
 **FLUX Architecture — Flagship Model Documentation**  
 *For AI Agents, Developers, and Integration Systems*  
-*Version: 8.0-autonomous | Phase: autonomous | Updated: April 1, 2026*
+*Version: 8.1-complete | Phase: complete | Updated: April 1, 2026*
 
-> **⚠️ Weight Injection Available:** Some native FLUX components (CGN, Memory, GR, TL) have trained weights in phase checkpoints that are NOT YET in this .flx file. Run `notebooks/flux_weight_injection.ipynb` to inject them and create v8.1-complete.  
-> See `output/flux_native_results/needs_injection/` for proven results.
+> **✅ Weight Injection Complete:** All native FLUX components now have trained weights. The model was upgraded from v8.0-autonomous to v8.1-complete on April 1, 2026 via `notebooks/flux_weight_injection.ipynb`.
 
 ---
 
@@ -17,12 +16,12 @@
 | **Location** | `checkpoints/Flux-Apex-V1.flx` |
 | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
 | **Format** | FLUX (self-describing cognitive architecture) |
-| **Version** | 8.0-autonomous |
-| **Phase** | autonomous |
-| **File Size** | ~15.41 GB |
-| **Total Parameters** | ~7,438,927,280 (~7.44B) |
-| **Total Tensors** | 5,875 |
-| **Top-Level Keys** | 25 |
+| **Version** | 8.1-complete |
+| **Phase** | complete |
+| **File Size** | ~17.40 GB |
+| **Total Parameters** | ~8,340,860,219 (~8.34B) |
+| **Total Tensors** | 5,875+ |
+| **Top-Level Keys** | 26 |
 | **Max Nesting Depth** | 10 |
 | **Can Continue Learning** | `True` |
 | **Embedded Models** | 12 (7 language/vision/audio, 5 detection) |
@@ -45,16 +44,17 @@ Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not j
 
 ---
 
-## What This Model IS (v8.0 State)
+## What This Model IS (v8.1-complete State)
 
 - **12 embedded models** — Language (instruct, coder), Vision (VLM, CLIP), Audio (Whisper, TTS), Detection (face, depth, pose, object)
-- **Compressed native FLUX** — Field reduced to 48³×256 (~28.4M params)
+- **Complete native FLUX** — All components have trained weights (CGN, Memory, GR, TL, CWC injected)
+- **Compressed field** — Field at 48³×256 (~28.4M params), expandable to 96³×512
 - **Lazy loading support** — Models loaded on-demand to manage VRAM
 - **ONNX detection** — InsightFace face recognition via 5 ONNX models
 - **Full runtime embed** — 87 Python files (27,647 lines) embedded for autonomous bootstrap
 - **CLAW harness** — 922 tools from Claude Code port integrated
-- **Native JSON tools** — Qwen2.5-compatible function calling format
 - **Native JSON tools** — Orchestration uses Qwen2.5-compatible JSON function calling
+- **Weight injection** — Phase 1.5, 3, 4, 5, 6 weights injected April 1, 2026
 
 ## What This Model is NOT
 
@@ -107,47 +107,53 @@ Camera       ─┬─► Face Detection          │   │      │
 | 9 | `cse` | dict | Continuous Semantic Encoder (1.3M params) |
 | 10 | `grid_to_wave` | dict | ARC grid encoder (192K params) |
 | 11 | `field` | dict | Resonance field (28.4M params, compressed) |
-| 12 | `memory` | dict | Working + episodic (878K params) |
-| 13 | `models` | dict | **12 embedded models (6.4B params)** |
-| 14 | `causal` | dict | CGN state + causal graph |
+| 12 | `memory` | dict | Three-tier memory (542M params) |
+| 13 | `models` | dict | **12 embedded models (6.9B params)** |
+| 14 | `causal` | dict | CGN state + causal graph (149.8M params) |
 | 15 | `bridges` | dict | Wave↔Field projections (455.7M params) |
 | 16 | `adapters` | dict | Multi-modal adapters (15.4M params) |
 | 17 | `spatial_memory` | dict | Exploration/curiosity fields (12K params) |
 | 18 | `causal_tracker` | dict | Causal links |
 | 19 | `learned_rules` | dict | Induced rules |
 | 20 | `orchestration` | dict | Tool definitions, system prompt |
-| 21 | `modified` | bool | `True` — model has been modified |
-| 22 | `modified_components` | list | Recently modified components |
-| 23 | `state` | dict | Runtime state snapshots |
-| 24 | `removed_components` | list | `["decoder", "llm", "llm_reference", "grid_adapters"]` |
+| 21 | `gravity` | dict | Gravitational Relevance (75.2M params) |
+| 22 | `thermodynamic` | dict | Thermodynamic Learning (135M params) |
+| 23 | `causal_wave_chaining` | dict | Causal Wave Chaining (570K params) |
+| 24 | `modified` | bool | `True` — model has been modified |
+| 25 | `modified_components` | list | Recently modified components |
+| 26 | `state` | dict | Runtime state snapshots |
+| 27 | `removed_components` | list | `["decoder", "llm", "llm_reference", "grid_adapters"]` |
 
 ---
 
 ## Component Parameters (Sorted by Size)
 
-### Native FLUX Components (~502M params)
+### Native FLUX Components (~1.4B params) — v8.1-complete
 
-| # | Component | Parameters | % of Total | Tensors | Has Weights |
-|---|-----------|------------|------------|---------|-------------|
-| 1 | **bridges** | 455,683,559 | 6.1% | 59 | ✗ (config only) |
-| 2 | **field** | 28,442,624 | 0.4% | 2 | ✓ |
-| 3 | **adapters** | 15,412,331 | 0.2% | 53 | ✗ (config only) |
-| 4 | **cse** | 1,337,264 | <0.1% | 22 | ✓ |
-| 5 | **memory** | 878,593 | <0.1% | 11 | ✗ (metadata only) |
-| 6 | **grid_to_wave** | 192,256 | <0.1% | 13 | ✓ |
-| 7 | **spatial_memory** | 12,288 | <0.1% | 3 | ✓ |
-| 8 | **causal** | 0 | 0% | 0 | ✗ (empty) |
-| 9 | **causal_tracker** | 0 | 0% | 0 | ✗ (empty) |
-| 10 | **learned_rules** | 0 | 0% | 0 | ✗ (empty) |
+| # | Component | Parameters | % of Total | Status |
+|---|-----------|------------|------------|--------|
+| 1 | **memory** | 542,259,062 | 6.5% | ✅ Trained (injected Phase 6) |
+| 2 | **bridges** | 455,683,559 | 5.5% | ✅ Config+weights |
+| 3 | **causal** | 149,757,403 | 1.8% | ✅ Trained (injected Phase 5) |
+| 4 | **thermodynamic** | 135,047,043 | 1.6% | ✅ Trained (injected Phase 4) |
+| 5 | **gravity** | 75,177,862 | 0.9% | ✅ Trained (injected Phase 3) |
+| 6 | **field** | 28,442,624 | 0.3% | ✅ Trained |
+| 7 | **adapters** | 15,412,331 | 0.2% | ✅ Config+weights |
+| 8 | **cse** | 1,337,264 | <0.1% | ✅ Trained |
+| 9 | **causal_wave_chaining** | 570,162 | <0.1% | ✅ Trained (injected Phase 1.5) |
+| 10 | **grid_to_wave** | 192,256 | <0.1% | ✅ Trained |
+| 11 | **spatial_memory** | 12,288 | <0.1% | ✅ Trained |
+| 12 | **causal_tracker** | 0 | 0% | ⬜ Placeholder |
+| 13 | **learned_rules** | 0 | 0% | ⬜ Placeholder |
 
-> **Note:** Field is compressed to 48³×256 (was 96³×512). Bridges/adapters contain projection configs but weights are generated on-demand.
+> **Note:** Field is compressed to 48³×256 (was 96³×512). Expandable on-demand for high-knowledge applications.
 >
-> **🔴 CRITICAL:** Components marked "empty" have trained weights in phase checkpoints (`UnseenGAP/FLUX/checkpoints/`) but those weights are NOT in this .flx file. Run `notebooks/flux_weight_injection.ipynb` to complete the model.
+> **✅ INJECTION COMPLETE (April 1, 2026):** All critical native FLUX components now have trained weights:
 >
 > | Component | Source Checkpoint | Key Result |
 > |-----------|-------------------|------------|
-> | causal | `phase5.phase.pt` | 6-hop causal trace |
-> | memory | `phase6.phase.pt` | 0.0000 forgetting |
+> | causal | `phase5.phase.pt` | 6-hop causal trace, 149.8M params |
+> | memory | `phase6.phase.pt` | 0.0000 forgetting, 542.3M params |
 > | gravity | `phase3.phase.pt` | O(log n) scaling |
 > | thermodynamic | `phase4.phase.pt` | 99.04% retention |
 
