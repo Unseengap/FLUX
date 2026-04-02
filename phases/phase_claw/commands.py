@@ -24,6 +24,8 @@ class CommandExecution:
 
 @lru_cache(maxsize=1)
 def load_command_snapshot() -> tuple[PortingModule, ...]:
+    if not SNAPSHOT_PATH.exists():
+        return ()  # Graceful degradation when embedded
     raw_entries = json.loads(SNAPSHOT_PATH.read_text())
     return tuple(
         PortingModule(
@@ -36,32 +38,44 @@ def load_command_snapshot() -> tuple[PortingModule, ...]:
     )
 
 
-PORTED_COMMANDS = load_command_snapshot()
+# Lazy load to avoid crash when embedded
+def get_ported_commands() -> tuple[PortingModule, ...]:
+    return load_command_snapshot()
+
+
+# For backwards compatibility - lazy property
+class _LazyCommands:
+    @property
+    def PORTED_COMMANDS(self):
+        return load_command_snapshot()
+
+_lazy = _LazyCommands()
+PORTED_COMMANDS = ()
 
 
 @lru_cache(maxsize=1)
 def built_in_command_names() -> frozenset[str]:
-    return frozenset(module.name for module in PORTED_COMMANDS)
+    return frozenset(module.name for module in get_ported_commands())
 
 
 def build_command_backlog() -> PortingBacklog:
-    return PortingBacklog(title='Command surface', modules=list(PORTED_COMMANDS))
+    return PortingBacklog(title='Command surface', modules=list(get_ported_commands()))
 
 
 def command_names() -> list[str]:
-    return [module.name for module in PORTED_COMMANDS]
+    return [module.name for module in get_ported_commands()]
 
 
 def get_command(name: str) -> PortingModule | None:
     needle = name.lower()
-    for module in PORTED_COMMANDS:
+    for module in get_ported_commands():
         if module.name.lower() == needle:
             return module
     return None
 
 
 def get_commands(cwd: str | None = None, include_plugin_commands: bool = True, include_skill_commands: bool = True) -> tuple[PortingModule, ...]:
-    commands = list(PORTED_COMMANDS)
+    commands = list(get_ported_commands())
     if not include_plugin_commands:
         commands = [module for module in commands if 'plugin' not in module.source_hint.lower()]
     if not include_skill_commands:
@@ -71,7 +85,7 @@ def get_commands(cwd: str | None = None, include_plugin_commands: bool = True, i
 
 def find_commands(query: str, limit: int = 20) -> list[PortingModule]:
     needle = query.lower()
-    matches = [module for module in PORTED_COMMANDS if needle in module.name.lower() or needle in module.source_hint.lower()]
+    matches = [module for module in get_ported_commands() if needle in module.name.lower() or needle in module.source_hint.lower()]
     return matches[:limit]
 
 
@@ -84,8 +98,9 @@ def execute_command(name: str, prompt: str = '') -> CommandExecution:
 
 
 def render_command_index(limit: int = 20, query: str | None = None) -> str:
-    modules = find_commands(query, limit) if query else list(PORTED_COMMANDS[:limit])
-    lines = [f'Command entries: {len(PORTED_COMMANDS)}', '']
+    ported = get_ported_commands()
+    modules = find_commands(query, limit) if query else list(ported[:limit])
+    lines = [f'Command entries: {len(ported)}', '']
     if query:
         lines.append(f'Filtered by: {query}')
         lines.append('')

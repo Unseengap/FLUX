@@ -26,6 +26,8 @@ class ToolExecution:
 
 @lru_cache(maxsize=1)
 def load_tool_snapshot() -> tuple[PortingModule, ...]:
+    if not SNAPSHOT_PATH.exists():
+        return ()  # Graceful degradation when embedded
     raw_entries = json.loads(SNAPSHOT_PATH.read_text())
     return tuple(
         PortingModule(
@@ -38,20 +40,26 @@ def load_tool_snapshot() -> tuple[PortingModule, ...]:
     )
 
 
-PORTED_TOOLS = load_tool_snapshot()
+# Lazy load to avoid crash when embedded
+def get_ported_tools() -> tuple[PortingModule, ...]:
+    return load_tool_snapshot()
+
+
+# Empty tuple at module level for backwards compat, use get_ported_tools() instead
+PORTED_TOOLS = ()
 
 
 def build_tool_backlog() -> PortingBacklog:
-    return PortingBacklog(title='Tool surface', modules=list(PORTED_TOOLS))
+    return PortingBacklog(title='Tool surface', modules=list(get_ported_tools()))
 
 
 def tool_names() -> list[str]:
-    return [module.name for module in PORTED_TOOLS]
+    return [module.name for module in get_ported_tools()]
 
 
 def get_tool(name: str) -> PortingModule | None:
     needle = name.lower()
-    for module in PORTED_TOOLS:
+    for module in get_ported_tools():
         if module.name.lower() == needle:
             return module
     return None
@@ -68,7 +76,7 @@ def get_tools(
     include_mcp: bool = True,
     permission_context: ToolPermissionContext | None = None,
 ) -> tuple[PortingModule, ...]:
-    tools = list(PORTED_TOOLS)
+    tools = list(get_ported_tools())
     if simple_mode:
         tools = [module for module in tools if module.name in {'BashTool', 'FileReadTool', 'FileEditTool'}]
     if not include_mcp:
@@ -78,7 +86,7 @@ def get_tools(
 
 def find_tools(query: str, limit: int = 20) -> list[PortingModule]:
     needle = query.lower()
-    matches = [module for module in PORTED_TOOLS if needle in module.name.lower() or needle in module.source_hint.lower()]
+    matches = [module for module in get_ported_tools() if needle in module.name.lower() or needle in module.source_hint.lower()]
     return matches[:limit]
 
 
@@ -91,8 +99,9 @@ def execute_tool(name: str, payload: str = '') -> ToolExecution:
 
 
 def render_tool_index(limit: int = 20, query: str | None = None) -> str:
-    modules = find_tools(query, limit) if query else list(PORTED_TOOLS[:limit])
-    lines = [f'Tool entries: {len(PORTED_TOOLS)}', '']
+    ported = get_ported_tools()
+    modules = find_tools(query, limit) if query else list(ported[:limit])
+    lines = [f'Tool entries: {len(ported)}', '']
     if query:
         lines.append(f'Filtered by: {query}')
         lines.append('')
