@@ -62,11 +62,17 @@ class EmbeddedModuleLoader(importlib.abc.Loader):
         self.compressed_source = compressed_source
     
     def create_module(self, spec):
-        return None  # Use default module creation
+        # Create module with proper attributes pre-set
+        module = types.ModuleType(spec.name)
+        module.__file__ = f"<embedded:{spec.name}>"
+        module.__loader__ = self
+        module.__package__ = spec.name.rsplit('.', 1)[0] if '.' in spec.name else ''
+        module.__spec__ = spec
+        return module
     
     def exec_module(self, module):
         source = decompress_source(self.compressed_source)
-        code = compile(source, f"<embedded:{module.__name__}>", 'exec')
+        code = compile(source, module.__file__, 'exec')
         exec(code, module.__dict__)
 
 
@@ -74,10 +80,16 @@ class EmbeddedPackageLoader(importlib.abc.Loader):
     """Loader for embedded packages (directories)."""
     
     def create_module(self, spec):
-        return None
+        module = types.ModuleType(spec.name)
+        module.__file__ = f"<embedded:{spec.name}/__init__.py>"
+        module.__loader__ = self
+        module.__package__ = spec.name
+        module.__path__ = [f"<embedded:{spec.name}>"]
+        module.__spec__ = spec
+        return module
     
     def exec_module(self, module):
-        module.__path__ = [f"<embedded:{module.__name__}>"]
+        pass  # Packages don't need code execution
 
 
 def decompress_source(compressed: str) -> str:
