@@ -2,16 +2,15 @@
 
 **Goal:** Shrink native FLUX components and embed ALL models (language, vision, audio, detection) into a single self-contained .flx file that powers a local AI hub.
 
-**Version:** 8.1-complete | **Current Size:** ~17.40 GB | **VRAM:** 4-20 GB (lazy loading)
+**Version:** 7.1-detection-embedded | **Current Size:** ~14-15 GB | **VRAM:** 4-20 GB (lazy loading)
 
 ---
 
 > **Quick Start for AI Agents:**
-> - **Weight Injection:** ✅ Complete — `notebooks/flux_weight_injection.ipynb`
+> - **Phase 2.5 Notebook:** `notebooks/phase2_5_detection_embed.ipynb`
 > - **Critical Fix:** Always pin `numpy<2.0` in EVERY pip install (see Common Issues)
-> - **Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 2.5 ✅ | **Codebase Embed ✅** | **Weight Injection ✅**
-> - **Embedded:** 12 models + 87 runtime files (27,647 lines) + all native FLUX weights
-> - **Next:** Upload to HuggingFace + full autonomy testing
+> - **Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 2.5 ✅ (4/5) | 11/12 models embedded
+> - **Next:** Phase 3 validation testing
 
 ---
 
@@ -705,12 +704,11 @@ CAMERA_ALWAYS_ON = {
 5. [x] Add HRNet-W32 to .flx ✅ (39.3M params) *(ViTPose → HRNet via timm)*
 6. [x] Create camera orchestration pipeline ✅
 
-### Phase 3: Update Loaders ✅ PARTIALLY COMPLETE
-1. [x] Create `LazyModelManager` class — `flux_lazy_loader.py` (607 lines)
-2. [x] Create `LazyModel` wrapper class
-3. [ ] Update orchestration to use embedded weights
-4. [x] Add model unloading for memory management
-5. [ ] Test lazy loading from .flx end-to-end
+### Phase 3: Update Loaders
+1. [ ] Create `EmbeddedLazyModel` class
+2. [ ] Update orchestration to use embedded weights
+3. [ ] Add model unloading for memory management
+4. [ ] Test lazy loading from .flx
 
 ### Phase 4: Validation
 1. [ ] Test offline operation

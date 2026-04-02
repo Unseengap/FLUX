@@ -1,36 +1,34 @@
 # FLUX Codebase Embedding Specification
 
-**Version:** 2.0  
+**Version:** 1.0  
 **Date:** April 1, 2026  
-**Status:** ✅ COMPLETE — v8.1-complete  
-**Current Model:** v8.1-complete (87 files embedded, all weights injected)
+**Status:** REQUIRED for v8.0-autonomous  
+**Current Model:** v6.0-autonomous (partial embed ~30%)
 
 ---
 
 ## Executive Summary
 
-FLUX is now **fully autonomous** with:
-- **87 Python files** (27,647 lines) embedded for self-bootstrap
-- **All native FLUX weights** injected from phase checkpoints
-- **12 embedded models** for language, vision, audio, detection
-- **Total: ~8.34B parameters** in a single .flx file
+For FLUX to be truly autonomous, the **entire runtime codebase** must be embedded in the `.flx` file. Currently, v6.0-autonomous has only ~10 gzipped files (~30% of what's needed). This document specifies:
+
+1. **What files must be embedded** (full inventory)
+2. **Directory structure** to preserve in the archive
+3. **Dependencies between modules**
+4. **Bootstrap sequence** to wake FLUX from .flx alone
+5. **Implementation checklist**
 
 ---
 
-## Current State (v8.1-complete)
+## Current State vs Target
 
-| Metric | Value |
-|--------|-------|
-| Embedded code files | **87** |
-| Embedded lines | **27,647** |
-| Can run from .flx only | ✅ |
-| Has bootstrap.py | ✅ |
-| Has tool executor | ✅ |
-| Has unified agent | ✅ |
-| Has __init__.py files | ✅ (10 files) |
-| Weight injection | ✅ **COMPLETE** |
-| Native FLUX weights | **~1.4B params** |
-| Total model size | **~17.40 GB** |
+| Metric | v6.0-autonomous | v8.0-autonomous (Target) |
+|--------|-----------------|--------------------------|
+| Embedded code files | ~10 | ~60+ |
+| Embedded lines | ~3,000 | ~15,000+ |
+| Can run from .flx only | ❌ | ✅ |
+| Has bootstrap.py | ❌ | ✅ |
+| Has tool executor | ❌ | ✅ |
+| Has unified agent | ❌ | ✅ |
 
 ---
 
@@ -214,39 +212,6 @@ FLUX is now **fully autonomous** with:
 
 ---
 
-### Tier 5: CLAW Harness (Claude Code Integration) — NEW April 1, 2026
-
-> **CRITICAL:** The Claw harness provides 922+ tools and 1000+ commands from the clean-room Python port of Claude Code. This gives FLUX the same agentic capabilities.
-
-#### Phase CLAW: Claude Code Harness (~2,500 lines)
-
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `phases/phase_claw/__init__.py` | 90 | Module exports + FLUX bridge integration | ✅ Created |
-| `phases/phase_claw/flux_bridge.py` | 350 | FLUX ↔ Claw integration layer | ✅ Created |
-| `phases/phase_claw/runtime.py` | 193 | Runtime session management | ✅ Ported |
-| `phases/phase_claw/tools.py` | 96 | Tool definitions (922+ tools) | ✅ Ported |
-| `phases/phase_claw/commands.py` | 90 | Command definitions (1000+ commands) | ✅ Ported |
-| `phases/phase_claw/query_engine.py` | 194 | Query engine with budget/turn management | ✅ Ported |
-| `phases/phase_claw/tool_pool.py` | 37 | Tool pool assembly | ✅ Ported |
-| `phases/phase_claw/models.py` | 50 | Data models | ✅ Ported |
-| `phases/phase_claw/permissions.py` | 80 | Tool permission system | ✅ Ported |
-| `phases/phase_claw/context.py` | 50 | Workspace context | ✅ Ported |
-| `phases/phase_claw/session_store.py` | 60 | Session persistence | ✅ Ported |
-| `phases/phase_claw/history.py` | 40 | History logging | ✅ Ported |
-| `phases/phase_claw/reference_data/*.json` | N/A | Tool/command snapshots (922 tools, 207 commands) | ✅ Ported |
-
-**Tier 5 Subtotal: ~1,330 lines + JSON reference data**
-
-**Capabilities Added:**
-- BashTool, FileReadTool, FileEditTool, FileWriteTool
-- AgentTool (subagents), AskUserQuestionTool
-- GitTool, GithubTool, SearchTool, GrepTool
-- MCP tools (Model Context Protocol)
-- 1000+ slash commands (/branch, /add-dir, /agents, etc.)
-
----
-
 ## Total Line Counts
 
 | Tier | Lines | Required? |
@@ -255,9 +220,8 @@ FLUX is now **fully autonomous** with:
 | **Tier 2: Orchestration + Agent** | ~6,820 | ✅ YES |
 | **Tier 3: Multi-Modal** | ~2,900 | ✅ YES |
 | **Tier 4: Optional** | ~4,700 | ❌ Optional |
-| **Tier 5: CLAW Harness** | ~1,330 | ✅ YES (NEW) |
-| **TOTAL REQUIRED** | **~22,200** | |
-| **TOTAL WITH OPTIONAL** | **~26,900** | |
+| **TOTAL REQUIRED** | **~20,870** | |
+| **TOTAL WITH OPTIONAL** | **~25,570** | |
 
 ---
 
@@ -564,35 +528,31 @@ phases/phase_unified/unified_agent.py  ← MAIN AGENT
 
 ## Implementation Checklist
 
-### Phase 1: Create Embedding Notebook ✅ COMPLETED (April 1, 2026)
+### Phase 1: Create Embedding Notebook
 
-- [x] Create `notebooks/flux_codebase_embed.ipynb`
-- [x] Implement `collect_files()` — gather all files from Tier 1-3
-- [x] Implement `validate_syntax()` — AST parse all files
-- [x] Implement `resolve_dependencies()` — check imports resolve
-- [x] Implement `compress_bundle()` — gzip + base64
-- [x] Create `bootstrap.py` — self-extractor module
-- [x] Create all missing `__init__.py` files (10 files)
+- [ ] Create `notebooks/flux_codebase_embed.ipynb`
+- [ ] Implement `collect_files()` — gather all files from Tier 1-3
+- [ ] Implement `validate_syntax()` — AST parse all files
+- [ ] Implement `resolve_dependencies()` — check imports resolve
+- [ ] Implement `compress_bundle()` — gzip + base64
 
-### Phase 2: Embed & Save ✅ COMPLETED (April 2, 2026)
+### Phase 2: Embed & Save
 
-- [x] Load current Flux-Apex-V1.flx
-- [x] Add complete `runtime` section (87 files, 27,647 lines)
-- [x] Add `bootstrap.py` source (463 lines)
-- [x] Update version to `8.0-autonomous`
-- [x] Save and verify (15.41 GB)
-- [x] Compression: 950 KB → 325 KB (65.8% ratio)
+- [ ] Load current Flux-Apex-V1.flx
+- [ ] Add complete `runtime` section
+- [ ] Add `bootstrap.py` source
+- [ ] Update version to `8.0-autonomous`
+- [ ] Save and verify
 
-### Phase 3: Test Wake-Up ✅ PARTIAL (April 2, 2026)
+### Phase 3: Test Wake-Up
 
-- [x] Run bootstrap module test
-- [x] Verify `get_runtime_info()` works
 - [ ] Create fresh Python environment (no FLUX repo)
 - [ ] Copy only Flux-Apex-V1.flx
-- [ ] Verify all modules load via `wake_up()`
+- [ ] Run bootstrap
+- [ ] Verify all modules load
 - [ ] Test basic operations (encode, query, generate)
 
-### Phase 4: Validate Autonomy (PENDING)
+### Phase 4: Validate Autonomy
 
 - [ ] Test tool calling works
 - [ ] Test memory operations
@@ -640,40 +600,23 @@ phases/phase12/       # Multi-agent (optional)
 
 The codebase embed is complete when:
 
-1. ✅ All Tier 1-3 files embedded (87 files, 27,647 lines) — **EXCEEDED TARGET**
-2. ✅ Bootstrap.py works from .flx alone — **VERIFIED**
-3. ⬜ `wake_up()` initializes orchestrator + agent — **PENDING FULL TEST**
-4. ⬜ No external codebase required — **PENDING CLEAN ENV TEST**
-5. ⬜ All basic operations functional — **PENDING**
-6. ✅ Version updated to 8.0-autonomous — **DONE**
+1. ✅ All Tier 1-3 files embedded (~60 files, ~21K lines)
+2. ✅ Bootstrap.py works from .flx alone
+3. ✅ `wake_up()` initializes orchestrator + agent
+4. ✅ No external codebase required
+5. ✅ All basic operations functional
+6. ✅ Version updated to 8.0-autonomous
 
 ---
 
-## Completed (April 2, 2026)
-
-| Metric | Target | Actual |
-|--------|--------|--------|
-| Files embedded | ~60 | **87** |
-| Lines of code | ~21K | **27,647** |
-| Raw size | ~800 KB | **950 KB** |
-| Compressed | ~200 KB | **325 KB** |
-| Model size | ~14.35 GB | **15.41 GB** |
-
 ## Next Steps
 
-1. ~~Create notebook~~ ✅ `notebooks/flux_codebase_embed.ipynb`
-2. ~~Run on Kaggle~~ ✅ Completed April 2, 2026
-3. **Upload v8.0-autonomous** to HuggingFace — Set `UPLOAD_TO_HF=True`
+1. **Create notebook:** `notebooks/flux_codebase_embed.ipynb`
+2. **Run on Kaggle** (T4 GPU, 15GB VRAM)
+3. **Upload v8.0-autonomous** to HuggingFace
 4. **Test from scratch** on clean environment
-5. **Inject missing weights** ✅ Notebook created: `notebooks/flux_weight_injection.ipynb`
-   - CGN (Phase 5) — 6-hop causal trace
-   - Memory (Phase 6) — 0.0000 forgetting
-   - GR (Phase 3) — O(log n) scaling
-   - TL (Phase 4) — 99.04% retention
-   - CWC (Phase 1.5) — 93% order accuracy
 
 ---
 
 *Document created: April 1, 2026*  
-*Last updated: April 1, 2026 — Weight injection notebook created*  
-*Related: PHASE_AUTONOMOUS_SPEC.md, FLUX_LITE_EMBEDDED_MODELS.md, FLUX_CONSOLIDATION_ROADMAP.md*
+*Related: PHASE_AUTONOMOUS_SPEC.md, FLUX_LITE_EMBEDDED_MODELS.md*
