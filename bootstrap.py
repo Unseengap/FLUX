@@ -16,8 +16,68 @@ import sys
 import gzip
 import base64
 import types
+import importlib
+import importlib.abc
+import importlib.machinery
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+
+# ─────────────────────────────────────────────
+# Embedded Module Import Hook
+# ─────────────────────────────────────────────
+
+class EmbeddedModuleFinder(importlib.abc.MetaPathFinder):
+    """Custom finder for embedded modules."""
+    
+    def __init__(self, code_bundle: Dict[str, str]):
+        # Map module names to compressed source
+        self.modules = {}
+        for path, compressed in code_bundle.items():
+            module_name = path.replace('/', '.').replace('.py', '')
+            self.modules[module_name] = compressed
+    
+    def find_spec(self, fullname, path, target=None):
+        if fullname in self.modules:
+            return importlib.machinery.ModuleSpec(
+                fullname,
+                EmbeddedModuleLoader(self.modules[fullname]),
+                is_package=False,
+            )
+        # Check if it's a package (has submodules)
+        pkg_prefix = fullname + '.'
+        if any(m.startswith(pkg_prefix) for m in self.modules):
+            return importlib.machinery.ModuleSpec(
+                fullname,
+                EmbeddedPackageLoader(),
+                is_package=True,
+            )
+        return None
+
+
+class EmbeddedModuleLoader(importlib.abc.Loader):
+    """Custom loader for embedded modules."""
+    
+    def __init__(self, compressed_source: str):
+        self.compressed_source = compressed_source
+    
+    def create_module(self, spec):
+        return None  # Use default module creation
+    
+    def exec_module(self, module):
+        source = decompress_source(self.compressed_source)
+        code = compile(source, f"<embedded:{module.__name__}>", 'exec')
+        exec(code, module.__dict__)
+
+
+class EmbeddedPackageLoader(importlib.abc.Loader):
+    """Loader for embedded packages (directories)."""
+    
+    def create_module(self, spec):
+        return None
+    
+    def exec_module(self, module):
+        module.__path__ = [f"<embedded:{module.__name__}>"]
 
 
 def decompress_source(compressed: str) -> str:
@@ -47,7 +107,7 @@ def extract_runtime(flx: Dict[str, Any], verbose: bool = False) -> Dict[str, typ
     """
     Extract and load all embedded modules from a .flx file.
     
-    Uses multi-pass loading to handle inter-module dependencies.
+    Uses a custom import hook to handle inter-module dependencies.
     
     Args:
         flx: Loaded .flx dictionary (from torch.load)
@@ -64,116 +124,50 @@ def extract_runtime(flx: Dict[str, Any], verbose: bool = False) -> Dict[str, typ
             print("⚠ No embedded runtime code found")
         return {}
     
+    # Install custom import hook
+    finder = EmbeddedModuleFinder(code_bundle)
+    sys.meta_path.insert(0, finder)
+    
     modules = {}
     
-    # Create package hierarchy first
-    packages = set()
-    for path in code_bundle.keys():
-        parts = path.replace('.py', '').split('/')
-        for i in range(1, len(parts)):
-            pkg = '.'.join(parts[:i])
-            packages.add(pkg)
+    # Load modules in dependency order (leaf modules first)
+    # Sort by depth (fewer dots = higher level = load last)
+    sorted_paths = sorted(code_bundle.keys(), key=lambda p: p.count('/'))
     
-    # Register packages in sys.modules with proper __path__
-    for pkg in sorted(packages):
-        if pkg not in sys.modules:
-            mod = types.ModuleType(pkg)
-            mod.__file__ = f"<embedded:{pkg}>"
-            mod.__path__ = [f"<embedded:{pkg}>"]  # Must be list for package
-            mod.__package__ = pkg
-            sys.modules[pkg] = mod
-    
-    # Multi-pass loading to handle dependencies
-    pending = dict(code_bundle)  # path -> compressed source
-    max_passes = 10
-    
-    for pass_num in range(max_passes):
-        if not pending:
-            break
-            
-        still_pending = {}
-        loaded_this_pass = 0
-        
-        for path, compressed in pending.items():
-            module_name = path.replace('/', '.').replace('.py', '')
-            parts = module_name.rsplit('.', 1)
-            package = parts[0] if len(parts) > 1 else None
-            
-            try:
-                source = decompress_source(compressed)
-                module = load_module_from_source(module_name, source, package)
-                
-                # Check if it loaded cleanly (no import errors stored)
-                if hasattr(module, '__load_error__'):
-                    err = module.__load_error__
-                    # If it's an import error, retry later
-                    if 'No module named' in err or 'cannot import name' in err:
-                        still_pending[path] = compressed
-                        continue
-                
-                # Success - register in sys.modules
-                sys.modules[module_name] = module
-                modules[path] = module
-                loaded_this_pass += 1
-                
-                # Register in parent package
-                if package and package in sys.modules:
-                    attr_name = parts[1] if len(parts) > 1 else module_name
-                    parent = sys.modules[package]
-                    if parent is not None:
-                        setattr(parent, attr_name, module)
-                
-                if verbose:
-                    print(f"✓ {path}")
-                    
-            except Exception as e:
-                err_str = str(e)
-                if 'No module named' in err_str or 'cannot import name' in err_str:
-                    still_pending[path] = compressed
-                else:
-                    # Non-import error, store it but don't retry
-                    modules[path] = types.ModuleType(module_name)
-                    modules[path].__load_error__ = err_str
-                    if verbose:
-                        print(f"✗ {path}: {e}")
-        
-        pending = still_pending
-        
-        if verbose and loaded_this_pass > 0:
-            print(f"  [Pass {pass_num + 1}: loaded {loaded_this_pass}, pending {len(pending)}]")
-        
-        # If no progress, break to avoid infinite loop
-        if loaded_this_pass == 0 and pending:
-            break
-    
-    # Final pass - load remaining with errors stored
-    for path, compressed in pending.items():
+    for path in sorted_paths:
         module_name = path.replace('/', '.').replace('.py', '')
-        parts = module_name.rsplit('.', 1)
-        package = parts[0] if len(parts) > 1 else None
         
         try:
-            source = decompress_source(compressed)
-            module = load_module_from_source(module_name, source, package)
+            # Use the standard import machinery (now with our hook)
+            module = importlib.import_module(module_name)
+            modules[path] = module
+            
+            if verbose:
+                print(f"✓ {path}")
+                
+        except Exception as e:
+            # Create placeholder module with error
+            module = types.ModuleType(module_name)
+            module.__load_error__ = str(e)
             sys.modules[module_name] = module
             modules[path] = module
             
             if verbose:
-                if hasattr(module, '__load_error__'):
-                    print(f"⚠ {path} (error: {module.__load_error__})")
-                else:
-                    print(f"✓ {path}")
-        except Exception as e:
-            modules[path] = types.ModuleType(module_name)
-            modules[path].__load_error__ = str(e)
-            if verbose:
-                print(f"✗ {path}: {e}")
+                print(f"⚠ {path} (error: {e})")
     
     if verbose:
         success = sum(1 for m in modules.values() if not hasattr(m, '__load_error__'))
         print(f"\nLoaded {success}/{len(code_bundle)} modules successfully")
     
     return modules
+
+
+# Import helper for embedded modules to use
+def import_embedded(module_name: str):
+    """Import a module that may be embedded or on disk."""
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    return importlib.import_module(module_name)
 
 
 def wake_up(
