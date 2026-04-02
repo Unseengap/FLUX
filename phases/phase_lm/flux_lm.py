@@ -248,21 +248,25 @@ class FluxLM(nn.Module):
         past_kv = None
         
         for _ in range(config.max_new_bytes):
-            # Encode current context (or just last byte with cache)
-            if past_kv is None:
-                causal_waves = self.encode_bytes(bytes_tensor.unsqueeze(0))
-            else:
-                # Only encode the last byte
-                last_byte = bytes_tensor[-1:].unsqueeze(0)
-                semantic_wave = self.cse.encode_bytes(last_byte)
-                wave = semantic_wave.full
-                causal_waves = self.cwc(wave)
+            # Always encode full context through CSE and CWC
+            # (they don't support incremental encoding)
+            input_tensor = bytes_tensor.unsqueeze(0)  # [1, seq_len]
             
-            # Predict next wave
-            next_wave, past_kv = self.predictor.predict_next(causal_waves, past_kv)
+            # Encode to causal waves
+            semantic_wave = self.cse.encode_bytes(input_tensor)
+            wave = semantic_wave.full  # [1, seq_len, 432]
+            causal_waves = self.cwc(wave)  # [1, seq_len, 608]
+            
+            # Predict next wave (KV cache only helps predictor)
+            if past_kv is None:
+                next_wave, past_kv = self.predictor.predict_next(causal_waves, None)
+            else:
+                # With cache, only pass the new position to predictor
+                next_wave, past_kv = self.predictor.predict_next(causal_waves[:, -1:], past_kv)
             
             # Decode to byte logits
-            logits = self.decoder(next_wave)  # [1, 256]
+            logits = self.decoder(next_wave.unsqueeze(1) if next_wave.dim() == 2 else next_wave)
+            logits = logits.squeeze(1)  # [1, 256]
             
             # Apply repetition penalty
             if config.repetition_penalty != 1.0:
