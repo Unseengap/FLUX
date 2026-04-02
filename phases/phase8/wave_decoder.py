@@ -1,4 +1,16 @@
 """
+################################################################################
+# DEPRECATED as of v6.0-autonomous (April 2026)
+# 
+# This byte decoder has been SUPERSEDED by embedded models.instruct (Qwen2.5-1.5B)
+# which produces far superior text generation quality.
+#
+# This file is preserved for HISTORICAL REFERENCE ONLY.
+# Do not use in new code. Do not import WaveDecoder.
+#
+# See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+################################################################################
+
 Phase 8: WaveDecoder — Autoregressive Byte-Level Decoder
 
 The FLUX pipeline provides WHAT to say (semantic meaning via field features

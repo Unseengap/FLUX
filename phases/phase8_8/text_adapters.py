@@ -100,6 +100,16 @@ class TextToWave(XToWave):
 @register_output_adapter('text')
 class WaveToText(WaveToX):
     """
+    ############################################################################
+    # DEPRECATED as of v6.0-autonomous (April 2026)
+    #
+    # This wave-to-text decoder is SUPERSEDED by embedded models.instruct.
+    # Use the embedded Qwen2.5-1.5B-Instruct model for text generation instead.
+    #
+    # This class is preserved for HISTORICAL REFERENCE ONLY.
+    # See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+    ############################################################################
+    
     Wave → Text adapter.
     
     Decodes a single wave (representing ~1 word/chunk) to UTF-8 bytes.

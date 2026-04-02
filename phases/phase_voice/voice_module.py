@@ -1,4 +1,19 @@
 """
+################################################################################
+# DEPRECATED as of v6.0-autonomous (April 2026)
+#
+# This module used Qwen2.5-Omni as a single integrated voice model.
+# That approach was replaced by separate embedded models:
+#   - models.instruct (text generation)
+#   - models.whisper (speech recognition)
+#   - models.tts (text-to-speech via Bark)
+#
+# This file is preserved for HISTORICAL REFERENCE ONLY.
+# Use the embedded model system via flux_lazy_loader.py instead.
+#
+# See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+################################################################################
+
 Phase Voice: FLUXVoiceOmni — Embedded Multimodal Voice Module.
 
 This module wraps Qwen2.5-Omni for text/audio/vision generation,

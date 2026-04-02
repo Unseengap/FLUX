@@ -1,4 +1,14 @@
 """
+################################################################################
+# DEPRECATED as of v6.0-autonomous (April 2026)
+#
+# This wave-to-text decoder has been SUPERSEDED by embedded models.instruct.
+# Use the embedded Qwen2.5-1.5B-Instruct model for text generation instead.
+#
+# This file is preserved for HISTORICAL REFERENCE ONLY.
+# See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+################################################################################
+
 Phase 9 — WaveToText: Last-Mile Wave→Bytes Decoder
 
 Convert a single 432-dim wave into its byte representation.

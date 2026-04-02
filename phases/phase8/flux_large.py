@@ -1,4 +1,17 @@
 """
+################################################################################
+# PARTIALLY DEPRECATED as of v6.0-autonomous (April 2026)
+#
+# The WaveDecoder integration in this file is DEPRECATED.
+# Text generation is now handled by embedded models.instruct.
+#
+# STILL USEFUL:
+#   - FLUXLarge scaling concepts (larger field, more CGN nodes)
+#   - Integration architecture patterns
+#
+# See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+################################################################################
+
 Phase 8: FLUXModel + WaveDecoder — Scaled FLUX for GPT-2 Benchmark
 
 Uses the SAME FLUXModel from Phase 7 with compatible field_features=512,

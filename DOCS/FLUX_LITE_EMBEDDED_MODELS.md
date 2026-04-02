@@ -704,11 +704,12 @@ CAMERA_ALWAYS_ON = {
 5. [x] Add HRNet-W32 to .flx ✅ (39.3M params) *(ViTPose → HRNet via timm)*
 6. [x] Create camera orchestration pipeline ✅
 
-### Phase 3: Update Loaders
-1. [ ] Create `EmbeddedLazyModel` class
-2. [ ] Update orchestration to use embedded weights
-3. [ ] Add model unloading for memory management
-4. [ ] Test lazy loading from .flx
+### Phase 3: Update Loaders ✅ PARTIALLY COMPLETE
+1. [x] Create `LazyModelManager` class — `flux_lazy_loader.py` (607 lines)
+2. [x] Create `LazyModel` wrapper class
+3. [ ] Update orchestration to use embedded weights
+4. [x] Add model unloading for memory management
+5. [ ] Test lazy loading from .flx end-to-end
 
 ### Phase 4: Validation
 1. [ ] Test offline operation

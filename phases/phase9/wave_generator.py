@@ -1,4 +1,18 @@
 """
+################################################################################
+# DEPRECATED as of v6.0-autonomous (April 2026)
+#
+# This wave-level text generator has been SUPERSEDED by embedded models.instruct
+# (Qwen2.5-1.5B-Instruct) which produces far superior text generation.
+#
+# The concept of wave-based generation was a proof-of-concept for native FLUX
+# text output. With embedded models, we now use LLMs for text generation while
+# native FLUX handles cognition (memory, causality, learning).
+#
+# This file is preserved for HISTORICAL REFERENCE ONLY.
+# See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+################################################################################
+
 Phase 9 — WaveGenerator v2: GRU-Based Wave Sequence Generator
 
 Predicts the next 432-dim wave from context and previous waves using

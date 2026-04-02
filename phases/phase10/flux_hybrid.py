@@ -1,4 +1,18 @@
 """
+################################################################################
+# DEPRECATED as of v6.0-autonomous (April 2026)
+#
+# This hybrid model loaded external LLMs and used WaveDecoder for byte mode.
+# Both approaches are now OBSOLETE:
+#   - External LLMs → replaced by embedded models (instruct, vision, coder)
+#   - WaveDecoder → replaced by embedded models.instruct
+#
+# This file is preserved for HISTORICAL REFERENCE ONLY.
+# Use phases/phase_unified/ or phases/phase_orchestrator/ instead.
+#
+# See: DOCS/FLUX_CONSOLIDATION_ROADMAP.md
+################################################################################
+
 Phase 10: FLUXHybrid — Unified Hybrid Wave+Byte Model
 
 The best of both worlds:

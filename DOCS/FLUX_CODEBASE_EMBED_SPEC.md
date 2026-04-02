@@ -26,9 +26,11 @@ For FLUX to be truly autonomous, the **entire runtime codebase** must be embedde
 | Embedded code files | ~10 | ~60+ |
 | Embedded lines | ~3,000 | ~15,000+ |
 | Can run from .flx only | ❌ | ✅ |
-| Has bootstrap.py | ❌ | ✅ |
+| Has bootstrap.py | ✅ Created | ✅ |
 | Has tool executor | ❌ | ✅ |
 | Has unified agent | ❌ | ✅ |
+| Has __init__.py files | ✅ Created (10) | ✅ |
+| Has embed notebook | ✅ Created | ✅ |
 
 ---
 
@@ -212,6 +214,39 @@ For FLUX to be truly autonomous, the **entire runtime codebase** must be embedde
 
 ---
 
+### Tier 5: CLAW Harness (Claude Code Integration) — NEW April 1, 2026
+
+> **CRITICAL:** The Claw harness provides 922+ tools and 1000+ commands from the clean-room Python port of Claude Code. This gives FLUX the same agentic capabilities.
+
+#### Phase CLAW: Claude Code Harness (~2,500 lines)
+
+| File | Lines | Purpose | Status |
+|------|-------|---------|--------|
+| `phases/phase_claw/__init__.py` | 90 | Module exports + FLUX bridge integration | ✅ Created |
+| `phases/phase_claw/flux_bridge.py` | 350 | FLUX ↔ Claw integration layer | ✅ Created |
+| `phases/phase_claw/runtime.py` | 193 | Runtime session management | ✅ Ported |
+| `phases/phase_claw/tools.py` | 96 | Tool definitions (922+ tools) | ✅ Ported |
+| `phases/phase_claw/commands.py` | 90 | Command definitions (1000+ commands) | ✅ Ported |
+| `phases/phase_claw/query_engine.py` | 194 | Query engine with budget/turn management | ✅ Ported |
+| `phases/phase_claw/tool_pool.py` | 37 | Tool pool assembly | ✅ Ported |
+| `phases/phase_claw/models.py` | 50 | Data models | ✅ Ported |
+| `phases/phase_claw/permissions.py` | 80 | Tool permission system | ✅ Ported |
+| `phases/phase_claw/context.py` | 50 | Workspace context | ✅ Ported |
+| `phases/phase_claw/session_store.py` | 60 | Session persistence | ✅ Ported |
+| `phases/phase_claw/history.py` | 40 | History logging | ✅ Ported |
+| `phases/phase_claw/reference_data/*.json` | N/A | Tool/command snapshots (922 tools, 207 commands) | ✅ Ported |
+
+**Tier 5 Subtotal: ~1,330 lines + JSON reference data**
+
+**Capabilities Added:**
+- BashTool, FileReadTool, FileEditTool, FileWriteTool
+- AgentTool (subagents), AskUserQuestionTool
+- GitTool, GithubTool, SearchTool, GrepTool
+- MCP tools (Model Context Protocol)
+- 1000+ slash commands (/branch, /add-dir, /agents, etc.)
+
+---
+
 ## Total Line Counts
 
 | Tier | Lines | Required? |
@@ -220,8 +255,9 @@ For FLUX to be truly autonomous, the **entire runtime codebase** must be embedde
 | **Tier 2: Orchestration + Agent** | ~6,820 | ✅ YES |
 | **Tier 3: Multi-Modal** | ~2,900 | ✅ YES |
 | **Tier 4: Optional** | ~4,700 | ❌ Optional |
-| **TOTAL REQUIRED** | **~20,870** | |
-| **TOTAL WITH OPTIONAL** | **~25,570** | |
+| **Tier 5: CLAW Harness** | ~1,330 | ✅ YES (NEW) |
+| **TOTAL REQUIRED** | **~22,200** | |
+| **TOTAL WITH OPTIONAL** | **~26,900** | |
 
 ---
 
@@ -528,15 +564,17 @@ phases/phase_unified/unified_agent.py  ← MAIN AGENT
 
 ## Implementation Checklist
 
-### Phase 1: Create Embedding Notebook
+### Phase 1: Create Embedding Notebook ✅ COMPLETED (April 1, 2026)
 
-- [ ] Create `notebooks/flux_codebase_embed.ipynb`
-- [ ] Implement `collect_files()` — gather all files from Tier 1-3
-- [ ] Implement `validate_syntax()` — AST parse all files
-- [ ] Implement `resolve_dependencies()` — check imports resolve
-- [ ] Implement `compress_bundle()` — gzip + base64
+- [x] Create `notebooks/flux_codebase_embed.ipynb`
+- [x] Implement `collect_files()` — gather all files from Tier 1-3
+- [x] Implement `validate_syntax()` — AST parse all files
+- [x] Implement `resolve_dependencies()` — check imports resolve
+- [x] Implement `compress_bundle()` — gzip + base64
+- [x] Create `bootstrap.py` — self-extractor module
+- [x] Create all missing `__init__.py` files (10 files)
 
-### Phase 2: Embed & Save
+### Phase 2: Embed & Save (pending notebook run)
 
 - [ ] Load current Flux-Apex-V1.flx
 - [ ] Add complete `runtime` section
