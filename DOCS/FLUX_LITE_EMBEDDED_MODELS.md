@@ -2,15 +2,16 @@
 
 **Goal:** Shrink native FLUX components and embed ALL models (language, vision, audio, detection) into a single self-contained .flx file that powers a local AI hub.
 
-**Version:** 7.1-detection-embedded | **Current Size:** ~14-15 GB | **VRAM:** 4-20 GB (lazy loading)
+**Version:** 8.0-autonomous | **Current Size:** ~15.41 GB | **VRAM:** 4-20 GB (lazy loading)
 
 ---
 
 > **Quick Start for AI Agents:**
-> - **Phase 2.5 Notebook:** `notebooks/phase2_5_detection_embed.ipynb`
+> - **Codebase Embed Notebook:** `notebooks/flux_codebase_embed.ipynb`
 > - **Critical Fix:** Always pin `numpy<2.0` in EVERY pip install (see Common Issues)
-> - **Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 2.5 ✅ (4/5) | 11/12 models embedded
-> - **Next:** Phase 3 validation testing
+> - **Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 2.5 ✅ | **Codebase Embed ✅**
+> - **Embedded:** 12 models + 87 runtime files (27,647 lines)
+> - **Next:** Weight injection (CGN, Memory, GR, TL) + full autonomy testing
 
 ---
 

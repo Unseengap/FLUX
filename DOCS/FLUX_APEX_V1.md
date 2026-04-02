@@ -2,7 +2,7 @@
 
 **FLUX Architecture — Flagship Model Documentation**  
 *For AI Agents, Developers, and Integration Systems*  
-*Version: 6.0-autonomous | Phase: autonomous | Updated: April 1, 2026*
+*Version: 8.0-autonomous | Phase: autonomous | Updated: April 2, 2026*
 
 ---
 
@@ -14,15 +14,16 @@
 | **Location** | `checkpoints/Flux-Apex-V1.flx` |
 | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
 | **Format** | FLUX (self-describing cognitive architecture) |
-| **Version** | 6.0-autonomous |
+| **Version** | 8.0-autonomous |
 | **Phase** | autonomous |
-| **File Size** | ~14.35 GB (15.4 GB on HuggingFace with xet) |
+| **File Size** | ~15.41 GB |
 | **Total Parameters** | ~7,438,927,280 (~7.44B) |
 | **Total Tensors** | 5,875 |
 | **Top-Level Keys** | 25 |
 | **Max Nesting Depth** | 10 |
 | **Can Continue Learning** | `True` |
 | **Embedded Models** | 12 (7 language/vision/audio, 5 detection) |
+| **Embedded Runtime** | 87 files, 27,647 lines (325 KB compressed) |
 
 ---
 
@@ -41,13 +42,15 @@ Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not j
 
 ---
 
-## What This Model IS (v6.0 State)
+## What This Model IS (v8.0 State)
 
 - **12 embedded models** — Language (instruct, coder), Vision (VLM, CLIP), Audio (Whisper, TTS), Detection (face, depth, pose, object)
 - **Compressed native FLUX** — Field reduced to 48³×256 (~28.4M params)
 - **Lazy loading support** — Models loaded on-demand to manage VRAM
 - **ONNX detection** — InsightFace face recognition via 5 ONNX models
-- **Partial runtime embed** — ~10 files embedded, full codebase embed pending (see FLUX_CODEBASE_EMBED_SPEC.md)
+- **Full runtime embed** — 87 Python files (27,647 lines) embedded for autonomous bootstrap
+- **CLAW harness** — 922 tools from Claude Code port integrated
+- **Native JSON tools** — Qwen2.5-compatible function calling format
 - **Native JSON tools** — Orchestration uses Qwen2.5-compatible JSON function calling
 
 ## What This Model is NOT

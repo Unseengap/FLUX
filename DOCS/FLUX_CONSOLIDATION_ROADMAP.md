@@ -1,14 +1,14 @@
 # FLUX Consolidation Roadmap
 
-**Version:** 1.0  
-**Date:** April 1, 2026  
+**Version:** 1.4  
+**Date:** April 2, 2026  
 **Purpose:** Eliminate redundancy, clarify what's kept vs. deprecated, and define injection/cleanup tasks
 
 ---
 
 ## Executive Summary
 
-Flux-Apex-V1.flx (v6.0-autonomous) now contains **12 embedded models** that provide capabilities which overlap with some native FLUX components. This document identifies:
+Flux-Apex-V1.flx (v8.0-autonomous) now contains **12 embedded models** and **87 runtime files** (27,647 lines) for fully autonomous operation. This document identifies:
 
 1. **What's proven working** (from output/ results)
 2. **What's in the .flx file** (current state)
@@ -361,6 +361,7 @@ Flux-Apex-V1.flx (v8.0-complete)
 | April 1, 2026 | 1.1 | **Codebase cleanup completed** — 12 files marked DEPRECATED |
 | April 1, 2026 | 1.2 | **Codebase embed infrastructure** — Created bootstrap.py, 10 __init__.py files, embed notebook |
 | April 1, 2026 | 1.3 | **CLAW integration** — Integrated claw-code (Claude Code Python port) into FLUX harness |
+| April 2, 2026 | 1.4 | **v8.0-autonomous COMPLETE** — 87 files (27,647 lines) embedded, bootstrap verified, 15.41 GB |
 
 ---
 

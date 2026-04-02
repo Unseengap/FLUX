@@ -4,15 +4,17 @@
 
 FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons.
 
-**Current Flagship Model:** `Flux-Apex-V1.flx` (v5.1-orchestrated, Phase Orchestrator, ~5.7B params)
+**Current Flagship Model:** `Flux-Apex-V1.flx` (v8.0-autonomous, Full Codebase Embed, ~7.44B params)
 
 **Source of truth:**
 - `DOCS/FLUX_APEX_V1.md` — Complete Flux-Apex model reference
 - `DOCS/FLUX_FILE_FORMAT.md` — .flx format specification
-- `DOCS/FLUX_7B_SPEC.md` — Large-scale architecture spec
+- `DOCS/FLUX_CODEBASE_EMBED_SPEC.md` — Runtime embedding specification
+- `DOCS/FLUX_CONSOLIDATION_ROADMAP.md` — Component status and injection plan
 - `DOCS/PHASE_ORCHESTRATOR_SPEC.md` — VLM orchestration specification
 - `flux_model.py` — FLUXModel class for loading/saving
 - `flux_utils.py` — Core utilities (checkpoints, logging, HF Hub)
+- `bootstrap.py` — Self-extractor for wake-from-flx capability
 
 ---
 
@@ -24,27 +26,29 @@ FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture th
 |----------|-------|
 | **Location** | `checkpoints/Flux-Apex-V1.flx` |
 | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
-| **File Size** | 5,793.9 MB (5.79 GB) |
-| **Total Parameters** | 1,904,320,314 (1.9B) |
+| **File Size** | ~15.41 GB |
+| **Total Parameters** | ~7,438,927,280 (~7.44B) |
 | **Wave Dimension** | 432 (universal semantic space) |
-| **Field Dimensions** | 96 × 96 × 96 × 512 |
-| **Version** | 5.1-orchestrated |
+| **Field Dimensions** | 48 × 48 × 48 × 256 (compressed) |
+| **Version** | 8.0-autonomous |
+| **Embedded Models** | 12 (language, vision, audio, detection) |
+| **Embedded Runtime** | 87 files, 27,647 lines (325 KB compressed) |
 
 ### Top-Level Components (26 keys)
 
 | Component | Parameters | Purpose |
 |-----------|------------|---------|
-| `cse` | 2.7M | Continuous Semantic Encoder (bytes → 432D waves) |
-| `field` | 1.36B | Resonance Field (96³ × 512 knowledge storage) |
-| `memory` | 911M | Three-tier memory (working, episodic, semantic) |
-| `bridges` | 458M | Wave↔Field projections + router |
-| `decoder` | 65M | Byte-level text decoder (GRU-based) |
-| `causal` | 59M | CGN nodes + causal arrow graph |
+| `cse` | 1.3M | Continuous Semantic Encoder (bytes → 432D waves) |
+| `field` | 28.4M | Resonance Field (48³ × 256 knowledge storage, compressed) |
+| `memory` | 878K | Three-tier memory (working, episodic, semantic) |
+| `bridges` | 456M | Wave↔Field projections + router |
+| `causal` | 0 (placeholder) | CGN nodes + causal arrow graph — **NEEDS INJECTION** |
 | `adapters` | 15M | Multi-modal (grid, image, audio) |
-| `grid_to_wave` | 384K | ARC grid encoder |
-| `spatial_memory` | 25K | Curiosity-driven exploration |
-| `vlm` | 3.75B | Embedded Qwen2.5-VL-3B (text + vision) |
-| `orchestration` | — | Self-describing tool definitions |
+| `grid_to_wave` | 192K | ARC grid encoder |
+| `spatial_memory` | 12K | Curiosity-driven exploration |
+| `models` | 6.4B | 12 embedded models (instruct, coder, vision, clip, whisper, tts, etc.) |
+| `orchestration` | — | Self-describing tool definitions (JSON format) |
+| `runtime` | ~325KB | 87 Python files for autonomous bootstrap |
 
 ### Component Status Flags
 
@@ -55,12 +59,13 @@ Every component has an enabled/disabled flag in `components`:
     'grid_to_wave': True,
     'field': True,
     'memory': True,
-    'vlm': True,             # Embedded Qwen2.5-VL-3B
-    'vlm_text': True,        # Text generation
-    'vlm_vision': True,      # Vision understanding
+    'models': True,          # 12 embedded models
+    'instruct': True,        # Qwen2.5-1.5B-Instruct
+    'vision': True,          # Qwen2-VL-2B-Instruct
     'orchestration': True,   # Self-describing tools
     'tool_use': True,        # VLM can call FLUX tools
     'causal_tracker': True,
+    'runtime': True,         # Embedded codebase
     ...
 }
 ```
@@ -112,9 +117,12 @@ def get_legacy_components(model: FLUXModel) -> List[str]:
 
 ### Current Legacy Components
 
-| Component | Legacy Since | Replacement | Removal Target |
-|-----------|--------------|-------------|----------------|
-| `grid_adapters` | 2026-03-30 | `adapters.grid_to_wave` | v5.0 |
+| Component | Legacy Since | Replacement | Status |
+|-----------|--------------|-------------|--------|
+| `decoder` | 2026-03-30 | `models.instruct` | **REMOVED** |
+| `llm_reference` | 2026-03-30 | `models.*` (embedded) | **REMOVED** |
+| `grid_adapters` | 2026-03-30 | `adapters.grid_to_wave` | **REMOVED** |
+| `voice` | 2026-03-30 | `models.whisper` + `models.tts` | **REMOVED** |
 
 ---
 
