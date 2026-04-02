@@ -253,16 +253,15 @@ class FluxLM(nn.Module):
             wave = semantic_wave.full  # [1, seq_len, 432]
             causal_waves = self.cwc(wave)  # [1, seq_len, 608]
             
-            # Run full predictor (no KV cache - waves change each iteration)
+            # Run full predictor
             predicted_waves, _ = self.predictor(causal_waves)
             # predicted_waves: [1, seq_len, 608]
             
-            # Get prediction at last position
-            next_wave = predicted_waves[:, -1]  # [1, 608]
+            # Decode FULL sequence (decoder needs multi-position context)
+            logits = self.decoder(predicted_waves)  # [1, seq_len, 256]
             
-            # Decode to byte logits
-            logits = self.decoder(next_wave.unsqueeze(1))  # [1, 1, 256]
-            logits = logits.squeeze(1)  # [1, 256]
+            # Take logits at last position
+            logits = logits[:, -1]  # [1, 256]
             
             # Apply repetition penalty
             if config.repetition_penalty != 1.0:
