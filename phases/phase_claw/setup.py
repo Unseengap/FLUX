@@ -5,8 +5,12 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from .deferred_init import DeferredInitResult, run_deferred_init
-from .prefetch import PrefetchResult, start_keychain_prefetch, start_mdm_raw_read, start_project_scan
+try:
+    from phases.phase_claw.deferred_init import DeferredInitResult, run_deferred_init
+    from phases.phase_claw.prefetch import PrefetchResult, start_keychain_prefetch, start_mdm_raw_read, start_project_scan
+except ImportError:
+    from .deferred_init import DeferredInitResult, run_deferred_init
+    from .prefetch import PrefetchResult, start_keychain_prefetch, start_mdm_raw_read, start_project_scan
 
 
 @dataclass(frozen=True)

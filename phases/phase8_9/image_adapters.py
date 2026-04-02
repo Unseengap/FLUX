@@ -29,7 +29,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 if str(_PHASES_DIR / 'phase8_8') not in sys.path:
     sys.path.insert(0, str(_PHASES_DIR / 'phase8_8'))
 
-from wave_to_x import XToWave, WaveToX, register_input_adapter, register_output_adapter
+try:
+    from phases.phase8_8.wave_to_x import XToWave, WaveToX, register_input_adapter, register_output_adapter
+except ImportError:
+    from wave_to_x import XToWave, WaveToX, register_input_adapter, register_output_adapter
 
 
 # ─────────────────────────────────────────────

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .commands import get_commands
-from .models import PortingModule
+try:
+    from phases.phase_claw.commands import get_commands
+    from phases.phase_claw.models import PortingModule
+except ImportError:
+    from .commands import get_commands
+    from .models import PortingModule
 
 
 @dataclass(frozen=True)

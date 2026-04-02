@@ -5,8 +5,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from .models import PortingBacklog, PortingModule
-from .permissions import ToolPermissionContext
+try:
+    from phases.phase_claw.models import PortingBacklog, PortingModule
+    from phases.phase_claw.permissions import ToolPermissionContext
+except ImportError:
+    from .models import PortingBacklog, PortingModule
+    from .permissions import ToolPermissionContext
 
 SNAPSHOT_PATH = Path(__file__).resolve().parent / 'reference_data' / 'tools_snapshot.json'
 

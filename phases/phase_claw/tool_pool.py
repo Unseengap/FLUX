@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import PortingModule
-from .permissions import ToolPermissionContext
-from .tools import get_tools
+try:
+    from phases.phase_claw.models import PortingModule
+    from phases.phase_claw.permissions import ToolPermissionContext
+    from phases.phase_claw.tools import get_tools
+except ImportError:
+    from .models import PortingModule
+    from .permissions import ToolPermissionContext
+    from .tools import get_tools
 
 
 @dataclass(frozen=True)

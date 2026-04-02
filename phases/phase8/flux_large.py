@@ -49,6 +49,7 @@ from datetime import datetime
 _PHASES_DIR = Path(__file__).parent.parent
 _PROJECT_ROOT = _PHASES_DIR.parent
 
+# Add paths for direct execution
 for _phase in ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6', 'phase7']:
     _p = str(_PHASES_DIR / _phase)
     if _p not in sys.path:
@@ -56,25 +57,47 @@ for _phase in ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6', 'phas
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from cse import ContinuousSemanticEncoder
-from wave_types import SemanticWave, TOTAL_WAVE_DIM
-from field import ResonanceField
-from gravity import GravitationalRelevance
-from thermodynamic import ThermodynamicLearner
-from cgn import CausalGeometryNode
-from multi_timescale import MultiTimescaleCoordinator
-from causal_graph import CausalGraph
-from working_memory import WorkingMemory
-from episodic_memory import EpisodicMemory
-from semantic_memory import SemanticMemory
-from memory_router import MemoryRouter
-from consolidation import ConsolidationProcess
-from flux_model import FLUXModel, OutputHead, FLUXResponse, FLUXStats
-from wave_decoder import WaveDecoder
-from flux_utils import (
-    get_device, load_checkpoint, save_checkpoint, checkpoint_exists,
-    PhaseLogger,
-)
+# Import with fallback for embedded vs direct execution
+try:
+    from phases.phase1.cse import ContinuousSemanticEncoder
+    from phases.phase1.wave_types import SemanticWave, TOTAL_WAVE_DIM
+    from phases.phase2.field import ResonanceField
+    from phases.phase3.gravity import GravitationalRelevance
+    from phases.phase4.thermodynamic import ThermodynamicLearner
+    from phases.phase5.cgn import CausalGeometryNode
+    from phases.phase5.multi_timescale import MultiTimescaleCoordinator
+    from phases.phase5.causal_graph import CausalGraph
+    from phases.phase6.working_memory import WorkingMemory
+    from phases.phase6.episodic_memory import EpisodicMemory
+    from phases.phase6.semantic_memory import SemanticMemory
+    from phases.phase6.memory_router import MemoryRouter
+    from phases.phase6.consolidation import ConsolidationProcess
+    from flux_model import FLUXModel, OutputHead, FLUXResponse, FLUXStats
+    from phases.phase8.wave_decoder import WaveDecoder
+    from flux_utils import (
+        get_device, load_checkpoint, save_checkpoint, checkpoint_exists,
+        PhaseLogger,
+    )
+except ImportError:
+    from cse import ContinuousSemanticEncoder
+    from wave_types import SemanticWave, TOTAL_WAVE_DIM
+    from field import ResonanceField
+    from gravity import GravitationalRelevance
+    from thermodynamic import ThermodynamicLearner
+    from cgn import CausalGeometryNode
+    from multi_timescale import MultiTimescaleCoordinator
+    from causal_graph import CausalGraph
+    from working_memory import WorkingMemory
+    from episodic_memory import EpisodicMemory
+    from semantic_memory import SemanticMemory
+    from memory_router import MemoryRouter
+    from consolidation import ConsolidationProcess
+    from flux_model import FLUXModel, OutputHead, FLUXResponse, FLUXStats
+    from wave_decoder import WaveDecoder
+    from flux_utils import (
+        get_device, load_checkpoint, save_checkpoint, checkpoint_exists,
+        PhaseLogger,
+    )
 
 
 # ─────────────────────────────────────────────

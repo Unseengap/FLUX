@@ -26,7 +26,11 @@ import torch.nn.functional as F
 from torch import Tensor
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass, field
-from manifold import ManifoldPatch
+
+try:
+    from phases.phase5.manifold import ManifoldPatch
+except ImportError:
+    from manifold import ManifoldPatch
 
 
 # ─────────────────────────────────────────────

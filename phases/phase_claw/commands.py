@@ -5,7 +5,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from .models import PortingBacklog, PortingModule
+try:
+    from phases.phase_claw.models import PortingBacklog, PortingModule
+except ImportError:
+    from .models import PortingBacklog, PortingModule
 
 SNAPSHOT_PATH = Path(__file__).resolve().parent / 'reference_data' / 'commands_snapshot.json'
 

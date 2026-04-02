@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .commands import PORTED_COMMANDS, execute_command
-from .tools import PORTED_TOOLS, execute_tool
+try:
+    from phases.phase_claw.commands import PORTED_COMMANDS, execute_command
+    from phases.phase_claw.tools import PORTED_TOOLS, execute_tool
+except ImportError:
+    from .commands import PORTED_COMMANDS, execute_command
+    from .tools import PORTED_TOOLS, execute_tool
 
 
 @dataclass(frozen=True)

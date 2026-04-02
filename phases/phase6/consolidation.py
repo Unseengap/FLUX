@@ -24,8 +24,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from episodic_memory import EpisodicMemory, EpisodicEntry
-from semantic_memory import SemanticMemory
+try:
+    from phases.phase6.episodic_memory import EpisodicMemory, EpisodicEntry
+    from phases.phase6.semantic_memory import SemanticMemory
+except ImportError:
+    from episodic_memory import EpisodicMemory, EpisodicEntry
+    from semantic_memory import SemanticMemory
 
 
 # ─────────────────────────────────────────────

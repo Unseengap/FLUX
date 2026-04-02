@@ -41,25 +41,46 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable, Tuple
 
 # Import claw components
-from .tools import (
-    PORTED_TOOLS,
-    get_tool,
-    get_tools,
-    execute_tool as claw_execute_tool,
-    ToolExecution,
-)
-from .commands import (
-    PORTED_COMMANDS,
-    get_command,
-    get_commands,
-    execute_command as claw_execute_command,
-    CommandExecution,
-)
-from .query_engine import QueryEnginePort, QueryEngineConfig, TurnResult
-from .models import PortingModule, PermissionDenial, UsageSummary
-from .permissions import ToolPermissionContext
-from .tool_pool import ToolPool, assemble_tool_pool
-from .runtime import PortRuntime, RuntimeSession
+try:
+    from phases.phase_claw.tools import (
+        PORTED_TOOLS,
+        get_tool,
+        get_tools,
+        execute_tool as claw_execute_tool,
+        ToolExecution,
+    )
+    from phases.phase_claw.commands import (
+        PORTED_COMMANDS,
+        get_command,
+        get_commands,
+        execute_command as claw_execute_command,
+        CommandExecution,
+    )
+    from phases.phase_claw.query_engine import QueryEnginePort, QueryEngineConfig, TurnResult
+    from phases.phase_claw.models import PortingModule, PermissionDenial, UsageSummary
+    from phases.phase_claw.permissions import ToolPermissionContext
+    from phases.phase_claw.tool_pool import ToolPool, assemble_tool_pool
+    from phases.phase_claw.runtime import PortRuntime, RuntimeSession
+except ImportError:
+    from .tools import (
+        PORTED_TOOLS,
+        get_tool,
+        get_tools,
+        execute_tool as claw_execute_tool,
+        ToolExecution,
+    )
+    from .commands import (
+        PORTED_COMMANDS,
+        get_command,
+        get_commands,
+        execute_command as claw_execute_command,
+        CommandExecution,
+    )
+    from .query_engine import QueryEnginePort, QueryEngineConfig, TurnResult
+    from .models import PortingModule, PermissionDenial, UsageSummary
+    from .permissions import ToolPermissionContext
+    from .tool_pool import ToolPool, assemble_tool_pool
+    from .runtime import PortRuntime, RuntimeSession
 
 
 # ─────────────────────────────────────────────

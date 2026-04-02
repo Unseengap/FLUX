@@ -25,8 +25,8 @@ from pathlib import Path
 
 # Local imports
 try:
-    from .frame_differ import FrameDiffer, FrameDiff, ACTION_NAMES
-    from .strategies import (
+    from phases.phase_unified.frame_differ import FrameDiffer, FrameDiff, ACTION_NAMES
+    from phases.phase_unified.strategies import (
         MovementStrategy,
         ClickStrategy, 
         HybridStrategy,
@@ -34,18 +34,30 @@ try:
         CONTROL_INSTRUCTIONS,
         ACTION_FORMAT,
     )
-    from .rendering import render_with_diff, render_grid_ascii
+    from phases.phase_unified.rendering import render_with_diff, render_grid_ascii
 except ImportError:
-    from frame_differ import FrameDiffer, FrameDiff, ACTION_NAMES
-    from strategies import (
-        MovementStrategy,
-        ClickStrategy,
-        HybridStrategy,
-        get_control_scheme,
-        CONTROL_INSTRUCTIONS,
-        ACTION_FORMAT,
-    )
-    from rendering import render_with_diff, render_grid_ascii
+    try:
+        from .frame_differ import FrameDiffer, FrameDiff, ACTION_NAMES
+        from .strategies import (
+            MovementStrategy,
+            ClickStrategy, 
+            HybridStrategy,
+            get_control_scheme,
+            CONTROL_INSTRUCTIONS,
+            ACTION_FORMAT,
+        )
+        from .rendering import render_with_diff, render_grid_ascii
+    except ImportError:
+        from frame_differ import FrameDiffer, FrameDiff, ACTION_NAMES
+        from strategies import (
+            MovementStrategy,
+            ClickStrategy,
+            HybridStrategy,
+            get_control_scheme,
+            CONTROL_INSTRUCTIONS,
+            ACTION_FORMAT,
+        )
+        from rendering import render_with_diff, render_grid_ascii
 
 
 # ─────────────────────────────────────────────

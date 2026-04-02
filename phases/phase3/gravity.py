@@ -6,8 +6,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from typing import List, Tuple, Optional
-from mass_tracker import MassTracker
-from spatial_index import SpatialIndex
+
+try:
+    from phases.phase3.mass_tracker import MassTracker
+    from phases.phase3.spatial_index import SpatialIndex
+except ImportError:
+    from mass_tracker import MassTracker
+    from spatial_index import SpatialIndex
 
 class GravitationalRelevance(nn.Module):
     def __init__(self, feature_dim: int = 512, k_neighbors: int = 32, base_mass: float = 1.0,

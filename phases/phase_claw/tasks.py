@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from .task import PortingTask
+try:
+    from phases.phase_claw.task import PortingTask
+except ImportError:
+    from .task import PortingTask
 
 
 def default_tasks() -> list[PortingTask]:

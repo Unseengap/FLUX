@@ -4,7 +4,10 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-from .models import Subsystem
+try:
+    from phases.phase_claw.models import Subsystem
+except ImportError:
+    from .models import Subsystem
 
 DEFAULT_SRC_ROOT = Path(__file__).resolve().parent
 

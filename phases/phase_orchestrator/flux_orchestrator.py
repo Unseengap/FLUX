@@ -29,11 +29,15 @@ import re
 from dataclasses import dataclass
 
 try:
-    from .tool_registry import FLUX_TOOLS, ToolDefinition, get_tool
-    from .system_prompt import FLUX_SYSTEM_PROMPT
+    from phases.phase_orchestrator.tool_registry import FLUX_TOOLS, ToolDefinition, get_tool
+    from phases.phase_orchestrator.system_prompt import FLUX_SYSTEM_PROMPT
 except ImportError:
-    from tool_registry import FLUX_TOOLS, ToolDefinition, get_tool
-    from system_prompt import FLUX_SYSTEM_PROMPT
+    try:
+        from .tool_registry import FLUX_TOOLS, ToolDefinition, get_tool
+        from .system_prompt import FLUX_SYSTEM_PROMPT
+    except ImportError:
+        from tool_registry import FLUX_TOOLS, ToolDefinition, get_tool
+        from system_prompt import FLUX_SYSTEM_PROMPT
 
 
 @dataclass

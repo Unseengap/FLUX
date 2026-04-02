@@ -19,8 +19,11 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 
-sys.path.insert(0, str(Path(__file__).parent))
-from thermodynamic import ThermodynamicLearner, SettleResult
+try:
+    from phases.phase4.thermodynamic import ThermodynamicLearner, SettleResult
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from thermodynamic import ThermodynamicLearner, SettleResult
 
 
 @dataclass

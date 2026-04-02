@@ -31,9 +31,12 @@ from typing import Tuple, Optional, List, Dict, Any
 import sys
 from pathlib import Path
 
-# Import wave constants from Phase 1
-sys.path.insert(0, str(Path(__file__).parent.parent / 'phase1'))
-from wave_types import TOTAL_WAVE_DIM
+# Import wave constants from Phase 1 - support embedded and direct
+try:
+    from phases.phase1.wave_types import TOTAL_WAVE_DIM
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent.parent / 'phase1'))
+    from wave_types import TOTAL_WAVE_DIM
 
 
 # ─────────────────────────────────────────────

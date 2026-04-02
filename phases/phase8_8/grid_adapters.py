@@ -15,7 +15,10 @@ import torch.nn.functional as F
 from torch import Tensor
 from typing import Optional, Tuple, Union
 
-from wave_to_x import XToWave, WaveToX, register_input_adapter, register_output_adapter
+try:
+    from phases.phase8_8.wave_to_x import XToWave, WaveToX, register_input_adapter, register_output_adapter
+except ImportError:
+    from wave_to_x import XToWave, WaveToX, register_input_adapter, register_output_adapter
 
 
 @register_input_adapter('grid')

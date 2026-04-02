@@ -20,9 +20,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from working_memory import WorkingMemory
-from episodic_memory import EpisodicMemory
-from semantic_memory import SemanticMemory
+try:
+    from phases.phase6.working_memory import WorkingMemory
+    from phases.phase6.episodic_memory import EpisodicMemory
+    from phases.phase6.semantic_memory import SemanticMemory
+except ImportError:
+    from working_memory import WorkingMemory
+    from episodic_memory import EpisodicMemory
+    from semantic_memory import SemanticMemory
 
 
 # ─────────────────────────────────────────────

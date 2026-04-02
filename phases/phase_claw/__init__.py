@@ -45,26 +45,48 @@ Usage:
 """
 
 # Core claw-code modules
-from .commands import PORTED_COMMANDS, build_command_backlog
-from .tools import PORTED_TOOLS, build_tool_backlog
-from .parity_audit import ParityAuditResult, run_parity_audit
-from .port_manifest import PortManifest, build_port_manifest
-from .query_engine import QueryEnginePort, TurnResult
-from .runtime import PortRuntime, RuntimeSession
-from .session_store import StoredSession, load_session, save_session
-from .system_init import build_system_init_message
+try:
+    from phases.phase_claw.commands import PORTED_COMMANDS, build_command_backlog
+    from phases.phase_claw.tools import PORTED_TOOLS, build_tool_backlog
+    from phases.phase_claw.parity_audit import ParityAuditResult, run_parity_audit
+    from phases.phase_claw.port_manifest import PortManifest, build_port_manifest
+    from phases.phase_claw.query_engine import QueryEnginePort, TurnResult
+    from phases.phase_claw.runtime import PortRuntime, RuntimeSession
+    from phases.phase_claw.session_store import StoredSession, load_session, save_session
+    from phases.phase_claw.system_init import build_system_init_message
+except ImportError:
+    from .commands import PORTED_COMMANDS, build_command_backlog
+    from .tools import PORTED_TOOLS, build_tool_backlog
+    from .parity_audit import ParityAuditResult, run_parity_audit
+    from .port_manifest import PortManifest, build_port_manifest
+    from .query_engine import QueryEnginePort, TurnResult
+    from .runtime import PortRuntime, RuntimeSession
+    from .session_store import StoredSession, load_session, save_session
+    from .system_init import build_system_init_message
 
 # FLUX bridge (integration layer)
-from .flux_bridge import (
-    ClawHarness,
-    FluxToolDefinition,
-    claw_to_flux_tool,
-    flux_to_claw_tool,
-    get_claw_harness,
-    register_claw_tools_with_orchestrator,
-    execute_claw_tool,
-    search_claw_tools,
-)
+try:
+    from phases.phase_claw.flux_bridge import (
+        ClawHarness,
+        FluxToolDefinition,
+        claw_to_flux_tool,
+        flux_to_claw_tool,
+        get_claw_harness,
+        register_claw_tools_with_orchestrator,
+        execute_claw_tool,
+        search_claw_tools,
+    )
+except ImportError:
+    from .flux_bridge import (
+        ClawHarness,
+        FluxToolDefinition,
+        claw_to_flux_tool,
+        flux_to_claw_tool,
+        get_claw_harness,
+        register_claw_tools_with_orchestrator,
+        execute_claw_tool,
+        search_claw_tools,
+    )
 
 __all__ = [
     # Core claw modules

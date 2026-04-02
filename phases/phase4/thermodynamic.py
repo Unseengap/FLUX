@@ -25,12 +25,19 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass
 
-sys.path.insert(0, str(Path(__file__).parent))
-from temperature import TemperatureManager
-from energy_functions import (
-    local_energy, coherence_energy, prediction_energy,
-    mass_resistance_energy, total_local_energy,
-)
+try:
+    from phases.phase4.temperature import TemperatureManager
+    from phases.phase4.energy_functions import (
+        local_energy, coherence_energy, prediction_energy,
+        mass_resistance_energy, total_local_energy,
+    )
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from temperature import TemperatureManager
+    from energy_functions import (
+        local_energy, coherence_energy, prediction_energy,
+        mass_resistance_energy, total_local_energy,
+    )
 
 
 @dataclass

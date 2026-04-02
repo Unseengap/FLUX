@@ -20,7 +20,10 @@ from torch import Tensor
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 
-from cgn import CausalGeometryNode, SignalTrace, CGN_CONFIG
+try:
+    from phases.phase5.cgn import CausalGeometryNode, SignalTrace, CGN_CONFIG
+except ImportError:
+    from cgn import CausalGeometryNode, SignalTrace, CGN_CONFIG
 
 
 @dataclass

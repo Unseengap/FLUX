@@ -22,11 +22,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 import torch
 
 try:
-    from .tool_registry import FLUX_TOOLS, ToolCategory
-    from .system_prompt import FLUX_SYSTEM_PROMPT, FLUX_SYSTEM_PROMPT_SHORT
+    from phases.phase_orchestrator.tool_registry import FLUX_TOOLS, ToolCategory
+    from phases.phase_orchestrator.system_prompt import FLUX_SYSTEM_PROMPT, FLUX_SYSTEM_PROMPT_SHORT
 except ImportError:
-    from tool_registry import FLUX_TOOLS, ToolCategory
-    from system_prompt import FLUX_SYSTEM_PROMPT, FLUX_SYSTEM_PROMPT_SHORT
+    try:
+        from .tool_registry import FLUX_TOOLS, ToolCategory
+        from .system_prompt import FLUX_SYSTEM_PROMPT, FLUX_SYSTEM_PROMPT_SHORT
+    except ImportError:
+        from tool_registry import FLUX_TOOLS, ToolCategory
+        from system_prompt import FLUX_SYSTEM_PROMPT, FLUX_SYSTEM_PROMPT_SHORT
 
 
 def serialize_tool_definitions() -> dict:

@@ -2,15 +2,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .commands import PORTED_COMMANDS
-from .context import PortContext, build_port_context, render_context
-from .history import HistoryLog
-from .models import PermissionDenial, PortingModule
-from .query_engine import QueryEngineConfig, QueryEnginePort, TurnResult
-from .setup import SetupReport, WorkspaceSetup, run_setup
-from .system_init import build_system_init_message
-from .tools import PORTED_TOOLS
-from .execution_registry import build_execution_registry
+try:
+    from phases.phase_claw.commands import PORTED_COMMANDS
+    from phases.phase_claw.context import PortContext, build_port_context, render_context
+    from phases.phase_claw.history import HistoryLog
+    from phases.phase_claw.models import PermissionDenial, PortingModule
+    from phases.phase_claw.query_engine import QueryEngineConfig, QueryEnginePort, TurnResult
+    from phases.phase_claw.setup import SetupReport, WorkspaceSetup, run_setup
+    from phases.phase_claw.system_init import build_system_init_message
+    from phases.phase_claw.tools import PORTED_TOOLS
+    from phases.phase_claw.execution_registry import build_execution_registry
+except ImportError:
+    from .commands import PORTED_COMMANDS
+    from .context import PortContext, build_port_context, render_context
+    from .history import HistoryLog
+    from .models import PermissionDenial, PortingModule
+    from .query_engine import QueryEngineConfig, QueryEnginePort, TurnResult
+    from .setup import SetupReport, WorkspaceSetup, run_setup
+    from .system_init import build_system_init_message
+    from .tools import PORTED_TOOLS
+    from .execution_registry import build_execution_registry
 
 
 @dataclass(frozen=True)

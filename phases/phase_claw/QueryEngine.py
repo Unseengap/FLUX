@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .query_engine import QueryEnginePort
-from .runtime import PortRuntime
+try:
+    from phases.phase_claw.query_engine import QueryEnginePort
+    from phases.phase_claw.runtime import PortRuntime
+except ImportError:
+    from .query_engine import QueryEnginePort
+    from .runtime import PortRuntime
 
 
 class QueryEngineRuntime(QueryEnginePort):

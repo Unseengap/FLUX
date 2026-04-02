@@ -4,12 +4,20 @@ import json
 from dataclasses import dataclass, field
 from uuid import uuid4
 
-from .commands import build_command_backlog
-from .models import PermissionDenial, UsageSummary
-from .port_manifest import PortManifest, build_port_manifest
-from .session_store import StoredSession, load_session, save_session
-from .tools import build_tool_backlog
-from .transcript import TranscriptStore
+try:
+    from phases.phase_claw.commands import build_command_backlog
+    from phases.phase_claw.models import PermissionDenial, UsageSummary
+    from phases.phase_claw.port_manifest import PortManifest, build_port_manifest
+    from phases.phase_claw.session_store import StoredSession, load_session, save_session
+    from phases.phase_claw.tools import build_tool_backlog
+    from phases.phase_claw.transcript import TranscriptStore
+except ImportError:
+    from .commands import build_command_backlog
+    from .models import PermissionDenial, UsageSummary
+    from .port_manifest import PortManifest, build_port_manifest
+    from .session_store import StoredSession, load_session, save_session
+    from .tools import build_tool_backlog
+    from .transcript import TranscriptStore
 
 
 @dataclass(frozen=True)

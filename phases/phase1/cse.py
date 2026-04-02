@@ -20,10 +20,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-# Local imports
-sys.path.insert(0, str(Path(__file__).parent))
-from wave_types import SemanticWave, WAVE_DIMS, TOTAL_WAVE_DIM
-from interference import apply_neighborhood_interference
+# Local imports - support both embedded and direct execution
+try:
+    from phases.phase1.wave_types import SemanticWave, WAVE_DIMS, TOTAL_WAVE_DIM
+    from phases.phase1.interference import apply_neighborhood_interference
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from wave_types import SemanticWave, WAVE_DIMS, TOTAL_WAVE_DIM
+    from interference import apply_neighborhood_interference
 
 
 # ─────────────────────────────────────────────

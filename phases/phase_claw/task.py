@@ -1,5 +1,13 @@
 from __future__ import annotations
 
-from .task import PortingTask
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PortingTask:
+    """A task in the porting backlog."""
+    name: str
+    description: str
+
 
 __all__ = ['PortingTask']
