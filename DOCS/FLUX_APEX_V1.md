@@ -2,7 +2,7 @@
 
 **FLUX Architecture — Flagship Model Documentation**  
 *For AI Agents, Developers, and Integration Systems*  
-*Version: 5.0-voice-embedded | Phase: Voice | Created: March 30, 2026*
+*Version: 6.0-autonomous | Phase: autonomous | Updated: April 1, 2026*
 
 ---
 
@@ -14,16 +14,15 @@
 | **Location** | `checkpoints/Flux-Apex-V1.flx` |
 | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
 | **Format** | FLUX (self-describing cognitive architecture) |
-| **Version** | 5.0-voice-embedded |
-| **Phase** | phase_voice |
-| **File Size** | ~8,500 MB (~8.5 GB) |
-| **Total Parameters** | ~4,700,000,000 (~4.7B) |
-| **Total Tensors** | ~3,100 |
-| **Total Configs** | 18 |
-| **Top-Level Keys** | 23 |
-| **Max Nesting Depth** | 5 |
+| **Version** | 6.0-autonomous |
+| **Phase** | autonomous |
+| **File Size** | ~14.35 GB (15.4 GB on HuggingFace with xet) |
+| **Total Parameters** | ~7,438,927,280 (~7.44B) |
+| **Total Tensors** | 5,875 |
+| **Top-Level Keys** | 25 |
+| **Max Nesting Depth** | 10 |
 | **Can Continue Learning** | `True` |
-| **Voice Model** | Qwen2.5-Omni-7B (4-bit quantized) |
+| **Embedded Models** | 12 (7 language/vision/audio, 5 detection) |
 
 ---
 
@@ -32,110 +31,141 @@
 Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not just weights. It contains:
 
 1. **Wave-based encoding** (no tokenizer, raw UTF-8 bytes → 432D semantic waves)
-2. **Resonance field** (96³ × 512 knowledge storage)
+2. **Compressed resonance field** (48³ × 256 knowledge storage, expandable)
 3. **Three-tier memory** (working, episodic, semantic)
-4. **Embedded voice model** (Qwen2.5-Omni-7B — text, vision, speech in one)
-5. **Multi-modal adapters** (grid, image, audio, voice)
+4. **12 embedded models** (language, vision, audio, detection — all self-contained)
+5. **Multi-modal adapters** (grid, image, audio)
 6. **Causal reasoning** (CGN nodes + arrow graph)
 7. **Spatial memory** (curiosity-driven exploration)
-8. **Wave↔Voice bridges** (432D ↔ 3584D projections)
+8. **Wave↔Model bridges** (432D ↔ model hidden dimensions)
 
 ---
 
-## What This Model IS (v5.0 Changes)
+## What This Model IS (v6.0 State)
 
-- **NOW** an integrated voice LLM — Qwen2.5-Omni-7B weights embedded (4-bit quantized)
-- **REMOVED** byte decoder — replaced by voice thinker module
-- **REMOVED** external LLM references — all generation is internal
-- **NEW** wave↔voice bridges — bidirectional 432D ↔ 3584D projections
+- **12 embedded models** — Language (instruct, coder), Vision (VLM, CLIP), Audio (Whisper, TTS), Detection (face, depth, pose, object)
+- **Compressed native FLUX** — Field reduced to 48³×256 (~28.4M params)
+- **Lazy loading support** — Models loaded on-demand to manage VRAM
+- **ONNX detection** — InsightFace face recognition via 5 ONNX models
+- **Partial runtime embed** — ~10 files embedded, full codebase embed pending (see FLUX_CODEBASE_EMBED_SPEC.md)
+- **Native JSON tools** — Orchestration uses Qwen2.5-compatible JSON function calling
 
 ## What This Model is NOT
 
 - **NOT** a traditional transformer — uses physics-inspired wave mechanics
 - **NOT** a tokenizer-based model — operates on raw bytes via CSE
-- **NOT** dependent on external models — fully self-contained
+- **NOT** dependent on external downloads — all weights embedded
 
 ---
 
 ## Architecture Overview
 
 ```
-INPUT                           PROCESSING                        OUTPUT
-─────                           ──────────                        ──────
+INPUT                          PROCESSING                         OUTPUT
+─────                          ──────────                         ──────
                                                                   
-Text (UTF-8)  ─┬─► CSE ─────────────────────┬─► Field ──┬─► Decoder ──► Text
-               │   (wave encoding)          │   (96³)   │
-Grid (ARC)   ─┼─► GridToWave ──────────────┤           ├─► WaveToGrid ─► Grid
-               │                            │           │
-Image        ─┼─► [External VLM] ──────────┤           ├─► WaveToImage ► Image
-               │                            │   Memory  │
-Audio        ─┴─► AudioToWave ─────────────┤   ├────── ├─► WaveToAudio ► Audio
-                                            │   │      │
-                                            │   │      │
-                                   Causal ◄─┴───┘      │
-                                   Tracker             │
-                                      │                │
-                                      ▼                │
-                               Rule Inducer ───────────┘
-                               Goal Planner
+Text (UTF-8)  ─┬─► CSE ────────────────────┬─► Field ──┬─► Instruct ──► Text
+               │   (wave encoding)         │   (48³)   │
+Grid (ARC)   ─┼─► GridToWave ─────────────┤           ├─► WaveToGrid ─► Grid
+               │                           │           │
+Image        ─┼─► CLIP + Vision ──────────┤           ├─► [Generation] ► Image
+               │                           │   Memory  │
+Audio        ─┴─► Whisper ────────────────┤   ├────── ├─► TTS ────────► Audio
+                                           │   │      │
+Camera       ─┬─► Face Detection          │   │      │
+              ├─► Depth Estimation  ──────┤   │      │
+              ├─► Pose Detection          │   │      │
+              └─► Object Detection ───────┘   │      │
+                                              │      │
+                                   Causal ◄───┴──────┘
+                                   Tracker
+                                      │
+                                      ▼
+                               Orchestration ───────────► Tools/Actions
 ```
 
 ---
 
-## Top-Level Keys (23)
+## Top-Level Keys (24)
 
 | # | Key | Type | Description |
 |---|-----|------|-------------|
 | 1 | `format` | str | `"FLUX"` — format identifier |
-| 2 | `version` | str | `"5.0-voice-embedded"` |
-| 3 | `phase` | str | `"phase_voice"` |
-| 4 | `runtime_config` | dict | 8 subsections for runtime behavior |
-| 5 | `components` | dict | 18 boolean flags for enabled components |
+| 2 | `version` | str | `"7.1-detection-embedded"` |
+| 3 | `phase` | str | `"phase2_5_detection"` |
+| 4 | `runtime_config` | dict | Runtime behavior settings |
+| 5 | `components` | dict | Boolean flags for enabled components |
 | 6 | `timestamp` | str | ISO format creation time |
 | 7 | `can_continue_learning` | bool | `True` — supports online learning |
-| 8 | `metadata` | dict | 18 entries (lineage, tests, capabilities) |
-| 9 | `cse` | dict | Continuous Semantic Encoder weights |
-| 10 | `grid_to_wave` | dict | ARC grid encoder |
-| 11 | `field` | dict | Resonance field + gravity + thermodynamic state |
-| 12 | `memory` | dict | Working, episodic, semantic memories |
-| 13 | `voice` | dict | **Qwen2.5-Omni-7B (4-bit) — thinker, talker, token2wav** |
+| 8 | `metadata` | dict | Lineage, tests, capabilities |
+| 9 | `cse` | dict | Continuous Semantic Encoder (1.3M params) |
+| 10 | `grid_to_wave` | dict | ARC grid encoder (192K params) |
+| 11 | `field` | dict | Resonance field (28.4M params, compressed) |
+| 12 | `memory` | dict | Working + episodic (878K params) |
+| 13 | `models` | dict | **12 embedded models (6.4B params)** |
 | 14 | `causal` | dict | CGN state + causal graph |
-| 15 | `bridges` | dict | Wave↔Field + Wave↔Voice projections |
-| 16 | `adapters` | dict | Multi-modal adapters (6 types) |
-| 17 | `spatial_memory` | dict | Exploration/curiosity fields |
-| 18 | `causal_tracker` | dict | 463 causal links |
-| 19 | `learned_rules` | dict | 10 induced rules |
-| 20 | `modified` | bool | `True` — model has been modified |
-| 21 | `modified_components` | list | Recently modified components |
-| 22 | `state` | dict | Runtime state snapshots |
-| 23 | `removed_components` | list | `["decoder", "llm", "llm_reference", "grid_adapters"]` |
-
-> **v5.0 Changes:** Removed `decoder`, `llm`, `llm_reference`, `grid_adapters`. Added `voice` with embedded Qwen-Omni weights.
+| 15 | `bridges` | dict | Wave↔Field projections (455.7M params) |
+| 16 | `adapters` | dict | Multi-modal adapters (15.4M params) |
+| 17 | `spatial_memory` | dict | Exploration/curiosity fields (12K params) |
+| 18 | `causal_tracker` | dict | Causal links |
+| 19 | `learned_rules` | dict | Induced rules |
+| 20 | `orchestration` | dict | Tool definitions, system prompt |
+| 21 | `modified` | bool | `True` — model has been modified |
+| 22 | `modified_components` | list | Recently modified components |
+| 23 | `state` | dict | Runtime state snapshots |
+| 24 | `removed_components` | list | `["decoder", "llm", "llm_reference", "grid_adapters"]` |
 
 ---
 
 ## Component Parameters (Sorted by Size)
 
-| # | Component | Parameters | % of Total | Tensors |
-|---|-----------|------------|------------|---------|
-| 1 | **voice** | ~2,800,000,000 | 59.6% | ~2,448 |
-| 2 | **field** | 1,366,229,131 | 29.1% | 45 |
-| 3 | **memory** | 910,997,255 | 19.4% | 27 |
-| 4 | **bridges** | 460,000,000 | 9.8% | 50 |
-| 5 | **causal** | 58,838,360 | 1.3% | 397 |
-| 6 | **adapters** | 15,412,331 | 0.3% | 53 |
-| 7 | **cse** | 2,674,528 | <0.1% | 22 |
-| 8 | **grid_to_wave** | 384,512 | <0.1% | 13 |
-| 9 | **spatial_memory** | 24,576 | <0.1% | 3 |
+### Native FLUX Components (~502M params)
 
-**Voice Module Breakdown:**
-| Sub-component | Tensors | Purpose |
-|---------------|---------|---------|
-| thinker | 1,346 | Text + Vision + Audio understanding |
-| talker | 293 | Speech synthesis |
-| token2wav | 809 | Vocoder (speech waveform) |
+| # | Component | Parameters | % of Total | Tensors | Has Weights |
+|---|-----------|------------|------------|---------|-------------|
+| 1 | **bridges** | 455,683,559 | 6.1% | 59 | ✗ (config only) |
+| 2 | **field** | 28,442,624 | 0.4% | 2 | ✓ |
+| 3 | **adapters** | 15,412,331 | 0.2% | 53 | ✗ (config only) |
+| 4 | **cse** | 1,337,264 | <0.1% | 22 | ✓ |
+| 5 | **memory** | 878,593 | <0.1% | 11 | ✗ (metadata only) |
+| 6 | **grid_to_wave** | 192,256 | <0.1% | 13 | ✓ |
+| 7 | **spatial_memory** | 12,288 | <0.1% | 3 | ✓ |
+| 8 | **causal** | 0 | 0% | 0 | ✗ (empty) |
+| 9 | **causal_tracker** | 0 | 0% | 0 | ✗ (empty) |
+| 10 | **learned_rules** | 0 | 0% | 0 | ✗ (empty) |
 
-> **Note:** Percentages based on ~4.7B total params. `decoder`, `llm`, `llm_reference`, `grid_adapters` removed in v5.0.
+> **Note:** Field is compressed to 48³×256 (was 96³×512). Bridges/adapters contain projection configs but weights are generated on-demand. Causal system is placeholder (weights not yet embedded).
+
+### Embedded Models (~6.4B params)
+
+| # | Model | Base | Parameters | % of Total | Lazy Load |
+|---|-------|------|------------|------------|-----------|
+| 1 | **vision** | Qwen/Qwen2-VL-2B-Instruct | 2,208,985,600 | 29.7% | Yes |
+| 2 | **instruct** | Qwen/Qwen2.5-1.5B-Instruct | 1,543,714,304 | 20.8% | No |
+| 3 | **coder** | Qwen/Qwen2.5-Coder-1.5B-Instruct | 1,543,714,304 | 20.8% | Yes |
+| 4 | **clip** | openai/clip-vit-large-patch14 | 427,616,513 | 5.7% | No |
+| 5 | **tts** | suno/bark-small | 410,086,114 | 5.5% | Yes |
+| 6 | **whisper** | openai/whisper-small | 241,734,912 | 3.2% | Yes |
+| 7 | **embedding** | sentence-transformers/all-MiniLM-L6-v2 | 22,713,216 | 0.3% | No |
+
+### Detection Models (~538M params)
+
+| # | Model | Base | Parameters | Type | Lazy Load |
+|---|-------|------|------------|------|-----------|
+| 1 | **depth** | intel-isl/MiDaS:DPT_Large | 344,055,465 | PyTorch | Yes |
+| 2 | **object_detect** | google/owlv2-base-patch16-ensemble | 154,984,809 | PyTorch | Yes |
+| 3 | **pose** | timm/hrnet_w32.ms_in1k | 39,363,128 | Timm | Yes |
+| 4 | **face** | insightface/buffalo_l | 0 (ONNX) | ONNX (5 models) | Yes |
+| 5 | **speaker_detect** | pyannote/speaker-diarization-3.1 | 0 (placeholder) | Placeholder | Yes |
+
+**InsightFace ONNX Models:**
+- `detection` — Face detection
+- `recognition` — Face embedding (512D)
+- `genderage` — Age/gender estimation
+- `landmark_2d_106` — 106-point facial landmarks
+- `landmark_3d_68` — 3D 68-point facial landmarks
+
+> **Total: 7,438,927,280 parameters (~7.44B)**
 
 ---
 
@@ -175,56 +205,35 @@ wave = cse.forward(text.encode('utf-8'))  # → [seq_len, 432]
 
 ---
 
-### 2. Field — Resonance Field
+### 2. Field — Resonance Field (Compressed)
 
 **Purpose:** Store and retrieve knowledge via wave interference in a 3D field.
 
-| Property | Value |
-|----------|-------|
-| Parameters | 911,169,800 (unique) |
-| Tensors | 45 |
-| Dimensions | 96 × 96 × 96 × 512 |
-| Total Cells | 884,736 |
-| Features per Cell | 512 |
+| Property | Value (v6.0) | Value (v5.0 legacy) |
+|----------|--------------|---------------------|
+| Parameters | 28,442,624 | 911,169,800 |
+| Tensors | 2 | 45 |
+| Dimensions | 48 × 48 × 48 × 256 | 96 × 96 × 96 × 512 |
+| Total Cells | 110,592 | 884,736 |
+| Features per Cell | 256 | 512 |
 
-**Sub-components:**
-- `state_dict` — Field state tensor [96, 96, 96, 512]
-- `gravity_state` — Gravitational relevance model
-- `thermodynamic_state` — Temperature, energy, settling
+> **v6.0 Change:** Field compressed to 1/32 size. Expandable on-demand for high-knowledge applications.
 
 **Config:**
 ```python
 {
-    'h': 96, 'w': 96, 'd': 96,
-    'features': 512,
-    'settle_iterations': 15,
-    'settle_dt': 0.1,
-    'perturbation_radius': 4
+    'h': 48, 'w': 48, 'd': 48,
+    'features': 256,
+    'expandable': True,
+    'max_resolution': (96, 96, 96, 512),
 }
 ```
 
-**Gravity State:**
+**Usage:**
 ```python
-{
-    'feature_dim': 512,
-    'k_neighbors': 64,
-    'base_mass': 1.0,
-    'growth_rate': 0.005,
-    'negative_rate': 0.05
-}
-```
-
-**Thermodynamic State:**
-```python
-{
-    'current_temp': 0.637,
-    'min_temp': 0.005,
-    'max_temp': 2.0,
-    'decay': 0.9999,
-    'step_count': 4500,
-    'total_samples': 4500,
-    'total_settles': 67500
-}
+# Query the field with a wave
+field_state = model.get_component('field')
+state_tensor = field_state['state_dict']['state']  # [48, 48, 48, 256]
 ```
 
 ---
@@ -233,103 +242,89 @@ wave = cse.forward(text.encode('utf-8'))  # → [seq_len, 432]
 
 **Purpose:** Working memory (session), episodic (facts), semantic (deep knowledge).
 
-| Tier | Parameters | Tensors | Purpose |
-|------|------------|---------|---------|
-| Working | 878,593 | 10 | Current session context (2048 window) |
-| Episodic | — | — | 74 stored facts (FAISS index) |
-| Semantic | 455,059,331 | 17 | Deep field-based knowledge |
+| Tier | Parameters | Purpose |
+|------|------------|---------|
+| Working | 878,593 | Current session context |
+| Episodic | varies | Stored facts with FAISS index |
 
-**Working Memory Config:**
-```python
-{
-    'window_size': 2048,
-    'wave_dim': 432,
-    'feature_dim': 512
-}
-```
-
-**Episodic Memory:**
-```python
-{
-    'vectors': numpy.ndarray,  # 74 × 512
-    'metadata': [74 items],    # timestamps, content, importance
-    'feature_dim': 512,
-    'next_id': 74
-}
-```
+> **v6.0 Note:** Semantic memory merged into compressed field. Memory component primarily holds working + episodic tiers.
 
 ---
 
-### 4. Voice — Embedded Qwen2.5-Omni-7B (4-bit)
+### 4. Embedded Models (v6.0)
 
-**Purpose:** Unified text, vision, and speech understanding + generation.
+**Purpose:** Self-contained language, vision, audio, and detection models.
 
-| Property | Value |
-|----------|-------|
-| Base Model | Qwen/Qwen2.5-Omni-7B |
-| Quantization | 4-bit (bitsandbytes nf4) |
-| Parameters | ~2,800,000,000 (quantized) |
-| Tensors | ~2,448 |
-| Hidden Dim | 3584 |
-| Vocabulary | 151,936 tokens |
+All models are stored in `models` dict with lazy loading support:
 
-**Sub-modules:**
-
-| Module | Tensors | Purpose |
-|--------|---------|---------|
-| thinker | 1,346 | Text + Vision + Audio understanding (main reasoning) |
-| talker | 293 | Speech synthesis (TTS) |
-| token2wav | 809 | DiT-based vocoder for waveform generation |
-
-**Architecture:**
-```
-                    ┌─────────────────────────────────────┐
-                    │        VOICE (Qwen-Omni)            │
-                    ├─────────────────────────────────────┤
-Text Input  ───────►│                                     │
-                    │                                     │
-Vision Input ──────►│    THINKER (1346 tensors)          │───► Text Output
-                    │    - Unified understanding          │
-Audio Input ───────►│    - Multi-modal reasoning          │
-                    │                                     │
-                    ├─────────────────────────────────────┤
-                    │                                     │
-                    │    TALKER (293 tensors)             │───► Speech Tokens
-                    │    - Text-to-speech synthesis       │
-                    │                                     │
-                    ├─────────────────────────────────────┤
-                    │                                     │
-                    │    TOKEN2WAV (809 tensors)          │───► Audio Waveform
-                    │    - DiT vocoder                    │
-                    │    - Mel → Waveform                 │
-                    └─────────────────────────────────────┘
-```
-
-**Wave ↔ Voice Bridges:**
 ```python
-# Bridge projections (in bridges component)
-wave_to_voice: Linear(432, 3584)   # FLUX waves → voice hidden
-voice_to_wave: Linear(3584, 432)   # voice hidden → FLUX waves
+models = model.state['models']
+# → dict with 12 embedded models
 ```
 
-**Config:**
+#### 4.1 Language Models
+
+| Model | Base | Parameters | Purpose |
+|-------|------|------------|---------|
+| **instruct** | Qwen/Qwen2.5-1.5B-Instruct | 1.54B | Main reasoning, conversation |
+| **coder** | Qwen/Qwen2.5-Coder-1.5B-Instruct | 1.54B | Code generation |
+| **embedding** | all-MiniLM-L6-v2 | 22.7M | Wave conversion, similarity |
+
+#### 4.2 Vision Models
+
+| Model | Base | Parameters | Purpose |
+|-------|------|------------|---------|
+| **vision** | Qwen/Qwen2-VL-2B-Instruct | 2.21B | Vision-language understanding |
+| **clip** | openai/clip-vit-large-patch14 | 427.6M | Image-text alignment |
+
+#### 4.3 Audio Models
+
+| Model | Base | Parameters | Purpose |
+|-------|------|------------|---------|
+| **whisper** | openai/whisper-small | 241.7M | Speech-to-text |
+| **tts** | suno/bark-small | 410.1M | Text-to-speech |
+
+#### 4.4 Detection Models
+
+| Model | Base | Parameters | Purpose |
+|-------|------|------------|---------|
+| **depth** | intel-isl/MiDaS:DPT_Large | 344.1M | Depth estimation |
+| **object_detect** | google/owlv2-base-patch16-ensemble | 155.0M | Open-vocab object detection |
+| **pose** | timm/hrnet_w32.ms_in1k | 39.4M | Human pose (17 keypoints) |
+| **face** | insightface/buffalo_l | ONNX | Face detection + recognition |
+| **speaker_detect** | pyannote/speaker-diarization-3.1 | placeholder | Speaker diarization |
+
+**Loading Models:**
 ```python
-{
-    'model_name': 'Qwen/Qwen2.5-Omni-7B',
-    'quantization': '4bit',
-    'wave_dim': 432,
-    'hidden_dim': 3584,
-    'vocab_size': 151936,
-    'modules': ['thinker', 'talker', 'token2wav'],
-    'capabilities': ['text', 'vision', 'audio', 'speech']
-}
+from flux_model import FLUXModel
+
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# List all embedded models
+for m in model.list_embedded_models():
+    print(f"{m['name']}: {m['base_model']} [{'lazy' if m['lazy_load'] else 'eager'}]")
+
+# Check if model exists
+if model.has_embedded_model('instruct'):
+    instruct_data = model.get_embedded_model('instruct')
+    
+# Use lazy loader for on-demand loading
+manager = model.get_model_manager(device='cuda')
+instruct = manager.load('instruct')  # Loads weights into HF model
 ```
 
----
+**Lazy Load Behavior:**
 
-### ~~4. Decoder — REMOVED in v5.0~~
-
-> **Note:** The byte-level GRU decoder has been removed in v5.0. Text generation is now handled by the embedded voice thinker module (Qwen-Omni).
+| Model | Load On Startup | Load When |
+|-------|-----------------|-----------|
+| instruct | ✓ (eager) | Always — main text generation |
+| embedding | ✓ (eager) | Always — wave conversion |
+| clip | ✓ (eager) | Always — vision bridge |
+| vision | ✗ (lazy) | First image/vision task |
+| coder | ✗ (lazy) | First code generation |
+| whisper | ✗ (lazy) | First audio input |
+| tts | ✗ (lazy) | First speech output |
+| detection | ✗ (lazy) | Camera activation |
 
 ---
 
@@ -464,11 +459,12 @@ visit_count       [64, 64]  — Visit frequency
 ### Generation Settings
 ```python
 {
-    'voice_primary': True,            # Use embedded voice model for generation
-    'voice_thinker_enabled': True,    # Text/vision/audio understanding
-    'voice_talker_enabled': True,     # Speech synthesis
-    'voice_token2wav_enabled': True,  # Vocoder for waveforms
-    'generation_mode': 'voice'        # 'voice' | 'wave_only'
+    'instruct_enabled': True,         # Use embedded instruct model
+    'vision_enabled': True,           # Use embedded vision model
+    'tts_enabled': True,              # Text-to-speech synthesis
+    'whisper_enabled': True,          # Speech recognition
+    'coder_enabled': True,            # Code generation
+    'generation_mode': 'multi_model'  # 'multi_model' | 'wave_only'
 }
 ```
 
@@ -505,20 +501,30 @@ visit_count       [64, 64]  — Visit frequency
 
 ### ~~External LLM Settings~~ (REMOVED in v5.0)
 
-> LLM is now embedded as the voice module. No external dependencies required.
+> LLM is now embedded in the `models` component. No external dependencies required.
 
-### Voice Settings (NEW in v5.0)
+### Embedded Models Settings (v6.0)
 ```python
 {
-    'model_name': 'Qwen/Qwen2.5-Omni-7B',
-    'quantization': '4bit',
-    'hidden_dim': 3584,
-    'max_tokens': 2048,
-    'temperature': 0.7,
-    'use_flux_context': True,
-    'flux_context_limit': 20,
-    'speech_enabled': True,
-    'vision_enabled': True
+    # Language Models
+    'instruct': {'model': 'Qwen/Qwen2.5-1.5B-Instruct', 'load_mode': 'eager'},
+    'coder': {'model': 'Qwen/Qwen2.5-Coder-1.5B-Instruct', 'load_mode': 'lazy'},
+    'vision': {'model': 'Qwen/Qwen2-VL-2B-Instruct', 'load_mode': 'lazy'},  # Note: Qwen2, not 2.5
+    
+    # Audio Models
+    'whisper': {'model': 'openai/whisper-small', 'load_mode': 'lazy'},
+    'tts': {'model': 'suno/bark-small', 'load_mode': 'lazy'},
+    
+    # Utility Models
+    'embedding': {'model': 'sentence-transformers/all-MiniLM-L6-v2', 'load_mode': 'eager'},
+    'clip': {'model': 'openai/clip-vit-large-patch14', 'load_mode': 'eager'},
+    
+    # Detection Models
+    'depth': {'model': 'intel-isl/MiDaS:DPT_Large', 'load_mode': 'lazy'},
+    'face': {'model': 'insightface/buffalo_l', 'load_mode': 'lazy', 'type': 'onnx'},
+    'object_detect': {'model': 'google/owlv2-base-patch16-ensemble', 'load_mode': 'lazy'},
+    'pose': {'model': 'timm/hrnet_w32.ms_in1k', 'load_mode': 'lazy'},
+    'speaker_detect': {'model': 'pyannote/speaker-diarization-3.1', 'load_mode': 'lazy', 'placeholder': True},
 }
 ```
 
@@ -526,40 +532,63 @@ visit_count       [64, 64]  — Visit frequency
 
 ## ~~External Dependencies~~ (REMOVED in v5.0)
 
-> **v5.0 Change:** All external dependencies have been removed. The voice model (Qwen2.5-Omni-7B) is now embedded directly in the .flx file.
+> **v6.0 Architecture:** All models are embedded directly in the .flx file. The multi-model ensemble provides comprehensive AI capabilities without runtime downloads.
 
-~~### LLM (Text Generation)~~ → **Replaced by embedded voice.thinker**
+~~### LLM (Text Generation)~~ → **Replaced by embedded models.instruct**
 
-~~### VLM (Vision-Language)~~ → **Replaced by embedded voice.thinker**
+~~### VLM (Vision-Language)~~ → **Replaced by embedded models.vision**
 
-The model is now fully self-contained with zero runtime downloads.
+The model is now fully self-contained with zero runtime downloads. Lazy loading ensures efficient VRAM usage.
 
 ---
 
-## Enabled Components
+## Enabled Components (v6.0)
+
+### Native FLUX Components
 
 | Component | Enabled | Has Weights | Notes |
 |-----------|---------|-------------|-------|
-| cse | ✓ | ✓ | Wave encoding |
-| grid_to_wave | ✓ | ✓ | ARC grid → wave |
-| spatial_memory | ✓ | ✓ | Exploration tracking |
-| perception_field | ✗ | ✗ | |
-| field | ✓ | ✓ | Resonance field |
-| working_memory | ✓ | ✓ | Session context |
-| episodic_memory | ✓ | ✓ | Stored facts |
-| semantic_memory | ✓ | ✓ | Deep knowledge |
-| **voice** | ✓ | ✓ | **Qwen-Omni (NEW)** |
-| voice_thinker | ✓ | ✓ | Text+Vision+Audio |
-| voice_talker | ✓ | ✓ | Speech synthesis |
-| voice_token2wav | ✓ | ✓ | Vocoder |
-| causal_tracker | ✓ | ✓ | Causal links |
-| rule_inducer | ✗ | ✗ | |
-| goal_planner | ✗ | ✗ | |
-| causal_graph | ✓ | ✓ | Arrow graph |
-| bridges | ✓ | ✓ | Wave↔Field + Wave↔Voice |
-| learned_rules | ✓ | ✓ | Induced rules |
-| ~~decoder~~ | ✗ | ✗ | **REMOVED** |
-| ~~llm~~ | ✗ | ✗ | **REMOVED** |
+| cse | ✓ | ✓ | Wave encoding (1.3M params) |
+| grid_to_wave | ✓ | ✓ | ARC grid → wave (192K params) |
+| spatial_memory | ✓ | ✓ | Exploration tracking (12K params) |
+| field | ✓ | ✓ | Compressed 48³×256 (28.4M params) |
+| working_memory | ✓ | ✗ | Session context (metadata) |
+| episodic_memory | ✓ | ✗ | Stored facts (metadata) |
+| bridges | ✓ | ✗ | Wave↔Field projections (config) |
+| causal_tracker | ✓ | ✗ | Causal links (empty) |
+| adapters | ✓ | ✗ | Multi-modal (config) |
+
+### Embedded Models (in `models` dict)
+
+| Model | Enabled | Has Weights | Lazy Load |
+|-------|---------|-------------|-----------|
+| instruct | ✓ | ✓ | No (eager) |
+| vision | ✓ | ✓ | Yes |
+| coder | ✓ | ✓ | Yes |
+| whisper | ✓ | ✓ | Yes |
+| tts | ✓ | ✓ | Yes |
+| embedding | ✓ | ✓ | No (eager) |
+| clip | ✓ | ✓ | No (eager) |
+
+### Detection Models (in `models` dict)
+
+| Model | Enabled | Has Weights | Type |
+|-------|---------|-------------|------|
+| depth | ✓ | ✓ | PyTorch |
+| face | ✓ | ✓ | ONNX (5 models) |
+| object_detect | ✓ | ✓ | PyTorch |
+| pose | ✓ | ✓ | Timm |
+| speaker_detect | ✓ | ○ | Placeholder |
+
+### Removed Components
+
+| Component | Removed In | Replacement |
+|-----------|------------|-------------|
+| decoder | v5.0 | Embedded instruct model |
+| llm | v5.0 | Embedded instruct model |
+| llm_reference | v5.0 | N/A |
+| grid_adapters | v4.0 | adapters.grid_to_wave |
+| voice (omni) | v7.0 | Split into instruct + tts + whisper |
 
 ---
 
@@ -569,45 +598,39 @@ This model contains components from all FLUX phases:
 
 | Phase | Component | Status |
 |-------|-----------|--------|
-| 1 | CSE (wave encoding) | ✓ |
-| 2 | Resonance Field | ✓ |
-| 3 | Gravitational Relevance | ✓ |
-| 4 | Thermodynamic Learning | ✓ |
-| 5 | CGN (Causal Geometry Nodes) | ✓ |
-| 6 | Three-Tier Memory | ✓ |
+| 1 | CSE (wave encoding) | ✓ has weights |
+| 2 | Resonance Field (compressed) | ✓ has weights |
+| 3 | Gravitational Relevance | ○ config only |
+| 4 | Thermodynamic Learning | ○ config only |
+| 5 | CGN (Causal Geometry Nodes) | ✗ empty (0 params) |
+| 6 | Three-Tier Memory | ○ metadata only |
 | 7 | FLUX Integration | ✓ |
 | 8 | ~~Byte Decoder~~ | **REMOVED** |
-| 8.5 | Grid Adapters | ✓ |
-| 8.8 | Spatial Memory | ✓ |
-| 8.9 | Causal Tracker + Rules | ✓ |
-| 10 | ~~Hybrid LLM Integration~~ | **REMOVED** |
-| 11 | Multi-Modal Adapters | ✓ |
-| 12 | Unified Agent | ✓ |
-| **Voice** | **Embedded Qwen-Omni** | **NEW** |
+| 8.5 | Grid Adapters | ✓ has weights |
+| 8.8 | Spatial Memory | ✓ has weights |
+| 8.9 | Causal Tracker + Rules | ✗ empty (0 params) |
+| 10 | ~~Hybrid LLM~~ | **REMOVED** |
+| 11 | Multi-Modal Adapters | ○ config only |
+| **Fabric** | **12 Embedded Models** | ✓ 11/12 with weights |
+| **Detection** | **5 Detection Models** | ✓ 4/5 with weights |
 
 ---
 
-## Metadata
+## Metadata (v6.0)
 
 ```python
 {
-    'created': '2026-03-29T06:36:42.571848',
-    'base': 'Flux-X-complete.flx',
-    'field_source': 'Flux-capable.flx',
-    'grid_encoder': 'gridtowave_contrastive.pt',
-    'voice_source': 'Qwen/Qwen2.5-Omni-7B (4-bit)',  # NEW in v5.0
-    'cse_test': 'PASS',
-    'gtw_test': 'PASS',
-    'field_test': 'PASS',
-    'memory_test': 'PASS',
-    'voice_test': 'PENDING',                         # NEW in v5.0
-    'phase': 'voice',
-    'description': 'FLUX Cognitive Architecture with Embedded Voice',
-    'saved': '2026-03-30T...',
-    'capabilities': ['text', 'grid', 'image', 'audio', 'vision', 'speech'],
-    'last_modified': '2026-03-30T...',
-    'modified_components': ['voice', 'bridges', 'runtime_config'],
-    'removed_components': ['decoder', 'llm', 'llm_reference', 'grid_adapters']
+    'last_modified': '2026-04-01T22:26:11.257984',
+    'modified_components': ['orchestration', 'runtime'],
+    'removed_components': ['decoder', 'llm', 'llm_reference', 'grid_adapters'],
+    'vlm_embedded': True,
+    'vlm_base_model': 'Qwen/Qwen2.5-VL-3B-Instruct',  # Note: actual model is Qwen2-VL-2B
+    'phase': 'autonomous',
+    'capabilities': [
+        'text', 'grid', 'image', 'audio', 'vision',
+        'face_detection', 'depth_estimation', 'pose_estimation', 'object_detection',
+        'multi_model_embedded', 'offline_capable', 'lazy_loading'
+    ],
 }
 ```
 
@@ -615,7 +638,7 @@ This model contains components from all FLUX phases:
 
 ## Loading the Model
 
-### Python (Recommended)
+### Python (Direct Load)
 ```python
 import torch
 from pathlib import Path
@@ -624,19 +647,38 @@ from pathlib import Path
 model_path = Path('checkpoints/Flux-Apex-V1.flx')
 raw = torch.load(str(model_path), map_location='cpu', weights_only=False)
 
-# Access components
+# Access native components
 cse_weights = raw['cse']['state_dict']
-field_state = raw['field']['state_dict']['state']  # [96, 96, 96, 512]
-voice_thinker = raw['voice']['thinker']            # Qwen-Omni thinker
-voice_talker = raw['voice']['talker']              # Speech synthesis
-voice_token2wav = raw['voice']['token2wav']        # Vocoder
+field_state = raw['field']['state_dict']['state']  # [48, 48, 48, 256]
+
+# Access embedded models
+models = raw['models']
+instruct_weights = models['instruct']['weights']   # Main LLM
+vision_weights = models['vision']['weights']       # VLM
+whisper_weights = models['whisper']['weights']     # Speech-to-text
+
+# Access detection models
+face_onnx = models['face']['onnx_models']          # Dict of 5 ONNX models
+depth_weights = models['depth']['weights']         # MiDaS weights
 ```
 
-### Via FLUXModel Class
+### Via FLUXModel Class (Recommended)
 ```python
 from flux_model import FLUXModel
 
-model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx', device='cuda')
+model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
+
+# List embedded models
+for m in model.list_embedded_models():
+    print(f"{m['name']}: {m['base_model']}")
+
+# Check for specific model
+if model.has_embedded_model('instruct'):
+    instruct = model.get_embedded_model('instruct')
+
+# Use lazy loader for on-demand loading
+manager = model.get_model_manager(device='cuda')
+instruct_model = manager.load('instruct')  # Returns loaded HF model
 ```
 
 ### From HuggingFace
@@ -669,24 +711,51 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 
 **DO NOT** create new filenames for incremental updates. The `.flx` format tracks history internally.
 
+### Saving on Disk-Constrained Environments (Kaggle/Colab)
+
+**CRITICAL:** The model is ~14 GB. On Kaggle (~20GB limit), delete the original before saving:
+
+```python
+import os, gc
+from pathlib import Path
+
+MODEL_PATH = Path('checkpoints/Flux-Apex-V1.flx')
+
+# Load into memory
+model = FLUXModel.load(str(MODEL_PATH))
+
+# Make modifications...
+model.version = '6.0-autonomous'
+
+# DELETE original to free disk space (model safe in RAM)
+os.remove(MODEL_PATH)
+gc.collect()
+
+# Save modified model
+model.save(str(MODEL_PATH), overwrite=True)
+```
+
 ---
 
 ## Key Tensor Shapes
 
 | Path | Shape | Parameters |
 |------|-------|------------|
-| field.state_dict.state | [96, 96, 96, 512] | 452,984,832 |
-| memory.semantic.field_state_dict.state | [96, 96, 96, 512] | 452,984,832 |
-| bridges.router.module_state.semantic.field.state | [96, 96, 96, 512] | 452,984,832 |
-| bridges.wave_to_voice.weight | [3584, 432] | 1,548,288 |
-| bridges.voice_to_wave.weight | [432, 3584] | 1,548,288 |
-| voice.thinker.model.* | various | ~2,000,000,000 |
-| voice.talker.* | various | ~500,000,000 |
-| voice.token2wav.* | various | ~300,000,000 |
-| adapters.wave_to_grid.spatial_expand.weight | [57600, 256] | 14,745,600 |
-| causal.cgn_state.state_dict.*.manifold.metric_L | [512, 512] | 262,144 each |
+| field.state_dict.state | [48, 48, 48, 256] | 28,311,552 |
+| bridges.wave_to_field.weight | [256, 432] | 110,592 |
+| bridges.field_to_wave.weight | [432, 256] | 110,592 |
+| adapters.wave_to_grid.* | various | 15,376,396 |
+| models.vision.state_dict.* | various | ~2,210,000,000 |
+| models.instruct.state_dict.* | various | ~1,540,000,000 |
+| models.coder.state_dict.* | various | ~1,540,000,000 |
+| models.clip.state_dict.* | various | ~427,600,000 |
+| models.tts.state_dict.* | various | ~410,100,000 |
+| models.whisper.state_dict.* | various | ~241,700,000 |
+| detection.depth.state_dict.* | various | ~344,100,000 |
+| detection.object_detect.state_dict.* | various | ~155,000,000 |
+| detection.face (ONNX models) | various | ~146,300,000 |
 
-> ~~decoder.state_dict~~ — **REMOVED in v5.0**
+> ~~decoder.state_dict~~ — **REMOVED in v5.0** (native FLUX now uses embedded models for generation)
 
 ---
 
@@ -695,38 +764,50 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 **All waves are 432-dimensional.** This is the universal semantic space:
 
 - CSE outputs: `[seq_len, 432]`
-- Field input: projects 432 → 512
-- Field output: projects 512 → 432
-- **Voice input: projects 432 → 3584** (wave_to_voice bridge)
-- **Voice output: projects 3584 → 432** (voice_to_wave bridge)
+- Field input: projects 432 → 256 (compressed field)
+- Field output: projects 256 → 432
+- **Embedded models**: use native hidden dimensions with bridge projections
 - All adapters: convert modality → 432 or 432 → modality
 
 ---
 
-## Memory Layout (v5.0)
+## Memory Layout (v6.0)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Flux-Apex-V1.flx (~8.5 GB)              │
+│                    Flux-Apex-V1.flx (~14.35 GB)            │
 ├─────────────────────────────────────────────────────────────┤
-│  voice (Qwen-Omni 4-bit)         │ ~2.8 GB                  │
-│    ├─ thinker (1346 tensors)    │   ~2.0 GB                │
-│    ├─ talker (293 tensors)      │   ~0.5 GB                │
-│    └─ token2wav (809 tensors)   │   ~0.3 GB                │
-├──────────────────────────────────┼──────────────────────────┤
-│  field.state [96³×512]           │ 1.7 GB (×2 copies)       │
-│  memory.semantic.state           │ (shared with field)      │
-│  bridges.router.semantic.state   │ (shared with field)      │
-├──────────────────────────────────┼──────────────────────────┤
-│  causal.cgn_state (56 nodes)     │ 112 MB                   │
-│  bridges.wave_to_voice           │ 6 MB                     │
-│  bridges.voice_to_wave           │ 6 MB                     │
-│  adapters (5 types)              │ 59 MB                    │
-│  cse.state_dict                  │ 5 MB                     │
-│  bridges.projections             │ 2 MB                     │
-│  configs + metadata              │ <1 MB                    │
-├──────────────────────────────────┴──────────────────────────┤
-│  REMOVED: decoder, llm, llm_reference, grid_adapters       │
+│  EMBEDDED MODELS (~6.4 GB)                                 │
+│    ├─ vision (Qwen2-VL-2B-Instruct)   │ ~2.2 GB [lazy]    │
+│    ├─ instruct (Qwen2.5-1.5B-Instruct)│ ~1.5 GB [eager]   │
+│    ├─ coder (Qwen2.5-Coder-1.5B)      │ ~1.5 GB [lazy]    │
+│    ├─ clip (CLIP-ViT-L/14)            │ ~0.4 GB [eager]   │
+│    ├─ tts (Bark-small)                │ ~0.4 GB [lazy]    │
+│    ├─ whisper (Whisper-small)         │ ~0.2 GB [lazy]    │
+│    └─ embedding (MiniLM-L6-v2)        │ ~0.02 GB [eager]  │
+├──────────────────────────────────────┼──────────────────────┤
+│  DETECTION MODELS (~0.54 GB)                               │
+│    ├─ depth (MiDaS DPT_Large)         │ ~344 MB [lazy]    │
+│    ├─ object_detect (OWL-ViT2)        │ ~155 MB [lazy]    │
+│    ├─ pose (HRNet-W32)                │ ~39 MB [lazy]     │
+│    ├─ face (InsightFace ONNX ×5)      │ ONNX [lazy]       │
+│    └─ speaker_detect (placeholder)    │ ~0 MB [lazy]      │
+├──────────────────────────────────────┼──────────────────────┤
+│  NATIVE FLUX (~0.5 GB)                                     │
+│    ├─ bridges (wave↔field+router)     │ ~456 MB (config)  │
+│    ├─ field.state [48³×256]           │ ~28 MB ✓          │
+│    ├─ adapters (5 types)              │ ~15 MB (config)   │
+│    ├─ cse.state_dict                  │ ~1.3 MB ✓         │
+│    ├─ grid_to_wave                    │ ~0.2 MB ✓         │
+│    └─ spatial_memory                  │ ~0.01 MB ✓        │
+├──────────────────────────────────────┴──────────────────────┤
+│  MISSING (placeholders):                                    │
+│    • causal, causal_tracker, learned_rules (0 params)      │
+│    • memory (metadata only, no FAISS index)                │
+│    • speaker_detect (placeholder, no weights)              │
+├─────────────────────────────────────────────────────────────┤
+│  REMOVED: decoder, llm_reference, grid_adapters, voice     │
+│  COMPRESSED: field (48³×256 vs old 96³×512)                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -742,6 +823,51 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 ---
 
 ## Changelog
+
+### v6.0-autonomous (Current — April 1, 2026)
+
+**Added:**
+- **Native JSON tool calling** — Qwen2.5-compatible function format (no custom `<tool>` tags)
+- **Partial runtime embed** — ~10 core Python files embedded for bootstrap
+- **Orchestration section** — Tool definitions, system prompt
+
+**Changed:**
+- Version: 5.x → 6.0-autonomous
+- Phase: phase2_5_detection → autonomous
+- Tool format: Custom XML → Native JSON schema
+
+**Status (from inspection):**
+- 12 embedded models: 11 with weights, 1 placeholder (speaker_detect)
+- Native FLUX: 4 with weights (cse, field, grid_to_wave, spatial_memory)
+- Causal system: Placeholder only (0 params) — weights not yet embedded
+- Memory: Metadata only — FAISS index not populated
+- Runtime: Partial (~30% of required codebase embedded)
+
+**Known Issues:**
+- `has_embedded_model('vlm')` returns False — key is 'vision' not 'vlm'
+- Metadata says vlm_base_model is Qwen2.5-VL-3B but actual is Qwen2-VL-2B
+
+### v5.x-detection-embedded (Prior)
+
+**Added:**
+- 12 embedded models for comprehensive multi-modal AI
+- **Language Models:** instruct (Qwen2.5-1.5B), coder (Qwen2.5-Coder-1.5B)
+- **Vision Models:** vision (Qwen2-VL-2B), clip (CLIP-ViT-L/14)
+- **Audio Models:** whisper (small), tts (Bark-small)
+- **Utility:** embedding (MiniLM-L6-v2)
+- 5 detection models with ONNX support
+- **Detection:** depth (MiDaS DPT_Large), object_detect (OWL-ViT2), face (InsightFace ×5), pose (HRNet-W32), speaker_detect (placeholder)
+- Lazy loading support for memory-efficient model access
+
+**Changed:**
+- File size: ~8.5 GB → ~14.35 GB
+- Total parameters: ~4.7B → ~7.44B
+- Total tensors: ~2800 → 5875
+- Field: 96³×512 → 48³×256 (compressed for storage efficiency)
+- Architecture: Single voice model → Multi-model ensemble
+
+**Removed:**
+- `voice` — Qwen-Omni integrated voice model (replaced by separate instruct + tts + whisper)
 
 ### v5.0-voice-embedded (March 30, 2026)
 
@@ -769,5 +895,5 @@ model.save('checkpoints/Flux-Apex-V1.flx')
 
 ---
 
-*This documentation reflects v5.0-voice-embedded.*  
-*Last updated: March 30, 2026*
+*This documentation reflects v6.0-autonomous (actual model state from Kaggle inspection).*  
+*Last updated: April 1, 2026*

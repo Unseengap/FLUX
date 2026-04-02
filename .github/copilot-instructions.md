@@ -204,6 +204,8 @@ model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
 ```python
 from flux_model import FLUXModel
 from datetime import datetime
+import os
+import gc
 
 # 1. Load current model
 model = FLUXModel.load('checkpoints/Flux-Apex-V1.flx')
@@ -230,6 +232,45 @@ model.save('checkpoints/Flux-Apex-V1.flx', overwrite=True)
 from flux_utils import upload_flx_to_hf
 upload_flx_to_hf('checkpoints/Flux-Apex-V1.flx')
 ```
+
+### Saving on Disk-Constrained Environments (Kaggle/Colab)
+
+**CRITICAL:** The Flux-Apex model is ~14-15 GB. On environments with limited disk space (Kaggle ~20GB, Colab ~40GB), you MUST delete the original file before saving to avoid "No space left on device" errors.
+
+```python
+from flux_model import FLUXModel
+from pathlib import Path
+import os
+import gc
+
+MODEL_PATH = Path('checkpoints/Flux-Apex-V1.flx')
+
+# 1. Load model into memory
+model = FLUXModel.load(str(MODEL_PATH))
+
+# 2. Make modifications (model is now in memory)
+model.version = '6.0-autonomous'
+model.state['orchestration'] = {'tools': [...], 'system_prompt': '...'}
+
+# 3. DELETE ORIGINAL to free disk space (model safe in memory)
+if MODEL_PATH.exists():
+    original_size = MODEL_PATH.stat().st_size / 1e9
+    os.remove(MODEL_PATH)
+    gc.collect()  # Free memory from any cached references
+    print(f"Freed {original_size:.2f} GB disk space")
+
+# 4. Save modified model
+model.save(str(MODEL_PATH), overwrite=True)
+print(f"Saved: {MODEL_PATH.stat().st_size / 1e9:.2f} GB")
+
+# 5. Verify (optional but recommended)
+verify = FLUXModel.load(str(MODEL_PATH))
+assert verify.version == '6.0-autonomous'
+del verify
+gc.collect()
+```
+
+**Why this works:** The model is fully loaded into RAM. Deleting the file only removes the disk copy. The in-memory `model` object retains all modifications and can be safely saved.
 
 ---
 
