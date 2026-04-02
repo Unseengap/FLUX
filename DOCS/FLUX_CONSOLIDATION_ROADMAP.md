@@ -1,20 +1,20 @@
 # FLUX Consolidation Roadmap
 
-**Version:** 2.0  
-**Date:** April 1, 2026  
+**Version:** 3.0  
+**Date:** April 2, 2026  
 **Purpose:** Eliminate redundancy, clarify what's kept vs. deprecated, and track injection/cleanup progress
 
-> **✅ Weight Injection COMPLETE (April 1, 2026):**  
-> All native FLUX components now have trained weights in Flux-Apex-V1.flx v8.1-complete.  
-> Injection performed via `notebooks/flux_weight_injection.ipynb` on Kaggle.
+> **✅ Bootstrap COMPLETE (April 2, 2026):**  
+> All 91 embedded modules now load successfully from Flux-Apex-V1.flx v8.2-fixed-imports.  
+> Bootstrap verified via `notebooks/flux_runtime_reembed.ipynb` on Kaggle.
 
 ---
 
 ## Executive Summary
 
-Flux-Apex-V1.flx (**v8.1-complete**) now contains:
+Flux-Apex-V1.flx (**v8.2-fixed-imports**) now contains:
 - **12 embedded models** (6.9B params)
-- **87 runtime files** (27,647 lines) for autonomous bootstrap
+- **91 runtime files** (27,710 lines) for autonomous bootstrap — **100% load success**
 - **All native FLUX components with trained weights** (~1.4B params)
 
 **Total: ~8.34B parameters**

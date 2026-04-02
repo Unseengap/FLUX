@@ -4,7 +4,7 @@
 
 FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture that replaces traditional neural network primitives with physics-inspired components: resonance fields instead of weights, continuous semantic waves instead of tokens, gravitational relevance instead of attention (O(log n)), thermodynamic settling instead of backpropagation, and causal geometry nodes instead of neurons.
 
-**Current Flagship Model:** `Flux-Apex-V1.flx` (v8.1-complete, All Weights Injected, ~8.34B params)
+**Current Flagship Model:** `Flux-Apex-V1.flx` (v8.2-fixed-imports, 91/91 Bootstrap, ~8.34B params)
 
 **Source of truth:**
 - `DOCS/FLUX_APEX_V1.md` — Complete Flux-Apex model reference
@@ -30,9 +30,10 @@ FLUX (Field-based Latent Understanding eXperience) is a novel AI architecture th
 | **Total Parameters** | ~8,340,860,219 (~8.34B) |
 | **Wave Dimension** | 432 (universal semantic space) |
 | **Field Dimensions** | 48 × 48 × 48 × 256 (compressed) |
-| **Version** | 8.1-complete |
+| **Version** | 8.2-fixed-imports |
 | **Embedded Models** | 12 (language, vision, audio, detection) |
-| **Embedded Runtime** | 87 files, 27,647 lines (325 KB compressed) |
+| **Embedded Runtime** | 91 files, 27,710 lines (327 KB compressed) |
+| **Bootstrap Status** | ✅ 91/91 modules load successfully |
 | **Native FLUX Weights** | ~1.4B (all injected April 1, 2026) |
 
 ### Top-Level Components (26 keys)

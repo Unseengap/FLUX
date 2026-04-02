@@ -1,34 +1,39 @@
 # FLUX Codebase Embedding Specification
 
-**Version:** 1.0  
-**Date:** April 1, 2026  
-**Status:** REQUIRED for v8.0-autonomous  
-**Current Model:** v6.0-autonomous (partial embed ~30%)
+**Version:** 2.0  
+**Date:** April 2, 2026  
+**Status:** ✅ COMPLETE (v8.2-fixed-imports)  
+**Current Model:** v8.2-fixed-imports (91/91 modules bootstrap)
 
 ---
 
 ## Executive Summary
 
-For FLUX to be truly autonomous, the **entire runtime codebase** must be embedded in the `.flx` file. Currently, v6.0-autonomous has only ~10 gzipped files (~30% of what's needed). This document specifies:
+For FLUX to be truly autonomous, the **entire runtime codebase** must be embedded in the `.flx` file. **This is now complete.** v8.2-fixed-imports has 91 Python files (27,710 lines) that all load successfully from the .flx with zero import errors.
 
-1. **What files must be embedded** (full inventory)
-2. **Directory structure** to preserve in the archive
+✅ **Bootstrap Verified:** Run `python bootstrap.py checkpoints/Flux-Apex-V1.flx` to wake FLUX from .flx alone.
+
+This document specifies:
+
+1. **What files are embedded** (full inventory)
+2. **Directory structure** preserved in the archive
 3. **Dependencies between modules**
 4. **Bootstrap sequence** to wake FLUX from .flx alone
-5. **Implementation checklist**
+5. **Import handling** for embedded vs development mode
 
 ---
 
 ## Current State vs Target
 
-| Metric | v6.0-autonomous | v8.0-autonomous (Target) |
-|--------|-----------------|--------------------------|
-| Embedded code files | ~10 | ~60+ |
-| Embedded lines | ~3,000 | ~15,000+ |
-| Can run from .flx only | ❌ | ✅ |
-| Has bootstrap.py | ❌ | ✅ |
-| Has tool executor | ❌ | ✅ |
-| Has unified agent | ❌ | ✅ |
+| Metric | v6.0-autonomous | v8.2-fixed-imports |
+|--------|-----------------|------------------------|
+| Embedded code files | ~10 | **91** ✅ |
+| Embedded lines | ~3,000 | **27,710** ✅ |
+| Can run from .flx only | ❌ | **✅ YES** |
+| Has bootstrap.py | ❌ | **✅ YES** |
+| Has tool executor | ❌ | **✅ YES** |
+| Has unified agent | ❌ | **✅ YES** |
+| Import success rate | Unknown | **91/91 (100%)** ✅ |
 
 ---
 
