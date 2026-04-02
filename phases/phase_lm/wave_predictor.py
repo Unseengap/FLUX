@@ -148,9 +148,9 @@ class WaveAttention(nn.Module):
         # Compute attention
         attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale
         
-        # Apply mask
+        # Apply causal mask (mask contains 0 for valid, -inf for invalid)
         if mask is not None:
-            attn = attn.masked_fill(mask == 0, float('-inf'))
+            attn = attn + mask  # Just add the mask (already has -inf values)
         
         attn = F.softmax(attn, dim=-1)
         attn = self.dropout(attn)
