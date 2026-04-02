@@ -47,6 +47,8 @@ def extract_runtime(flx: Dict[str, Any], verbose: bool = False) -> Dict[str, typ
     """
     Extract and load all embedded modules from a .flx file.
     
+    Uses multi-pass loading to handle inter-module dependencies.
+    
     Args:
         flx: Loaded .flx dictionary (from torch.load)
         verbose: Print loading progress
@@ -63,7 +65,6 @@ def extract_runtime(flx: Dict[str, Any], verbose: bool = False) -> Dict[str, typ
         return {}
     
     modules = {}
-    errors = []
     
     # Create package hierarchy first
     packages = set()
@@ -73,52 +74,104 @@ def extract_runtime(flx: Dict[str, Any], verbose: bool = False) -> Dict[str, typ
             pkg = '.'.join(parts[:i])
             packages.add(pkg)
     
-    # Register packages in sys.modules
+    # Register packages in sys.modules with proper __path__
     for pkg in sorted(packages):
         if pkg not in sys.modules:
             mod = types.ModuleType(pkg)
             mod.__file__ = f"<embedded:{pkg}>"
-            mod.__path__ = []
+            mod.__path__ = [f"<embedded:{pkg}>"]  # Must be list for package
             mod.__package__ = pkg
             sys.modules[pkg] = mod
     
-    # Load each module
-    for path, compressed in code_bundle.items():
-        # Convert path to module name: phases/phase1/cse.py -> phases.phase1.cse
-        module_name = path.replace('/', '.').replace('.py', '')
+    # Multi-pass loading to handle dependencies
+    pending = dict(code_bundle)  # path -> compressed source
+    max_passes = 10
+    
+    for pass_num in range(max_passes):
+        if not pending:
+            break
+            
+        still_pending = {}
+        loaded_this_pass = 0
         
-        # Determine package
+        for path, compressed in pending.items():
+            module_name = path.replace('/', '.').replace('.py', '')
+            parts = module_name.rsplit('.', 1)
+            package = parts[0] if len(parts) > 1 else None
+            
+            try:
+                source = decompress_source(compressed)
+                module = load_module_from_source(module_name, source, package)
+                
+                # Check if it loaded cleanly (no import errors stored)
+                if hasattr(module, '__load_error__'):
+                    err = module.__load_error__
+                    # If it's an import error, retry later
+                    if 'No module named' in err or 'cannot import name' in err:
+                        still_pending[path] = compressed
+                        continue
+                
+                # Success - register in sys.modules
+                sys.modules[module_name] = module
+                modules[path] = module
+                loaded_this_pass += 1
+                
+                # Register in parent package
+                if package and package in sys.modules:
+                    attr_name = parts[1] if len(parts) > 1 else module_name
+                    parent = sys.modules[package]
+                    if parent is not None:
+                        setattr(parent, attr_name, module)
+                
+                if verbose:
+                    print(f"✓ {path}")
+                    
+            except Exception as e:
+                err_str = str(e)
+                if 'No module named' in err_str or 'cannot import name' in err_str:
+                    still_pending[path] = compressed
+                else:
+                    # Non-import error, store it but don't retry
+                    modules[path] = types.ModuleType(module_name)
+                    modules[path].__load_error__ = err_str
+                    if verbose:
+                        print(f"✗ {path}: {e}")
+        
+        pending = still_pending
+        
+        if verbose and loaded_this_pass > 0:
+            print(f"  [Pass {pass_num + 1}: loaded {loaded_this_pass}, pending {len(pending)}]")
+        
+        # If no progress, break to avoid infinite loop
+        if loaded_this_pass == 0 and pending:
+            break
+    
+    # Final pass - load remaining with errors stored
+    for path, compressed in pending.items():
+        module_name = path.replace('/', '.').replace('.py', '')
         parts = module_name.rsplit('.', 1)
         package = parts[0] if len(parts) > 1 else None
         
         try:
             source = decompress_source(compressed)
             module = load_module_from_source(module_name, source, package)
-            
-            # Register in sys.modules
             sys.modules[module_name] = module
             modules[path] = module
             
-            # Also register in parent package
-            if package and package in sys.modules:
-                attr_name = parts[1] if len(parts) > 1 else module_name
-                setattr(sys.modules[package], attr_name, module)
-            
             if verbose:
                 if hasattr(module, '__load_error__'):
-                    print(f"⚠ {path} (loaded with error: {module.__load_error__})")
+                    print(f"⚠ {path} (error: {module.__load_error__})")
                 else:
                     print(f"✓ {path}")
-                    
         except Exception as e:
-            errors.append((path, str(e)))
+            modules[path] = types.ModuleType(module_name)
+            modules[path].__load_error__ = str(e)
             if verbose:
                 print(f"✗ {path}: {e}")
     
     if verbose:
-        print(f"\nLoaded {len(modules)}/{len(code_bundle)} modules")
-        if errors:
-            print(f"Errors: {len(errors)}")
+        success = sum(1 for m in modules.values() if not hasattr(m, '__load_error__'))
+        print(f"\nLoaded {success}/{len(code_bundle)} modules successfully")
     
     return modules
 
