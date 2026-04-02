@@ -25,10 +25,17 @@ from torch import Tensor
 from typing import Dict, Any, Optional, Tuple, List, Union
 from dataclasses import dataclass
 
-from .cse_large import CSELarge, CSE_L_CONFIG, SemanticWave
-from .cwc_large import CWCLarge, CWC_L_CONFIG
-from .wave_predictor import WavePredictor, WAVE_PREDICTOR_CONFIG
-from .wave_decoder_large import WaveDecoderLarge, WAVE_DECODER_L_CONFIG
+# Support both package and direct imports
+try:
+    from .cse_large import CSELarge, CSE_L_CONFIG, SemanticWave
+    from .cwc_large import CWCLarge, CWC_L_CONFIG
+    from .wave_predictor import WavePredictor, WAVE_PREDICTOR_CONFIG
+    from .wave_decoder_large import WaveDecoderLarge, WAVE_DECODER_L_CONFIG
+except ImportError:
+    from cse_large import CSELarge, CSE_L_CONFIG, SemanticWave
+    from cwc_large import CWCLarge, CWC_L_CONFIG
+    from wave_predictor import WavePredictor, WAVE_PREDICTOR_CONFIG
+    from wave_decoder_large import WaveDecoderLarge, WAVE_DECODER_L_CONFIG
 
 
 # ─────────────────────────────────────────────
