@@ -665,10 +665,15 @@ The codebase embed is complete when:
 2. ~~Run on Kaggle~~ ✅ Completed April 2, 2026
 3. **Upload v8.0-autonomous** to HuggingFace — Set `UPLOAD_TO_HF=True`
 4. **Test from scratch** on clean environment
-5. **Inject missing weights** — CGN, Memory, GR, TL (see FLUX_CONSOLIDATION_ROADMAP.md)
+5. **Inject missing weights** ✅ Notebook created: `notebooks/flux_weight_injection.ipynb`
+   - CGN (Phase 5) — 6-hop causal trace
+   - Memory (Phase 6) — 0.0000 forgetting
+   - GR (Phase 3) — O(log n) scaling
+   - TL (Phase 4) — 99.04% retention
+   - CWC (Phase 1.5) — 93% order accuracy
 
 ---
 
 *Document created: April 1, 2026*  
-*Last updated: April 2, 2026 — Codebase embed completed*  
-*Related: PHASE_AUTONOMOUS_SPEC.md, FLUX_LITE_EMBEDDED_MODELS.md*
+*Last updated: April 1, 2026 — Weight injection notebook created*  
+*Related: PHASE_AUTONOMOUS_SPEC.md, FLUX_LITE_EMBEDDED_MODELS.md, FLUX_CONSOLIDATION_ROADMAP.md*

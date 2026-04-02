@@ -2,7 +2,10 @@
 
 **FLUX Architecture — Flagship Model Documentation**  
 *For AI Agents, Developers, and Integration Systems*  
-*Version: 8.0-autonomous | Phase: autonomous | Updated: April 2, 2026*
+*Version: 8.0-autonomous | Phase: autonomous | Updated: April 1, 2026*
+
+> **⚠️ Weight Injection Available:** Some native FLUX components (CGN, Memory, GR, TL) have trained weights in phase checkpoints that are NOT YET in this .flx file. Run `notebooks/flux_weight_injection.ipynb` to inject them and create v8.1-complete.  
+> See `output/flux_native_results/needs_injection/` for proven results.
 
 ---
 
@@ -137,7 +140,16 @@ Camera       ─┬─► Face Detection          │   │      │
 | 9 | **causal_tracker** | 0 | 0% | 0 | ✗ (empty) |
 | 10 | **learned_rules** | 0 | 0% | 0 | ✗ (empty) |
 
-> **Note:** Field is compressed to 48³×256 (was 96³×512). Bridges/adapters contain projection configs but weights are generated on-demand. Causal system is placeholder (weights not yet embedded).
+> **Note:** Field is compressed to 48³×256 (was 96³×512). Bridges/adapters contain projection configs but weights are generated on-demand.
+>
+> **🔴 CRITICAL:** Components marked "empty" have trained weights in phase checkpoints (`UnseenGAP/FLUX/checkpoints/`) but those weights are NOT in this .flx file. Run `notebooks/flux_weight_injection.ipynb` to complete the model.
+>
+> | Component | Source Checkpoint | Key Result |
+> |-----------|-------------------|------------|
+> | causal | `phase5.phase.pt` | 6-hop causal trace |
+> | memory | `phase6.phase.pt` | 0.0000 forgetting |
+> | gravity | `phase3.phase.pt` | O(log n) scaling |
+> | thermodynamic | `phase4.phase.pt` | 99.04% retention |
 
 ### Embedded Models (~6.4B params)
 

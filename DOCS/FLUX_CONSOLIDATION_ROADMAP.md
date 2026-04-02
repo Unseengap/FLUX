@@ -1,8 +1,12 @@
 # FLUX Consolidation Roadmap
 
-**Version:** 1.4  
-**Date:** April 2, 2026  
+**Version:** 1.5  
+**Date:** April 1, 2026  
 **Purpose:** Eliminate redundancy, clarify what's kept vs. deprecated, and define injection/cleanup tasks
+
+> **NEW: Weight Injection Notebook Available!**  
+> Run `notebooks/flux_weight_injection.ipynb` to inject trained weights from phases 1.5, 3, 4, 5, 6 into Flux-Apex-V1.flx  
+> Results organized in `output/flux_native_results/`
 
 ---
 
@@ -113,6 +117,9 @@ These components have been **superseded by embedded models** and should be marke
 ## Section 2: What MUST Be Injected
 
 These components have **working code with trained weights** but those weights are NOT in Flux-Apex-V1.flx:
+
+> **🔧 Injection Notebook:** `notebooks/flux_weight_injection.ipynb`  
+> **📁 Results Archive:** `output/flux_native_results/needs_injection/`
 
 ### 2.1 Gravitational Relevance (Phase 3)
 
@@ -412,11 +419,35 @@ Flux-Apex-V1.flx (v8.0-complete)
 | `phases/phase8_8/__init__.py` | Grid adapter exports |
 | `phases/phase8_9/__init__.py` | Multi-modal adapter exports |
 | `phases/phase9_arc/__init__.py` | ARC reasoning exports |
+| `notebooks/flux_weight_injection.ipynb` | Weight injection from phase checkpoints ✅ NEW |
+| `output/flux_native_results/` | Organized results by status (in_apex, needs_injection, legacy) ✅ NEW |
 
 **Key Insight:**
 - **Embedded models** = I/O modalities (text, vision, audio, detection)
 - **Native FLUX** = Cognition (memory, causality, learning, retrieval)
 - They are **complementary**, not redundant
+
+---
+
+## Changelog
+
+| Date | Version | Change |
+|------|---------|--------|
+| April 1, 2026 | 1.0 | Initial consolidation roadmap |
+| April 1, 2026 | 1.1 | Codebase cleanup completed — 12 files marked DEPRECATED |
+| April 1, 2026 | 1.2 | Codebase embed infrastructure — bootstrap.py, __init__.py files |
+| April 1, 2026 | 1.3 | CLAW integration — Claude Code Python port |
+| April 2, 2026 | 1.4 | v8.0-autonomous COMPLETE — 87 files embedded |
+| April 1, 2026 | 1.5 | **Weight injection notebook created** — `flux_weight_injection.ipynb`, organized results |
+
+---
+
+## Next Steps (Action Required)
+
+1. **Run weight injection notebook** on Kaggle/Colab with GPU
+2. **Verify** injected components have proper parameter counts
+3. **Upload** v8.1-complete to HuggingFace
+4. **Validate** all FLUX claims work with injected weights
 
 ---
 
