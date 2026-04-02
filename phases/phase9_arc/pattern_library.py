@@ -30,7 +30,17 @@ _PROJECT_ROOT = _PHASES_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from object_detector import ObjectDetector, ObjectGraph, ARCObject, reconstruct_grid
+try:
+    from phases.phase9_arc.object_detector import ObjectDetector, ObjectGraph, ARCObject, reconstruct_grid
+except ImportError:
+    try:
+        from object_detector import ObjectDetector, ObjectGraph, ARCObject, reconstruct_grid
+    except ImportError:
+        # Stub when not available
+        ObjectDetector = None
+        ObjectGraph = None
+        ARCObject = None
+        reconstruct_grid = None
 
 
 # ─────────────────────────────────────────────

@@ -36,9 +36,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 if str(_PHASES_DIR / 'phase8_8') not in sys.path:
     sys.path.insert(0, str(_PHASES_DIR / 'phase8_8'))
 
-from arc_loader import ARCTask, ARCExample
-from object_detector import ObjectDetector, ObjectGraph, ARCObject
-from pattern_library import PATTERNS, Pattern, apply_sequence
+try:
+    from phases.phase9_arc.arc_loader import ARCTask, ARCExample
+    from phases.phase9_arc.object_detector import ObjectDetector, ObjectGraph, ARCObject
+    from phases.phase9_arc.pattern_library import PATTERNS, Pattern, apply_sequence
+except ImportError:
+    from arc_loader import ARCTask, ARCExample
+    from object_detector import ObjectDetector, ObjectGraph, ARCObject
+    from pattern_library import PATTERNS, Pattern, apply_sequence
 
 # Try to import grid adapters
 try:

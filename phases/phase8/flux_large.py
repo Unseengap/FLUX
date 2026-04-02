@@ -78,7 +78,18 @@ try:
         get_device, load_checkpoint, save_checkpoint, checkpoint_exists,
         PhaseLogger,
     )
-except ImportError:
+except ImportError as e:
+    # Direct execution fallback - add phase directories to path
+    import sys
+    from pathlib import Path
+    _phases = Path(__file__).parent.parent
+    for _d in ['phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'phase6', 'phase7', 'phase8']:
+        _p = str(_phases / _d)
+        if _p not in sys.path:
+            sys.path.insert(0, _p)
+    if str(_phases.parent) not in sys.path:
+        sys.path.insert(0, str(_phases.parent))
+    
     from cse import ContinuousSemanticEncoder
     from wave_types import SemanticWave, TOTAL_WAVE_DIM
     from field import ResonanceField
