@@ -12,7 +12,7 @@ Total: ~124M parameters (GPT-2 small equivalent)
 Key features:
 - No tokenizer, no vocabulary
 - Works on any UTF-8 byte sequence
-- Language-agnostic
+- Language-agnostic.   
 - Continuous semantic space
 """
 

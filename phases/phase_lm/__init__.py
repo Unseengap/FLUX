@@ -3,7 +3,7 @@ FLUX-LM: Vocabulary-Free Wave-Based Language Model
 
 Combines Phase 1 (CSE) + Phase 1.5 (CWC) + WavePredictor for autoregressive generation.
 Target: ~124M parameters (GPT-2 small equivalent)
-
+   
 Components:
     - CSELarge: Scaled Continuous Semantic Encoder (10M params)
     - CWCLarge: Scaled Causal Wave Chainer with order awareness (5M params)
