@@ -244,12 +244,8 @@ class FluxLM(nn.Module):
         # Encode initial context
         bytes_tensor = torch.tensor(output_bytes, dtype=torch.long, device=self.device)
         
-        # KV cache for efficiency
-        past_kv = None
-        
         for _ in range(config.max_new_bytes):
-            # Always encode full context through CSE and CWC
-            # (they don't support incremental encoding)
+            # Encode full context through CSE and CWC
             input_tensor = bytes_tensor.unsqueeze(0)  # [1, seq_len]
             
             # Encode to causal waves
@@ -257,15 +253,15 @@ class FluxLM(nn.Module):
             wave = semantic_wave.full  # [1, seq_len, 432]
             causal_waves = self.cwc(wave)  # [1, seq_len, 608]
             
-            # Predict next wave (KV cache only helps predictor)
-            if past_kv is None:
-                next_wave, past_kv = self.predictor.predict_next(causal_waves, None)
-            else:
-                # With cache, only pass the new position to predictor
-                next_wave, past_kv = self.predictor.predict_next(causal_waves[:, -1:], past_kv)
+            # Run full predictor (no KV cache - waves change each iteration)
+            predicted_waves, _ = self.predictor(causal_waves)
+            # predicted_waves: [1, seq_len, 608]
+            
+            # Get prediction at last position
+            next_wave = predicted_waves[:, -1]  # [1, 608]
             
             # Decode to byte logits
-            logits = self.decoder(next_wave.unsqueeze(1) if next_wave.dim() == 2 else next_wave)
+            logits = self.decoder(next_wave.unsqueeze(1))  # [1, 1, 256]
             logits = logits.squeeze(1)  # [1, 256]
             
             # Apply repetition penalty
