@@ -223,7 +223,9 @@ FLUX models follow a physics-inspired naming hierarchy:
 | **Flagship** | **Flux-Apex** | Peak performance | Production-ready, full capability |
 | Future | **Flux-Singularity** | Beyond limits | Reserved for future breakthroughs |
 
-**Current flagship:** `Flux-Apex-V1.flx` (v4.0-multi-modal-enhanced, Phase 12)
+**Current flagship:** `Flux-Apex-V1.flx` (v8.2-fixed-imports, ~8.34B params)
+
+> See [FLUX_APEX_V1.md](FLUX_APEX_V1.md) for complete current specifications.
 
 The version suffix (`V1`, `V2`, etc.) indicates major architecture revisions. Version numbers inside the file (`v4.0`) track internal format evolution.
 
@@ -363,9 +365,13 @@ The `.flx` version string is not cosmetic. It defines a contract for what sectio
 | `1.0-beta` | Flux-beta | Base 14 components | Text: encode, store, recall, generate |
 | `2.0` | Flux-capable | `input_adapters`, `output_adapters` | Any modality: grid, image, audio |
 | `3.0` | Flux-X | `causal_tracker`, `rule_inducer`, `goal_planner` | Reasoning + knowledge injection |
-| `4.0` | **Flux-Apex-V1** | `spatial_memory`, `llm_reference`, full adapters | Complete multi-modal agent |
+| `4.0` | Flux-Apex-V1 | `spatial_memory`, `llm_reference`, full adapters | Complete multi-modal agent |
+| `5.x` | Detection | `models` (12 embedded), detection models | Self-contained multi-modal |
+| `6.0` | Autonomous | `orchestration`, `runtime` (partial) | Native JSON tools, VLM orchestration |
+| `8.1` | Complete | All native FLUX weights injected | Full physics-based cognition |
+| **`8.2`** | **Fixed-Imports** | `runtime` (91 files, 100% load) | **Autonomous bootstrap from .flx** |
 
-Every version is a strict superset of its predecessor. A v4.0 reader can always load a v1.0-beta file. A v1.0-beta reader gracefully ignores sections it doesn't recognize.
+Every version is a strict superset of its predecessor. A v8.2 reader can always load a v1.0-beta file. A v1.0-beta reader gracefully ignores sections it doesn't recognize.
 
 ---
 
@@ -381,7 +387,9 @@ FLUX inverts this. The framework is minimal. The state IS the model. The field's
 
 ---
 
-## Technical Specifications: Flux-Apex-V1.flx (Current Flagship)
+## Technical Specifications: Flux-Apex-V1.flx (v4.0 Historical)
+
+> **⚠️ HISTORICAL REFERENCE:** These specs are from v4.0 (March 2026). For current specifications, see **[FLUX_APEX_V1.md](FLUX_APEX_V1.md)** which documents v8.2-fixed-imports (~16.2 GB, ~8.34B params, 91 embedded runtime files).
 
 | Property | Value |
 |----------|-------|
@@ -406,7 +414,9 @@ FLUX inverts this. The framework is minimal. The state IS the model. The field's
 | External VLM | Qwen/Qwen2.5-VL-3B-Instruct |
 | Capabilities | text, grid, image, audio, vision |
 
-### Component Breakdown (Flux-Apex-V1)
+### Component Breakdown (Flux-Apex-V1 — v4.0 Historical)
+
+> See [FLUX_APEX_V1.md](FLUX_APEX_V1.md) for current component breakdown.
 
 | Component | Parameters | % of Total |
 |-----------|------------|------------|

@@ -18,10 +18,10 @@
 | **Format** | FLUX (self-describing cognitive architecture) |
 | **Version** | 8.2-fixed-imports |
 | **Phase** | complete |
-| **File Size** | ~17.40 GB |
-| **Total Parameters** | ~8,340,860,219 (~8.34B) |
-| **Total Tensors** | 5,875+ |
-| **Top-Level Keys** | 26 |
+| **File Size** | ~16.20 GB |
+| **Total Parameters** | ~8,340,879,675 (~8.34B) |
+| **Total Tensors** | 6,283 |
+| **Top-Level Keys** | 27 |
 | **Max Nesting Depth** | 10 |
 | **Can Continue Learning** | `True` |
 | **Embedded Models** | 12 (7 language/vision/audio, 5 detection) |
