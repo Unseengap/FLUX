@@ -300,6 +300,10 @@ class FluxLM(nn.Module):
     ) -> int:
         """Sample a byte from logits with temperature, top-k, and top-p."""
         
+        # Greedy decoding for temperature=0
+        if temperature == 0.0:
+            return logits.argmax().item()
+        
         # Apply temperature
         if temperature != 1.0:
             logits = logits / temperature
