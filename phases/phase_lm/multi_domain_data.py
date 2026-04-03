@@ -9,7 +9,8 @@ Handles loading and mixing data from multiple domains:
 - MEDIA: MIDI (future)
 - PROTOCOLS: HTTP, API examples
 
-Uses ~10% of large datasets, all of small datasets (<10K).
+For 1B+ model training, uses 100% of available datasets.
+Scaled for ~2B tokens needed for 1B parameter model (Chinchilla scaling).
 """
 
 import os
@@ -185,7 +186,7 @@ DATASET_CONFIGS = {
         source='OpenAssistant/oasst1',
         subset=None,
         split='train',
-        max_samples=16000,  # 10% of 160K
+        max_samples=160000,  # 100% for 1B model
         domain='assistant',
         format_fn='format_openassistant',
         weight=0.12,
@@ -205,7 +206,7 @@ DATASET_CONFIGS = {
         source='tatsu-lab/alpaca',
         subset=None,
         split='train',
-        max_samples=5200,  # 10% of 52K
+        max_samples=52000,  # 100% for 1B model
         domain='assistant',
         format_fn='format_alpaca',
         weight=0.05,
@@ -253,7 +254,7 @@ DATASET_CONFIGS = {
         source='code_search_net',
         subset='python',
         split='train',
-        max_samples=50000,  # 10% of ~500K
+        max_samples=500000,  # 100% for 1B model (~500K Python functions)
         domain='code',
         format_fn='format_code_search_net',
         weight=0.10,
@@ -267,7 +268,7 @@ DATASET_CONFIGS = {
         source='wikitext',
         subset='wikitext-103-raw-v1',
         split='train',
-        max_samples=20000,  # 10% for general text
+        max_samples=100000,  # 100% for 1B model
         domain='docs',
         format_fn='format_wikitext',
         weight=0.10,
@@ -281,7 +282,7 @@ DATASET_CONFIGS = {
         source='opus100',
         subset='en-fr',
         split='train',
-        max_samples=10000,  # Sample from large
+        max_samples=100000,  # 100K for 1B model
         domain='multilingual',
         format_fn='format_opus100',
         weight=0.03,
@@ -291,7 +292,7 @@ DATASET_CONFIGS = {
         source='opus100',
         subset='en-de',
         split='train',
-        max_samples=10000,
+        max_samples=100000,  # 100K for 1B model
         domain='multilingual',
         format_fn='format_opus100',
         weight=0.03,
@@ -301,7 +302,7 @@ DATASET_CONFIGS = {
         source='opus100',
         subset='en-zh',
         split='train',
-        max_samples=10000,
+        max_samples=100000,  # 100K for 1B model
         domain='multilingual',
         format_fn='format_opus100',
         weight=0.03,
@@ -311,7 +312,7 @@ DATASET_CONFIGS = {
         source='opus100',
         subset='en-es',
         split='train',
-        max_samples=10000,
+        max_samples=100000,  # 100K for 1B model
         domain='multilingual',
         format_fn='format_opus100',
         weight=0.02,
@@ -321,7 +322,7 @@ DATASET_CONFIGS = {
         source='opus100',
         subset='en-ja',
         split='train',
-        max_samples=10000,
+        max_samples=100000,  # 100K for 1B model
         domain='multilingual',
         format_fn='format_opus100',
         weight=0.02,
