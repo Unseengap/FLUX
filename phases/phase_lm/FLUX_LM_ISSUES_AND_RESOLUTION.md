@@ -806,3 +806,106 @@ print(output)
 *FLUX-LM: Building the future of vocabulary-free language modeling, one byte at a time.*
 
 *Last updated: April 3, 2026 — Training complete (100%, 30K steps)*
+
+
+
+
+
+
+
+
+
+phase 2 blm 
+
+
+
+## FLUX-LM Universal: Issues & Fixes Summary (April 3, 2026)
+
+### Issue 1: Garbage Generation at 25K Steps
+**Symptom:** Model trained to 25K steps with good metrics (Loss 1.86, PPL 6.44, Acc 48.9%) but generated nonsense like "No you would in a seend of the second..."
+
+**Root Cause:** Special token encoding bug - tokens 256-319 were clamped to 255 in `encode_bytes()`
+
+**Fix:** Added separate `special_token_embed` layer in flux_lm_universal.py:
+```python
+# NEW: Special token embeddings for tokens 256-319
+self.special_token_embed = nn.Embedding(64, 432)
+
+# In encode_bytes(): Replace CSE output with learned embeddings at special positions
+if is_special.any():
+    special_embeds = self.special_token_embed(special_indices)
+    wave = torch.where(is_special.unsqueeze(-1), special_embeds, wave)
+```
+**Status:** ✅ FIXED (requires retraining)
+
+---
+
+### Issue 2: Model Load Fails with Missing Key
+**Symptom:** `RuntimeError: Missing key(s) in state_dict: "special_token_embed.weight"`
+
+**Root Cause:** Old checkpoints don't have the new `special_token_embed` layer
+
+**Fix:** Made `load()` backwards compatible with `strict=False`:
+```python
+missing_keys, unexpected_keys = model.load_state_dict(checkpoint['state_dict'], strict=False)
+if missing_keys:
+    print(f"⚠ Missing keys (will use random init): {missing_keys}")
+```
+**Status:** ✅ FIXED
+
+---
+
+### Issue 3: CWC Order Discrimination = 40%
+**Symptom:** Order discrimination test showed 40% accuracy (worse than random 50%)
+
+**Root Cause:** OrderClassifier head was **never trained** - training only used byte-loss:
+```python
+loss = CrossEntropy(logits, target_bytes)  # Only this was used
+# Missing: order_loss = BCE(ordered_score, 1) + BCE(shuffled_score, 0)
+```
+
+**Finding:** This was a **RED HERRING**. Perplexity-based test showed **100% accuracy** - the model DOES learn word order through the main prediction pathway.
+
+**Fix:** No fix needed. The OrderClassifier is an optional, unused feature. Updated diagnostic notebook with warnings.
+
+**Status:** ✅ NOT A BUG (misleading metric)
+
+---
+
+### Issue 4: Wave Stability Concern
+**Symptom:** Suspected bidirectional encoding (original FLUX-LM bug)
+
+**Finding:** CSE is **CAUSAL** - waves don't change when extending text. All positions showed 1.0 cosine similarity.
+
+**Status:** ✅ PASSED (not an issue)
+
+---
+
+### Summary Table
+
+| Issue | Root Cause | Fix | Status |
+|-------|------------|-----|--------|
+| Garbage generation | Special tokens clamped to 255 | Added `special_token_embed` | ✅ Fixed (retrain needed) |
+| Model load fails | Missing new layer in old ckpts | `strict=False` in load | ✅ Fixed |
+| CWC Order = 40% | OrderClassifier never trained | N/A (red herring) | ✅ Not a bug |
+| Wave instability | Suspected bidirectional CSE | N/A (CSE is causal) | ✅ Passed |
+
+---
+
+### Files Changed
+1. **flux_lm_universal.py**
+   - Added `special_token_embed` layer
+   - Fixed `encode_bytes()` to use learned embeddings for special tokens
+   - Made `load()` backwards compatible
+
+2. **flux_lm_universal_diagnostic.ipynb**
+   - Added CWC investigation cells (17-22)
+   - Added warnings about misleading OrderClassifier metric
+   - Updated summary with baseline values
+
+---
+
+### Next Steps
+1. **Retrain model** from scratch to use new special token embeddings
+2. Training to 50K+ steps for better quality
+3. *(Optional)* Add order training loss or remove unused OrderClassifier
