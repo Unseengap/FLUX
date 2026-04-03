@@ -628,11 +628,23 @@ class FluxLMUniversal(nn.Module):
     
     @classmethod
     def load(cls, path: str, device: str = 'cpu') -> 'FluxLMUniversal':
-        """Load model from checkpoint."""
+        """Load model from checkpoint (backwards compatible)."""
         checkpoint = torch.load(path, map_location=device)
         
         model = cls(checkpoint['config'])
-        model.load_state_dict(checkpoint['state_dict'])
+        
+        # Load state dict with backwards compatibility
+        # Use strict=False to allow missing keys (e.g., special_token_embed from older checkpoints)
+        missing_keys, unexpected_keys = model.load_state_dict(checkpoint['state_dict'], strict=False)
+        
+        if missing_keys:
+            print(f"  ⚠ Missing keys (will use random init): {missing_keys}")
+            # special_token_embed is expected to be missing from old checkpoints
+            # It's already randomly initialized in __init__, so this is fine
+        
+        if unexpected_keys:
+            print(f"  ⚠ Unexpected keys (ignored): {unexpected_keys}")
+        
         model.to(device)
         
         print(f"✓ FluxLM-Universal loaded from {path} (scale: {checkpoint.get('scale', 'unknown')})")
