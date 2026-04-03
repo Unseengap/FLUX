@@ -469,6 +469,7 @@ class FieldBLM(nn.Module):
         max_bytes: int = 100,
         temperature: float = 1.0,
         stop_on_newline: bool = False,
+        use_sampling: bool = True,
     ) -> str:
         """
         Generate text given prompt.
@@ -476,8 +477,14 @@ class FieldBLM(nn.Module):
         Args:
             prompt: Starting text/bytes
             max_bytes: Maximum bytes to generate
-            temperature: Generation temperature (1.0 = field temp)
+            temperature: Generation temperature
+                - 0.0 = deterministic (always pick highest vote)
+                - 1.0 = sample proportional to vote counts
+                - >1.0 = more random/creative
+                - <1.0 = more focused/conservative
             stop_on_newline: Stop on newline character
+            use_sampling: If True, sample from distribution (generative)
+                          If False, always pick highest vote (deterministic)
             
         Returns:
             Generated text (UTF-8 decoded)
@@ -491,18 +498,22 @@ class FieldBLM(nn.Module):
         # Generate
         generated = []
         
-        # Set temperature
-        orig_temp = self.settler.config.initial_temperature
-        self.settler.config.initial_temperature = temperature
-        
         for _ in range(max_bytes):
             # Encode context
             ctx_tensor = torch.tensor(context, dtype=torch.long, device=self.device)
             context_wave = self.encode_context(ctx_tensor)
             
-            # Predict
-            self.settler.reset_temperature()
-            byte_val, conf = self.settler.settle(context_wave)
+            # Predict - either sample or argmax
+            if use_sampling:
+                # GENERATIVE: sample from vote distribution
+                byte_val, conf, _ = self.field.query_sample(context_wave, temperature=temperature)
+            else:
+                # DETERMINISTIC: always pick highest vote
+                byte_val, conf, _ = self.field.query(context_wave)
+            
+            if byte_val is None:
+                # No knowledge - fall back to space
+                byte_val = ord(' ')
             
             # Check stop conditions
             if stop_on_newline and byte_val == ord('\n'):
@@ -515,9 +526,6 @@ class FieldBLM(nn.Module):
             # Trim context if too long
             if len(context) > self.config.context_window * 2:
                 context = context[-self.config.context_window:]
-        
-        # Restore temperature
-        self.settler.config.initial_temperature = orig_temp
         
         # Decode
         try:

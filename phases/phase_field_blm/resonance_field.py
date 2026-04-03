@@ -140,8 +140,8 @@ class ResonanceField:
         """
         Map wave vector to field position.
         
-        Uses first 192 dimensions, split into 3 groups,
-        each hashed to a coordinate.
+        Uses a combination of wave statistics to compute stable
+        position coordinates that spread well across the grid.
         
         Args:
             wave: [wave_dim] or [batch, wave_dim]
@@ -153,16 +153,33 @@ class ResonanceField:
         
         wave = wave.detach().cpu()
         
-        # Split wave into 3 parts
-        w1 = wave[:64]
-        w2 = wave[64:128]
-        w3 = wave[128:192]
+        # Normalize wave to zero mean to handle encoder bias
+        wave_norm = wave - wave.mean()
         
-        # Hash each part to coordinate
-        # Use sum of components, normalized to grid size
-        x = int((torch.tanh(w1.sum() / 8).item() + 1) / 2 * (self.dims[0] - 1))
-        y = int((torch.tanh(w2.sum() / 8).item() + 1) / 2 * (self.dims[1] - 1))
-        z = int((torch.tanh(w3.sum() / 8).item() + 1) / 2 * (self.dims[2] - 1))
+        # Use different strategies for each coordinate:
+        # x: use first 64 elements variance + specific indices
+        # y: use middle 64 elements + different indices  
+        # z: use last 64 elements + remaining indices
+        
+        # Get specific indices for additional entropy
+        idx1 = int(abs(wave_norm[0].item() * 1000)) % 64
+        idx2 = int(abs(wave_norm[100].item() * 1000)) % 64
+        idx3 = int(abs(wave_norm[200].item() * 1000)) % 64
+        
+        # Compute coordinates using normalized wave sections + indexed elements
+        w1 = wave_norm[:144]  # First third
+        w2 = wave_norm[144:288]  # Middle third
+        w3 = wave_norm[288:]  # Last third
+        
+        # Use combination of mean, std, and specific element
+        x_raw = (w1.mean() + w1[idx1] * 0.5).item()
+        y_raw = (w2.mean() + w2[idx2] * 0.5).item() 
+        z_raw = (w3.mean() + w3[idx3] * 0.5).item()
+        
+        # Map to grid using sigmoid for better spread
+        x = int(torch.sigmoid(torch.tensor(x_raw * 3)).item() * (self.dims[0] - 1))
+        y = int(torch.sigmoid(torch.tensor(y_raw * 3)).item() * (self.dims[1] - 1))
+        z = int(torch.sigmoid(torch.tensor(z_raw * 3)).item() * (self.dims[2] - 1))
         
         # Clamp to valid range
         x = max(0, min(self.dims[0] - 1, x))
@@ -183,15 +200,34 @@ class ResonanceField:
         waves = waves.detach()
         batch_size = waves.size(0)
         
-        # Split waves into 3 parts: [batch, 64] each
-        w1 = waves[:, :64]
-        w2 = waves[:, 64:128]
-        w3 = waves[:, 128:192]
+        # Normalize waves to zero mean (per wave)
+        wave_means = waves.mean(dim=1, keepdim=True)
+        waves_norm = waves - wave_means
         
-        # Hash each part: sum then tanh then scale
-        x = ((torch.tanh(w1.sum(dim=1) / 8) + 1) / 2 * (self.dims[0] - 1)).long()
-        y = ((torch.tanh(w2.sum(dim=1) / 8) + 1) / 2 * (self.dims[1] - 1)).long()
-        z = ((torch.tanh(w3.sum(dim=1) / 8) + 1) / 2 * (self.dims[2] - 1)).long()
+        # Split into thirds
+        w1 = waves_norm[:, :144]  # First third
+        w2 = waves_norm[:, 144:288]  # Middle third
+        w3 = waves_norm[:, 288:]  # Last third
+        
+        # Get specific indices for additional entropy
+        idx1 = (waves_norm[:, 0].abs() * 1000).long() % 64
+        idx2 = (waves_norm[:, 100].abs() * 1000).long() % 64
+        idx3 = (waves_norm[:, 200].abs() * 1000).long() % 64
+        
+        # Gather indexed elements
+        elem1 = torch.gather(w1, 1, idx1.unsqueeze(1).clamp(0, w1.size(1)-1)).squeeze(1)
+        elem2 = torch.gather(w2, 1, idx2.unsqueeze(1).clamp(0, w2.size(1)-1)).squeeze(1)
+        elem3 = torch.gather(w3, 1, idx3.unsqueeze(1).clamp(0, w3.size(1)-1)).squeeze(1)
+        
+        # Combine mean and indexed element
+        x_raw = w1.mean(dim=1) + elem1 * 0.5
+        y_raw = w2.mean(dim=1) + elem2 * 0.5
+        z_raw = w3.mean(dim=1) + elem3 * 0.5
+        
+        # Map to grid using sigmoid
+        x = (torch.sigmoid(x_raw * 3) * (self.dims[0] - 1)).long()
+        y = (torch.sigmoid(y_raw * 3) * (self.dims[1] - 1)).long()
+        z = (torch.sigmoid(z_raw * 3) * (self.dims[2] - 1)).long()
         
         # Clamp to valid range
         x = x.clamp(0, self.dims[0] - 1)
@@ -383,6 +419,66 @@ class ResonanceField:
             return byte_val, adjusted_conf, nearest
         
         return None, 0.0, pos
+    
+    def query_sample(
+        self, 
+        context_wave: torch.Tensor,
+        temperature: float = 1.0
+    ) -> Tuple[Optional[int], float, Tuple[int, int, int]]:
+        """
+        Query field and SAMPLE from distribution (generative).
+        
+        Unlike query() which returns argmax, this samples proportionally
+        to the vote counts, allowing diverse outputs.
+        
+        Args:
+            context_wave: [wave_dim] wave representing context
+            temperature: Sampling temperature
+                - 0.0 = argmax (deterministic)
+                - 1.0 = sample proportional to counts
+                - >1.0 = more random/creative
+                - <1.0 = more focused/conservative
+            
+        Returns:
+            (sampled_byte, confidence, position)
+            sampled_byte is None if no attractor found
+        """
+        pos = self.wave_to_position(context_wave)
+        
+        # Get votes from this position or nearest
+        votes = None
+        actual_pos = pos
+        
+        if pos in self.byte_votes:
+            votes = self.byte_votes[pos]
+        else:
+            # Find nearest attractor
+            nearest_positions = self.spatial_index.find_nearest(pos, k=1)
+            if nearest_positions and nearest_positions[0] in self.byte_votes:
+                actual_pos = nearest_positions[0]
+                votes = self.byte_votes[actual_pos]
+        
+        if not votes:
+            return None, 0.0, pos
+        
+        # Convert to tensors for sampling
+        bytes_list = list(votes.keys())
+        counts = torch.tensor([votes[b] for b in bytes_list], dtype=torch.float)
+        
+        if temperature == 0.0:
+            # Argmax (deterministic)
+            idx = counts.argmax().item()
+        else:
+            # Convert counts to log-space (like logits), then temperature-scale
+            # This gives proper sampling: temp=1 ~ proportional to counts
+            log_counts = torch.log(counts + 1e-10)
+            probs = F.softmax(log_counts / temperature, dim=0)
+            idx = torch.multinomial(probs, 1).item()
+        
+        sampled_byte = bytes_list[idx]
+        confidence = counts[idx].item() / counts.sum().item()
+        
+        return sampled_byte, confidence, actual_pos
     
     def query_top_k(
         self, 
