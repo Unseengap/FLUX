@@ -236,6 +236,10 @@ class FluxLM(nn.Module):
         Returns:
             Generated text (including prompt)
         """
+        # CRITICAL: Set eval mode for deterministic causal encoding
+        was_training = self.training
+        self.eval()
+        
         config = config or GenerationConfig()
         
         # Convert prompt to bytes
@@ -286,6 +290,10 @@ class FluxLM(nn.Module):
                 bytes_tensor,
                 torch.tensor([next_byte], dtype=torch.long, device=self.device)
             ])
+        
+        # Restore training mode if it was active
+        if was_training:
+            self.train()
         
         # Decode bytes to string
         return bytes(output_bytes).decode('utf-8', errors='replace')

@@ -76,13 +76,45 @@ class SemanticWave:
 
 
 # ─────────────────────────────────────────────
-# Multi-Scale Conv Bank (Larger)
+# Causal Conv1d (Left-padded only)
+# ─────────────────────────────────────────────
+
+class CausalConv1d(nn.Module):
+    """
+    Causal convolution that only sees past context.
+    Critical for autoregressive generation - ensures waves don't change
+    when new bytes are appended.
+    """
+    
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.padding = kernel_size - 1  # Left padding only
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, padding=0)
+    
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Args:
+            x: [batch, in_channels, seq_len]
+        Returns:
+            [batch, out_channels, seq_len]
+        """
+        # Pad only on the left (past)
+        x = F.pad(x, (self.padding, 0))
+        return self.conv(x)
+
+
+# ─────────────────────────────────────────────
+# Causal Multi-Scale Conv Bank
 # ─────────────────────────────────────────────
 
 class CSEConvBankLarge(nn.Module):
     """
-    Larger multi-scale convolutional bank.
-    Extracts byte patterns at multiple n-gram scales.
+    Causal multi-scale convolutional bank.
+    Uses left-only padding so waves remain stable during generation.
+    
+    Key difference from bidirectional: adding a new byte only affects
+    the NEW position's wave, not previous positions.
     """
 
     def __init__(
@@ -94,20 +126,19 @@ class CSEConvBankLarge(nn.Module):
     ):
         super().__init__()
         
-        # Multi-kernel convolutions: 1, 3, 5, 7, 9
+        # Multi-kernel CAUSAL convolutions: 1, 3, 5, 7, 9
         kernels = [1, 3, 5, 7, 9]
         self.convs = nn.ModuleList()
+        self.norms = nn.ModuleList()
         
         for i, k in enumerate(kernels):
             ch = hidden_channels[min(i, len(hidden_channels)-1)]
-            self.convs.append(
-                nn.Sequential(
-                    nn.Conv1d(in_channels, ch, kernel_size=k, padding=k // 2),
-                    nn.LayerNorm([ch]),
-                    nn.GELU(),
-                    nn.Dropout(dropout),
-                )
-            )
+            # Use CausalConv1d instead of regular Conv1d
+            self.convs.append(CausalConv1d(in_channels, ch, kernel_size=k))
+            self.norms.append(nn.LayerNorm(ch))
+        
+        self.act = nn.GELU()
+        self.dropout = nn.Dropout(dropout)
         
         total_channels = sum([
             hidden_channels[min(i, len(hidden_channels)-1)] 
@@ -129,18 +160,15 @@ class CSEConvBankLarge(nn.Module):
         Returns:
             [batch, seq_len, out_dim]
         """
-        seq_len = x.shape[1]
         x_t = x.transpose(1, 2)  # [batch, in_channels, seq_len]
 
         conv_outs = []
-        for conv in self.convs:
-            # Apply conv
-            c = conv[0](x_t)  # Conv
-            c = c.transpose(1, 2)  # [batch, seq_len', channels]
-            c = conv[1](c)  # LayerNorm
-            c = conv[2](c)  # GELU
-            c = conv[3](c)  # Dropout
-            c = c[:, :seq_len]  # Trim to original length
+        for conv, norm in zip(self.convs, self.norms):
+            c = conv(x_t)  # Causal conv: [batch, channels, seq_len]
+            c = c.transpose(1, 2)  # [batch, seq_len, channels]
+            c = norm(c)
+            c = self.act(c)
+            c = self.dropout(c)
             conv_outs.append(c)
 
         # Concatenate all scales
@@ -182,12 +210,14 @@ class RotaryPositionEncoding(nn.Module):
 
 
 # ─────────────────────────────────────────────
-# Interference Layer
+# Causal Interference Layer
 # ─────────────────────────────────────────────
 
 class InterferenceLayer(nn.Module):
     """
-    Wave interference: neighboring waves affect each other.
+    Causal wave interference: only PAST waves affect current position.
+    This ensures waves remain stable when new bytes are appended.
+    
     Constructive (similar) → amplify
     Destructive (opposite) → cancel
     """
@@ -205,7 +235,7 @@ class InterferenceLayer(nn.Module):
         Args:
             waves: [batch, seq_len, dim]
         Returns:
-            [batch, seq_len, dim] with interference applied
+            [batch, seq_len, dim] with causal interference applied
         """
         batch, seq_len, dim = waves.shape
         interference = torch.zeros_like(waves)
@@ -213,15 +243,19 @@ class InterferenceLayer(nn.Module):
         for offset in range(1, min(self.radius + 1, seq_len)):
             decay = torch.sigmoid(self.decay[offset - 1])
             
-            # Forward interference
-            w1 = waves[:, :-offset]
-            w2 = waves[:, offset:]
-            cos_sim = F.cosine_similarity(w1, w2, dim=-1).unsqueeze(-1)
-            interference[:, :-offset] += cos_sim * decay * w2
+            # CAUSAL ONLY: past positions (w1) affect current positions (w2)
+            # Position i is affected by position i-offset (past)
+            w1 = waves[:, :-offset]  # Past waves
+            w2 = waves[:, offset:]   # Current waves
             
-            # Backward interference
+            # How similar is current wave to past wave?
             cos_sim = F.cosine_similarity(w2, w1, dim=-1).unsqueeze(-1)
+            
+            # Add interference from past to current (causal direction only)
             interference[:, offset:] += cos_sim * decay * w1
+            
+            # REMOVED: Non-causal interference that would affect past positions
+            # interference[:, :-offset] += ... (this was the bug!)
         
         return waves + self.scale * interference
 
@@ -319,10 +353,16 @@ class CSELarge(nn.Module):
         return torch.tensor(byte_vals, dtype=torch.long, device=self.device)
     
     def bytes_to_windows(self, bytes_tensor: Tensor) -> Tensor:
-        """Sliding window over bytes."""
+        """
+        Causal sliding window over bytes.
+        Each position i only sees bytes [i-window+1, ..., i] (past and current).
+        This ensures adding new bytes doesn't change existing position waves.
+        """
         seq_len = bytes_tensor.shape[-1]
-        pad_left = self.byte_window // 2
-        pad_right = self.byte_window - 1 - pad_left
+        
+        # CAUSAL: All padding on left (past context), none on right (no future)
+        pad_left = self.byte_window - 1
+        pad_right = 0
         
         # Handle batched or unbatched input
         if bytes_tensor.dim() == 1:
