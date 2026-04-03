@@ -345,14 +345,22 @@ FLUX-LM-7B (production)
 FLUX-LBM-70B (frontier)
 ```
 
-**Why Bytes Can Win at Scale:**
+### Why Bytes Can Win at Scale:
 
-1. **Compute Efficiency:** No tokenizer overhead, no vocabulary embedding matrix
-2. **Context Efficiency:** Can use bytes for dense content, infer tokens for common patterns
-3. **Universality:** One model for all text, all languages, all formats
-4. **Precision:** Byte-level control for code, formatting, special characters
+1. **Training Speed:** 141M BLM trains in **1.44 hours on T4** vs 50+ hours for equivalent token LLM
+2. **Compute Efficiency:** No tokenizer overhead, no vocabulary embedding matrix
+3. **Context Efficiency:** Can use bytes for dense content, infer tokens for common patterns
+4. **Universality:** One model for all text, all languages, all formats
+5. **Precision:** Byte-level control for code, formatting, special characters
 
 **Comparison to Token LLMs:**
+
+| Factor | GPT-2 124M (Token) | FLUX-LM 141M (Byte) |
+|--------|-------------------|---------------------|
+| **Training Time** | ~50+ hours (8× V100) | **1.44 hours (1× T4)** |
+| **Embedding Params** | 38.6M (50K × 768) | **16K (256 × 64)** |
+| **Output Classes** | 50,257 | **256** |
+| **Hardware** | Multi-GPU required | Single consumer GPU |
 
 | Factor | 70B Token LLM | 70B Byte LM (theoretical) |
 |--------|---------------|---------------------------|
@@ -361,6 +369,7 @@ FLUX-LBM-70B (frontier)
 | Languages | Vocabulary-dependent | Universal |
 | OOV rate | ~1-5% | 0% (impossible) |
 | Code output | Token boundary artifacts | Byte-perfect |
+| Training efficiency | Baseline | **~35x faster** (projected) |
 
 ---
 
