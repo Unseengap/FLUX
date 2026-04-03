@@ -147,30 +147,15 @@ class SemanticWaveAnchors(nn.Module):
             return torch.tensor(0.0, device=input_ids.device)
         
         # Get current wave encoding for batch
-        # We need to access the internal encoding
-        batch_size, seq_len = input_ids.shape
-        
+        # IMPORTANT: Use model.encode_bytes() to get full causal waves (608-dim)
+        # This matches what was stored during anchor initialization via encode_text()
         with torch.amp.autocast('cuda'):
-            # Encode through CSE
-            is_special = input_ids >= 256
-            cse_input = input_ids.clone()
-            cse_input[is_special] = 0
-            
-            semantic_wave = model.cse.encode_bytes(cse_input)
-            wave = semantic_wave.full  # [batch, seq, 432]
-            
-            # Handle special tokens if model has them
-            if hasattr(model, 'special_token_embed') and is_special.any():
-                special_indices = (input_ids - 256).clamp(0, model.num_special_tokens - 1)
-                special_embeds = model.special_token_embed(special_indices)
-                wave = torch.where(
-                    is_special.unsqueeze(-1).expand_as(wave),
-                    special_embeds,
-                    wave
-                )
+            # Use the model's full encoding pipeline (CSE + special tokens + domain + CWC)
+            # Returns [batch, seq, 608] causal waves
+            causal_wave = model.encode_bytes(input_ids, domain)
             
             # Pool to get batch representation
-            wave_pooled = wave.mean(dim=(0, 1))  # [432]
+            wave_pooled = causal_wave.mean(dim=(0, 1))  # [608]
         
         # Compute distance to nearest domain centroid
         min_distance = float('inf')
