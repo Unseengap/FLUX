@@ -57,7 +57,7 @@ class FieldBLMConfig:
         # Create sub-configs
         self.encoder_config = ByteWaveConfig(
             wave_dim=wave_dim,
-            max_seq_len=context_window * 4,  # Allow longer sequences
+            max_seq_len=5000,  # Support diverse long texts
         )
         
         self.field_config = FieldConfig(
