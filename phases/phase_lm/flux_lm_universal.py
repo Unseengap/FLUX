@@ -355,6 +355,12 @@ class FluxLMUniversal(nn.Module):
         # Domain embeddings
         self.domain_embed = DomainEmbedding(wave_dim=432, num_domains=16)
         
+        # ==== SPECIAL TOKEN EMBEDDINGS (FIX for tokens 256-319) ====
+        # CSE only knows bytes 0-255, so we need separate embeddings for special tokens
+        self.num_special_tokens = self.vocab_size - 256  # 64 special tokens
+        self.special_token_embed = nn.Embedding(self.num_special_tokens, 432)
+        nn.init.normal_(self.special_token_embed.weight, std=0.02)
+        
         # Dimensions
         self.wave_dim = 432
         self.causal_dim = 608
@@ -376,6 +382,7 @@ class FluxLMUniversal(nn.Module):
             'predictor': count(self.predictor),
             'decoder': count(self.decoder),
             'domain_embed': count(self.domain_embed),
+            'special_token_embed': count(self.special_token_embed),
             'total': count(self),
         }
     
@@ -411,13 +418,33 @@ class FluxLMUniversal(nn.Module):
         Returns:
             [batch, seq_len, 608] causal waves
         """
-        # Clamp special tokens to byte range for CSE (CSE only knows 256 bytes)
-        # Special token info is preserved in the output logits
-        cse_input = bytes_tensor.clamp(0, 255)
+        batch_size, seq_len = bytes_tensor.shape
         
-        # Bytes → semantic waves
+        # ==== SEPARATE BYTES (0-255) AND SPECIAL TOKENS (256+) ====
+        is_special = bytes_tensor >= 256
+        is_byte = ~is_special
+        
+        # Create CSE input: bytes stay as-is, special tokens become 0 (placeholder)
+        cse_input = bytes_tensor.clone()
+        cse_input[is_special] = 0  # Placeholder byte for special token positions
+        
+        # Bytes → semantic waves via CSE
         semantic_wave = self.cse.encode_bytes(cse_input)
         wave = semantic_wave.full  # [batch, seq_len, 432]
+        
+        # ==== INJECT SPECIAL TOKEN EMBEDDINGS ====
+        # For positions with special tokens, replace CSE output with learned embeddings
+        if is_special.any():
+            # Get special token indices (0-63 for tokens 256-319)
+            special_indices = (bytes_tensor - 256).clamp(0, self.num_special_tokens - 1)
+            special_embeds = self.special_token_embed(special_indices)  # [batch, seq_len, 432]
+            
+            # Replace CSE output with special embeddings at special positions
+            wave = torch.where(
+                is_special.unsqueeze(-1).expand_as(wave),
+                special_embeds,
+                wave
+            )
         
         # Add domain embedding
         if domain:
