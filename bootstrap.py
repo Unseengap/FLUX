@@ -33,20 +33,36 @@ class EmbeddedModuleFinder(importlib.abc.MetaPathFinder):
     def __init__(self, code_bundle: Dict[str, str]):
         # Map module names to compressed source
         self.modules = {}
+        self.packages = set()
+        
         for path, compressed in code_bundle.items():
+            # Convert path to module name
             module_name = path.replace('/', '.').replace('.py', '')
-            self.modules[module_name] = compressed
+            
+            # Handle __init__.py specially - it defines the package
+            if module_name.endswith('.__init__'):
+                pkg_name = module_name[:-9]  # Remove '.__init__'
+                self.modules[pkg_name] = compressed
+                self.packages.add(pkg_name)
+            else:
+                self.modules[module_name] = compressed
+            
+            # Also register parent packages
+            parts = module_name.split('.')
+            for i in range(1, len(parts)):
+                pkg = '.'.join(parts[:i])
+                self.packages.add(pkg)
     
     def find_spec(self, fullname, path, target=None):
         if fullname in self.modules:
+            is_package = fullname in self.packages
             return importlib.machinery.ModuleSpec(
                 fullname,
-                EmbeddedModuleLoader(self.modules[fullname]),
-                is_package=False,
+                EmbeddedModuleLoader(self.modules[fullname], is_package),
+                is_package=is_package,
             )
-        # Check if it's a package (has submodules)
-        pkg_prefix = fullname + '.'
-        if any(m.startswith(pkg_prefix) for m in self.modules):
+        # Check if it's a package without __init__.py (namespace package)
+        if fullname in self.packages:
             return importlib.machinery.ModuleSpec(
                 fullname,
                 EmbeddedPackageLoader(),
@@ -58,15 +74,20 @@ class EmbeddedModuleFinder(importlib.abc.MetaPathFinder):
 class EmbeddedModuleLoader(importlib.abc.Loader):
     """Custom loader for embedded modules."""
     
-    def __init__(self, compressed_source: str):
+    def __init__(self, compressed_source: str, is_package: bool = False):
         self.compressed_source = compressed_source
+        self.is_package = is_package
     
     def create_module(self, spec):
         # Create module with proper attributes pre-set
         module = types.ModuleType(spec.name)
-        module.__file__ = f"<embedded:{spec.name}>"
+        if self.is_package:
+            module.__file__ = f"<embedded:{spec.name}/__init__.py>"
+            module.__path__ = [f"<embedded:{spec.name}>"]
+        else:
+            module.__file__ = f"<embedded:{spec.name.replace('.', '/')}.py>"
         module.__loader__ = self
-        module.__package__ = spec.name.rsplit('.', 1)[0] if '.' in spec.name else ''
+        module.__package__ = spec.name if self.is_package else spec.name.rsplit('.', 1)[0] if '.' in spec.name else ''
         module.__spec__ = spec
         return module
     
