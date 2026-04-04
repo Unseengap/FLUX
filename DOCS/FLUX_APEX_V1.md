@@ -2,11 +2,9 @@
 
 **FLUX Architecture — Flagship Model Documentation**  
 *For AI Agents, Developers, and Integration Systems*  
-*Version: 8.2-fixed-imports | Phase: complete | Updated: April 2, 2026*
+*Version: 8.3-autonomous | Phase: complete | Updated: April 3, 2026*
 
-> **✅ Bootstrap Complete:** All 91/91 embedded modules now load successfully from .flx with zero import errors. The model was upgraded from v8.1-complete to v8.2-fixed-imports on April 2, 2026 via `notebooks/flux_runtime_reembed.ipynb`.
-
-> **🔜 v8.3-autonomous:** New autonomous agent system being embedded via `notebooks/flux_autonomous_embed.ipynb`. Adds CoderPool (parallel sandboxes), GoalPlanner, DocumentIngester, and native JSON function calling.
+> **✅ v8.3-autonomous COMPLETE:** All 99 embedded modules load successfully from .flx with zero import errors. Autonomous agent system fully embedded with CoderPool, GoalPlanner, DocumentIngester, and native JSON function calling.
 
 ---
 
@@ -15,19 +13,19 @@
 | Property | Value |
 |----------|-------|
 | **Filename** | `Flux-Apex-V1.flx` |
-| **Location** | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` | not saved locally only on hugging face 
+| **Location** | HuggingFace: `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
 | **Format** | FLUX (self-describing cognitive architecture) |
-| **Version** | 8.2-fixed-imports (8.3-autonomous pending) |
+| **Version** | 8.3-autonomous |
 | **Phase** | complete |
-| **File Size** | ~16.20 GB |
+| **File Size** | ~17.24 GB |
 | **Total Parameters** | ~8,340,879,675 (~8.34B) |
 | **Total Tensors** | 6,283 |
 | **Top-Level Keys** | 27 |
 | **Max Nesting Depth** | 10 |
 | **Can Continue Learning** | `True` |
 | **Embedded Models** | 12 (7 language/vision/audio, 5 detection) |
-| **Embedded Runtime** | 91 files → ~100 files (v8.3), 27,710+ lines |
-| **Bootstrap Status** | ✅ 91/91 modules load successfully |
+| **Embedded Runtime** | 99 files, 31,605 lines (371 KB compressed) |
+| **Bootstrap Status** | ✅ 99/99 modules load successfully |
 
 ---
 
@@ -46,22 +44,23 @@ Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not j
 
 ---
 
-## What This Model IS (v8.1-complete State)
+## What This Model IS (v8.3-autonomous State)
 
 - **12 embedded models** — Language (instruct, coder), Vision (VLM, CLIP), Audio (Whisper, TTS), Detection (face, depth, pose, object)
 - **Complete native FLUX** — All components have trained weights (CGN, Memory, GR, TL, CWC injected)
 - **Compressed field** — Field at 48³×256 (~28.4M params), expandable to 96³×512
 - **Lazy loading support** — Models loaded on-demand to manage VRAM
 - **ONNX detection** — InsightFace face recognition via 5 ONNX models
-- **Full runtime embed** — 91 Python files (27,710 lines) embedded for autonomous bootstrap
-- **Bootstrap verified** — 91/91 modules load from .flx with zero import errors
+- **Full runtime embed** — 99 Python files (31,605 lines) embedded for autonomous bootstrap
+- **Bootstrap verified** — 99/99 modules load from .flx with zero import errors
 - **CLAW harness** — 922 tools from Claude Code port integrated
 - **Native JSON tools** — Orchestration uses Qwen2.5-compatible JSON function calling
 - **Weight injection** — Phase 1.5, 3, 4, 5, 6 weights injected April 1, 2026
+- **Autonomous agent** — CoderPool, GoalPlanner, DocumentIngester, AutonomousAgent embedded April 3, 2026
 
-## What's New in v8.3-autonomous (April 3, 2026)
+## v8.3-autonomous Components (April 3, 2026)
 
-> **Status:** Embedding pending — run `notebooks/flux_autonomous_embed.ipynb` in Colab
+> **Status:** ✅ COMPLETE — Verified via `notebooks/inspect_apex_dynamic.ipynb`
 
 - **CoderPool** — Instruct model delegates coding to Coder model with parallel sandboxes (Jules-style architecture)
 - **FluxToolExecutor** — 28 built-in tools for perception, knowledge, reasoning, exploration, generation
@@ -69,7 +68,7 @@ Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not j
 - **DocumentIngester** — Process and store PDF, DOCX, Markdown, JSON, CSV, HTML, code files
 - **GoalPlanner** — Proactive multi-step goal planning with triggers and pattern detection
 - **AutonomousAgent** — Main coordinator tying all components together
-- **Native JSON Function Calling** — Qwen2.5 native format replacing custom XML tags
+- **NativeJSONOrchestrator** — Qwen2.5 native JSON function calling format
 
 ```
 Architecture (v8.3):
