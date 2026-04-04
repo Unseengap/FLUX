@@ -170,6 +170,10 @@ def extract_runtime(flx: Dict[str, Any], verbose: bool = False) -> Dict[str, typ
     for path in sorted_paths:
         module_name = path.replace('/', '.').replace('.py', '')
         
+        # Strip .__init__ suffix - packages are registered without it
+        if module_name.endswith('.__init__'):
+            module_name = module_name[:-9]
+        
         try:
             # Use the standard import machinery (now with our hook)
             module = importlib.import_module(module_name)
