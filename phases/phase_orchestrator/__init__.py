@@ -59,6 +59,14 @@ from .embed_orchestration import (
     show_embedded_tools,
 )
 
+from .native_json_orchestrator import (
+    NativeJSONOrchestrator,
+    FunctionCall,
+    FunctionResult,
+    run_native_orchestration,
+    load_native_tools,
+)
+
 
 __all__ = [
     # Core classes
@@ -67,7 +75,14 @@ __all__ = [
     'ToolCall',
     'ToolResult',
     
-    # Main function
+    # Native JSON orchestration (recommended)
+    'NativeJSONOrchestrator',
+    'FunctionCall',
+    'FunctionResult',
+    'run_native_orchestration',
+    'load_native_tools',
+    
+    # Main function (legacy XML format)
     'orchestrated_inference',
     
     # Embedding

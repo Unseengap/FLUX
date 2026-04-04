@@ -6,6 +6,8 @@
 
 > **✅ Bootstrap Complete:** All 91/91 embedded modules now load successfully from .flx with zero import errors. The model was upgraded from v8.1-complete to v8.2-fixed-imports on April 2, 2026 via `notebooks/flux_runtime_reembed.ipynb`.
 
+> **🔜 v8.3-autonomous:** New autonomous agent system being embedded via `notebooks/flux_autonomous_embed.ipynb`. Adds CoderPool (parallel sandboxes), GoalPlanner, DocumentIngester, and native JSON function calling.
+
 ---
 
 ## Quick Reference
@@ -13,10 +15,9 @@
 | Property | Value |
 |----------|-------|
 | **Filename** | `Flux-Apex-V1.flx` |
-| **Location** | `checkpoints/Flux-Apex-V1.flx` |
-| **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` |
+| **Location** | **HuggingFace** | `UnseenGAP/FLUX` → `checkpoints/Flux-Apex-V1.flx` | not saved locally only on hugging face 
 | **Format** | FLUX (self-describing cognitive architecture) |
-| **Version** | 8.2-fixed-imports |
+| **Version** | 8.2-fixed-imports (8.3-autonomous pending) |
 | **Phase** | complete |
 | **File Size** | ~16.20 GB |
 | **Total Parameters** | ~8,340,879,675 (~8.34B) |
@@ -25,7 +26,7 @@
 | **Max Nesting Depth** | 10 |
 | **Can Continue Learning** | `True` |
 | **Embedded Models** | 12 (7 language/vision/audio, 5 detection) |
-| **Embedded Runtime** | 91 files, 27,710 lines (327 KB compressed) |
+| **Embedded Runtime** | 91 files → ~100 files (v8.3), 27,710+ lines |
 | **Bootstrap Status** | ✅ 91/91 modules load successfully |
 
 ---
@@ -57,6 +58,36 @@ Flux-Apex-V1 is a **complete, self-describing cognitive architecture** — not j
 - **CLAW harness** — 922 tools from Claude Code port integrated
 - **Native JSON tools** — Orchestration uses Qwen2.5-compatible JSON function calling
 - **Weight injection** — Phase 1.5, 3, 4, 5, 6 weights injected April 1, 2026
+
+## What's New in v8.3-autonomous (April 3, 2026)
+
+> **Status:** Embedding pending — run `notebooks/flux_autonomous_embed.ipynb` in Colab
+
+- **CoderPool** — Instruct model delegates coding to Coder model with parallel sandboxes (Jules-style architecture)
+- **FluxToolExecutor** — 28 built-in tools for perception, knowledge, reasoning, exploration, generation
+- **CodeSandbox** — Safe Python execution with 20 allowed modules (math, json, datetime, collections, etc.)
+- **DocumentIngester** — Process and store PDF, DOCX, Markdown, JSON, CSV, HTML, code files
+- **GoalPlanner** — Proactive multi-step goal planning with triggers and pattern detection
+- **AutonomousAgent** — Main coordinator tying all components together
+- **Native JSON Function Calling** — Qwen2.5 native format replacing custom XML tags
+
+```
+Architecture (v8.3):
+┌───────────────────────────────────────────────────────────────────┐
+│                    INSTRUCT MODEL (Brain)                         │
+│              Qwen2.5-1.5B-Instruct                                │
+│                         │                                         │
+│              delegate_to_coder()                                  │
+│                         ↓                                         │
+│  ┌──────────────────────────────────────────────────────────┐    │
+│  │                 CODER POOL                                │    │
+│  │           Qwen2.5-Coder-1.5B-Instruct                    │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐│    │
+│  │  │ Sandbox 1│  │ Sandbox 2│  │ Sandbox 3│  │ Sandbox 4││    │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘│    │
+│  └──────────────────────────────────────────────────────────┘    │
+└───────────────────────────────────────────────────────────────────┘
+```
 
 ## What This Model is NOT
 

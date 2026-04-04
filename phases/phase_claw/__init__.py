@@ -75,6 +75,8 @@ try:
         register_claw_tools_with_orchestrator,
         execute_claw_tool,
         search_claw_tools,
+        register_claw_with_autonomous,
+        get_claw_tool_names,
     )
 except ImportError:
     from .flux_bridge import (
@@ -86,6 +88,8 @@ except ImportError:
         register_claw_tools_with_orchestrator,
         execute_claw_tool,
         search_claw_tools,
+        register_claw_with_autonomous,
+        get_claw_tool_names,
     )
 
 __all__ = [
@@ -116,6 +120,8 @@ __all__ = [
     'register_claw_tools_with_orchestrator',
     'execute_claw_tool',
     'search_claw_tools',
+    'register_claw_with_autonomous',
+    'get_claw_tool_names',
 ]
 
 # Version info

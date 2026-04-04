@@ -164,6 +164,30 @@ This document specifies:
 
 ---
 
+### Tier 2.5: AUTONOMOUS (Self-contained agent system) — NEW in v8.3
+
+#### Phase Autonomous (~2,500 lines) — **ADDED April 3, 2026**
+
+| File | Lines | Purpose | Status |
+|------|-------|---------|--------|
+| `phases/phase_autonomous/__init__.py` | 100 | Module exports | ✅ Added |
+| `phases/phase_autonomous/tool_executor.py` | 700 | Central tool dispatcher (28 tools) | ✅ Added |
+| `phases/phase_autonomous/code_sandbox.py` | 350 | Safe Python execution (20 modules) | ✅ Added |
+| `phases/phase_autonomous/coder_pool.py` | 450 | Parallel sandbox execution (Jules-style) | ✅ Added |
+| `phases/phase_autonomous/document_ingester.py` | 400 | Multi-format ingestion (PDF, DOCX, etc.) | ✅ Added |
+| `phases/phase_autonomous/goal_planner.py` | 350 | Proactive goal and planning system | ✅ Added |
+| `phases/phase_autonomous/autonomous_agent.py` | 450 | Main agent coordinator | ✅ Added |
+
+#### Phase Orchestrator Updates (~400 lines) — **ADDED April 3, 2026**
+
+| File | Lines | Purpose | Status |
+|------|-------|---------|--------|
+| `phases/phase_orchestrator/native_json_orchestrator.py` | 400 | Qwen2.5 native JSON function calling | ✅ Added |
+
+**Tier 2.5 Subtotal: ~2,900 lines**
+
+---
+
 ### Tier 3: MULTI-MODAL (Required for full capabilities)
 
 #### Phase 8.9: Multi-Modal Adapters (~1,100 lines)
@@ -223,10 +247,11 @@ This document specifies:
 |------|-------|-----------|
 | **Tier 1: Core Components** | ~11,150 | ✅ YES |
 | **Tier 2: Orchestration + Agent** | ~6,820 | ✅ YES |
+| **Tier 2.5: Autonomous** | ~2,900 | ✅ YES (v8.3+) |
 | **Tier 3: Multi-Modal** | ~2,900 | ✅ YES |
 | **Tier 4: Optional** | ~4,700 | ❌ Optional |
-| **TOTAL REQUIRED** | **~20,870** | |
-| **TOTAL WITH OPTIONAL** | **~25,570** | |
+| **TOTAL REQUIRED** | **~23,770** | |
+| **TOTAL WITH OPTIONAL** | **~28,470** | |
 
 ---
 
@@ -313,6 +338,16 @@ flx['runtime'] = {
         'phases/phase_orchestrator/flux_orchestrator.py': '...',
         'phases/phase_orchestrator/tool_registry.py': '...',
         'phases/phase_orchestrator/system_prompt.py': '...',
+        'phases/phase_orchestrator/native_json_orchestrator.py': '...',  # v8.3+
+        
+        # Autonomous Agent (v8.3+)
+        'phases/phase_autonomous/__init__.py': '...',
+        'phases/phase_autonomous/tool_executor.py': '...',      # 28 built-in tools
+        'phases/phase_autonomous/code_sandbox.py': '...',       # Safe Python exec
+        'phases/phase_autonomous/coder_pool.py': '...',         # Parallel sandboxes
+        'phases/phase_autonomous/document_ingester.py': '...',  # Multi-format docs
+        'phases/phase_autonomous/goal_planner.py': '...',       # Proactive planning
+        'phases/phase_autonomous/autonomous_agent.py': '...',   # Main coordinator
         
         # Unified Agent
         'phases/phase_unified/__init__.py': '...',
@@ -329,8 +364,8 @@ flx['runtime'] = {
     },
     
     'metadata': {
-        'total_files': 60,
-        'total_lines': 20850,
+        'total_files': 100,  # Updated for v8.3
+        'total_lines': 28000,
         'compressed_size_bytes': 0,  # Filled after gzip
     }
 }

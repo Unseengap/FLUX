@@ -455,3 +455,36 @@ def search_claw_tools(query: str, limit: int = 20) -> List[FluxToolDefinition]:
     """Search Claw tools by name or description."""
     harness = get_claw_harness()
     return harness.search_tools(query, limit)
+
+
+def register_claw_with_autonomous(executor: 'FluxToolExecutor') -> int:
+    """
+    Register all Claw tools with an autonomous FluxToolExecutor.
+    
+    Args:
+        executor: FluxToolExecutor from phase_autonomous
+        
+    Returns:
+        Number of tools registered
+    """
+    harness = get_claw_harness()
+    count = 0
+    
+    for tool_name, tool_def in harness._flux_tools_cache.items():
+        # Create wrapper function
+        def make_handler(name):
+            def handler(args: Dict[str, Any]) -> Dict[str, Any]:
+                return harness.execute_tool(name, **args)
+            return handler
+        
+        executor.register_external_handler(tool_name, make_handler(tool_name))
+        count += 1
+    
+    return count
+
+
+def get_claw_tool_names() -> List[str]:
+    """Get list of all Claw tool names."""
+    harness = get_claw_harness()
+    return list(harness._flux_tools_cache.keys())
+
