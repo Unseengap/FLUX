@@ -76,7 +76,7 @@ def detect_model_type(name: str, config: Dict[str, Any]) -> str:
         return 'timm'
     
     # HuggingFace Transformers (default for most)
-    hf_indicators = ['qwen', 'llama', 'mistral', 'whisper', 'clip', 'owl', 'midas', 'dino']
+    hf_indicators = ['qwen', 'llama', 'mistral', 'whisper', 'clip', 'owl', 'midas', 'dino', 'suno', 'bark']
     if any(ind in base_model for ind in hf_indicators):
         return 'transformers'
     
@@ -123,6 +123,9 @@ def get_model_spec(name: str, config: Dict[str, Any]) -> ModelSpec:
         elif 'owl' in base_lower:
             model_class = 'Owlv2ForObjectDetection'
             processor_class = 'Owlv2Processor'
+        elif 'bark' in base_lower or 'suno' in base_lower:
+            model_class = 'BarkModel'
+            processor_class = 'AutoProcessor'
         elif 'midas' in base_lower:
             model_class = 'AutoModel'  # MiDaS uses custom architecture
             extra_kwargs['trust_remote_code'] = True
@@ -246,6 +249,9 @@ class LazyModel:
             elif self.spec.model_class == 'Owlv2ForObjectDetection':
                 from transformers import Owlv2ForObjectDetection
                 model_class = Owlv2ForObjectDetection
+            elif self.spec.model_class == 'BarkModel':
+                from transformers import BarkModel
+                model_class = BarkModel
             elif self.spec.model_class == 'AutoModel':
                 model_class = AutoModel
         
